@@ -1,0 +1,40 @@
+# Secrets & environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Candidate data (never commit personal data)
+data/
+uploads/
+recordings/
+transcripts/
+sample_cvs/
+*.dump
+*.sqlite
+*.sqlite3
+*.db
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+
+# Node / frontend
+node_modules/
+dist/
+build/
+
+# Logs
+*.log
+logs/
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
