@@ -1,0 +1,14 @@
+# Keep the image small and free of secrets.
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+tests/
+pytest.ini
+requirements-dev.txt
+.env
+.env.*
+Dockerfile
+.dockerignore
