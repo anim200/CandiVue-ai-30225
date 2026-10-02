@@ -15,7 +15,7 @@ Update this file at the end of each work session. Every Claude thread reads it.
 - LangGraph 4 – Final Assessment (workflow, HITL review in Reports screen)
 
 ## In progress
-- Platform foundation (Day 4): project configuration, Docker, API foundation and persistence, frontend foundation and role access, transport security
+- Platform foundation (WBS Day 4 work package): project configuration, Docker, API foundation and persistence, frontend foundation and role access, transport security
 
 ## Next
 - Set up Cowork project and Claude Code on the repository folder
