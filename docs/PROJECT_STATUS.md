@@ -15,7 +15,14 @@ Update this file at the end of each work session. Every Claude thread reads it.
 - LangGraph 4 – Final Assessment (workflow, HITL review in Reports screen)
 
 ## In progress
-- Platform foundation (WBS Day 4 work package): project configuration, Docker, API foundation and persistence, frontend foundation and role access, transport security
+- Platform foundation (WBS Day 4 work package), branch module/platform-foundation:
+  - Done 02-10-2026: .env.example, FastAPI skeleton with GET /api/health (DB check), JSON logging, generic error handler, backend Dockerfile, Docker Compose with PostgreSQL 17 + pgvector 0.8.7, health tests, README run/stop/reset commands. Verified: stack healthy, pgvector enabled.
+  - Remaining (each on its own module branch): database schema + Alembic, frontend foundation (React/Vite container) and role access, LangGraph setup
+
+## Git workflow
+- Branches: main (initial structure only), dev, module/<name> per feature
+- module/* branches start from dev and merge into dev by pull request; dev merges into main when the project is complete
+- Git Bash is used for git commands; check the branch name in the prompt before committing
 
 ## Next
 - Set up Cowork project and Claude Code on the repository folder
@@ -29,3 +36,4 @@ Update this file at the end of each work session. Every Claude thread reads it.
 
 ## Redmine task IDs
 - #646013 Initialize and share the BJIT GitHub repository, README and .gitignore
+- #646476 Platform foundation: backend skeleton, health endpoint, Docker Compose with PostgreSQL + pgvector (closed 02-10-2026)
