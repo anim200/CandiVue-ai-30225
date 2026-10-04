@@ -3,10 +3,12 @@
 from datetime import datetime, timezone
 
 import pytest
+from alembic.autogenerate import compare_metadata
+from alembic.migration import MigrationContext
 from sqlalchemy import func, inspect, select
 from sqlalchemy.orm import Session
 
-from app.db.base import Base
+from app.db.base import Base, include_name
 from app.db.database import engine
 from app.db.models import (
     AssessmentReport,
@@ -36,6 +38,15 @@ def session():
 def test_migrations_created_every_table():
     existing = set(inspect(engine).get_table_names())
     assert set(Base.metadata.tables) <= existing
+
+
+def test_migrations_match_models_and_keep_checkpoints():
+    """No forgotten migration, and Alembic leaves LangGraph's tables alone."""
+    with engine.connect() as connection:
+        context = MigrationContext.configure(
+            connection, opts={"include_name": include_name}
+        )
+        assert compare_metadata(context, Base.metadata) == []
 
 
 def test_deleting_a_candidate_deletes_all_their_data(session):

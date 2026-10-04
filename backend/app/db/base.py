@@ -19,6 +19,17 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
+def include_name(name, type_, parent_names) -> bool:
+    """Tell Alembic to ignore LangGraph's own checkpoint* tables.
+
+    They are not in our models, so without this, autogenerate would try to
+    drop them (and all saved workflow state with them).
+    """
+    if type_ == "table":
+        return not name.startswith("checkpoint")
+    return True
+
+
 class TimestampMixin:
     """Adds created_at and updated_at, filled in by the database."""
 
