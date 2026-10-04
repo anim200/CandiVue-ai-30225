@@ -33,6 +33,7 @@ services:
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-60}
       LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-2}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0}
     ports:
       # Bound to localhost only (documented local-development exception, N10).
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"

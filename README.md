@@ -93,6 +93,7 @@ The port can be changed with `BACKEND_PORT` in `.env`.
 | `LLM_API_KEY` | none | Your own key (Gemini: free from Google AI Studio). |
 | `LLM_TIMEOUT_SECONDS` | `60` | Longest wait for one answer. |
 | `LLM_MAX_RETRIES` | `2` | Extra tries after a failure, with a growing pause. |
+| `LLM_TEMPERATURE` | `0` | Randomness of answers. `0` keeps candidate scores repeatable. |
 
 - **Provider:** Google Gemini API (external service). The provider can be
   changed in `.env` without code changes.

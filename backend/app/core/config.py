@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr | None = None
     llm_timeout_seconds: float = 60
     llm_max_retries: int = 2
+    # 0 = least random: the same CV and job profile get the same score (F2, B2).
+    llm_temperature: float = 0
 
     @property
     def cors_origin_list(self) -> list[str]:

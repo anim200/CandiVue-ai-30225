@@ -38,6 +38,7 @@ def get_chat_model() -> BaseChatModel:
         model_provider=settings.llm_provider,
         api_key=api_key,
         timeout=settings.llm_timeout_seconds,
+        temperature=settings.llm_temperature,
         # Retries are done in invoke_llm(), the same way for every provider.
         max_retries=0,
     )
