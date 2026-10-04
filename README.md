@@ -85,6 +85,25 @@ The port can be changed with `BACKEND_PORT` in `.env`.
 | `backend` | built from `backend/Dockerfile` (target `runtime`) | FastAPI on Python 3.13. Applies migrations on start. |
 | `tests` | built from `backend/Dockerfile` (target `test`) | Only runs on demand (see below). |
 
+## AI provider and data sent to it
+
+| Setting (`.env`) | Default | Meaning |
+|---|---|---|
+| `LLM_PROVIDER` / `LLM_MODEL` | `google_genai` / `gemini-2.5-flash` | Which AI model is used. |
+| `LLM_API_KEY` | none | Your own key (Gemini: free from Google AI Studio). |
+| `LLM_TIMEOUT_SECONDS` | `60` | Longest wait for one answer. |
+| `LLM_MAX_RETRIES` | `2` | Extra tries after a failure, with a growing pause. |
+
+- **Provider:** Google Gemini API (external service). The provider can be
+  changed in `.env` without code changes.
+- **What is sent:** job profiles, CV text, interview transcripts and the
+  instructions (prompts) needed to screen and assess candidates.
+- **Free-tier notice:** on Gemini's free tier, Google may use the data it
+  receives to improve its products. Use only synthetic or sample data with a
+  free key, never real candidate data.
+- **If the AI fails** (timeout, outage, wrong key, rate limit) after all
+  retries, the API answers `503` with a clear message instead of crashing.
+
 ## Security note (local development)
 
 The backend uses plain HTTP and is bound to `127.0.0.1` only, so it is not
