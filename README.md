@@ -42,6 +42,33 @@ After a full reset, run `docker compose up --build -d` again. The database
 is recreated from scratch and the pgvector extension is enabled
 automatically.
 
+## Database and migrations
+
+Tables are defined in `backend/app/db/models/` and created by
+[Alembic](https://alembic.sqlalchemy.org/) migrations in
+`backend/migrations/versions/`. The backend applies all pending migrations
+every time it starts (`alembic upgrade head`), so no manual step is needed.
+
+LangGraph saves workflow state (checkpoints) in the same database, in its
+own `checkpoint*` tables. A stopped or restarted workflow continues from its
+last completed step.
+
+| Task | Command |
+|---|---|
+| Show the current migration | `docker compose exec backend alembic current` |
+| Create a migration after changing a model | see below |
+
+To create a migration after changing a model, rebuild the image and let
+Alembic compare the models with the database. The new file is written into
+`backend/migrations/versions/`; review it before committing.
+
+```bash
+docker compose build backend
+docker compose run --rm -v "$(pwd)/backend/migrations:/app/migrations" backend   alembic revision --autogenerate -m "describe the change"
+```
+
+On Windows Git Bash, prefix the second command with `MSYS_NO_PATHCONV=1`.
+
 ## Check that it works
 
 - Health check: <http://localhost:8000/api/health> returns
@@ -55,7 +82,8 @@ The port can be changed with `BACKEND_PORT` in `.env`.
 | Service | Image | Notes |
 |---|---|---|
 | `db` | `pgvector/pgvector:0.8.7-pg17-bookworm` | PostgreSQL 17 with pgvector. Data in the named volume `pgdata`. Not exposed to the host. |
-| `backend` | built from `backend/Dockerfile` | FastAPI on Python 3.13. |
+| `backend` | built from `backend/Dockerfile` (target `runtime`) | FastAPI on Python 3.13. Applies migrations on start. |
+| `tests` | built from `backend/Dockerfile` (target `test`) | Only runs on demand (see below). |
 
 ## Security note (local development)
 
@@ -63,7 +91,15 @@ The backend uses plain HTTP and is bound to `127.0.0.1` only, so it is not
 reachable from other machines. This is a local-development exception; it
 must not be exposed on a network without HTTPS.
 
-## Running the tests locally
+## Running the tests
+
+All tests, against the real database (the stack must be running):
+
+```bash
+docker compose run --rm --build tests
+```
+
+Locally without Docker (tests that need the database are skipped):
 
 ```bash
 cd backend

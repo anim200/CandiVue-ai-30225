@@ -17,10 +17,21 @@ Update this file at the end of each work session. Every Claude thread reads it.
 ## In progress
 - Platform foundation (WBS Day 4 work package), branch module/platform-foundation:
   - Done 02-10-2026: .env.example, FastAPI skeleton with GET /api/health (DB check), JSON logging, generic error handler, backend Dockerfile, Docker Compose with PostgreSQL 17 + pgvector 0.8.7, health tests, README run/stop/reset commands. Verified: stack healthy, pgvector enabled.
-  - Remaining (each on its own module branch): database schema + Alembic, frontend foundation (React/Vite container) and role access, LangGraph setup
+  - Merged into dev 03-10-2026 (PR #1). Work continues on the same branch until module 2 is complete.
+  - Done 03-10-2026 (WBS 2.3 persistent records + LangGraph state): Alembic with first migration (10 tables: users, jobs, job_descriptions, candidates, screening_runs, candidate_scores, interview_sessions, transcript_turns, qa_analyses, assessment_reports), migrations applied on backend start, LangGraph Postgres checkpointer opened at startup, tests in Docker (`docker compose run --rm tests`): tables exist, candidate delete cascades (N19), no protected-attribute columns (N20), graph resumes after restart (N26). Candidates have no account: they join by unique link only.
+  - Remaining on this branch: AI model access layer (timeouts, retries, failure state) + async jobs with status; frontend foundation (React/Vite container) and role access; transport-security note
+
+## Design notes to apply in later modules
+- Two roles: Interviewer logs in with email + password; Candidate authenticates with the unique interview link. Both get a role-based JWT; the backend enforces the role (N9). Candidate token is limited to one session.
+- Interview link safeguards (WBS 4.1–4.2): link valid only from shortly before the scheduled time until the interview ends; disabled after the interview; one candidate connection at a time; only the token hash is stored (done).
+- F7: the reference face/voice must be captured with consent BEFORE the interview (e.g. when the candidate confirms the invitation), not just before the call. "Link for access, F7 for identity."
+- One-laptop demo (two tabs, allowed by F3 clarification):
+  - Same microphone hears both speakers: use the in-call mute on the tab not speaking, or a separate mic per tab (headset + laptop mic); headphones against echo.
+  - Keep the login token per tab (sessionStorage) so interviewer and candidate tabs do not overwrite each other (WBS 2.4); Incognito window as backup.
+  - Use the same browser for both tabs so they can share the webcam.
 
 ## Git workflow
-- Branches: main (initial structure only), dev, module/<name> per feature
+- Branches: main (initial structure only), dev, module/<name> per WBS module (not per task)
 - module/* branches start from dev and merge into dev by pull request; dev merges into main when the project is complete
 - Git Bash is used for git commands; check the branch name in the prompt before committing
 
@@ -37,3 +48,13 @@ Update this file at the end of each work session. Every Claude thread reads it.
 ## Redmine task IDs
 - #646013 Initialize and share the BJIT GitHub repository, README and .gitignore
 - #646476 Platform foundation: backend skeleton, health endpoint, Docker Compose with PostgreSQL + pgvector (closed 02-10-2026)
+- Story #646469 Platform Foundation & Role Access (module/platform-foundation):
+  - #646475 Project structure, pinned dependencies, .env.example
+  - #646476 Docker/Compose, named volumes, one-command startup
+  - #646477 FastAPI, Pydantic, OpenAPI docs, error handling, structured logs
+  - #646478 Persistent records + LangGraph state with recovery after restart (done 03-10-2026)
+  - #646479 AI model access layer: timeouts, retries, clear failure state
+  - #646480 Long AI operations run async with processing status
+  - #646481 Frontend navigation and connection to backend
+  - #646482 Lightweight auth; block Candidate access to scores, rankings, assessments
+  - #646483 Secure transport for APIs and media; document local exceptions
