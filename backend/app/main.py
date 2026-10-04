@@ -10,6 +10,7 @@ from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 from app.core.logging import setup_logging
 from app.graphs.checkpointer import open_checkpointer
+from app.runs.runner import resume_interrupted_runs
 
 settings = get_settings()
 setup_logging(settings.log_level)
@@ -21,6 +22,8 @@ async def lifespan(app: FastAPI):
     with open_checkpointer() as checkpointer:
         # Every LangGraph in the app will use this to save its state.
         app.state.checkpointer = checkpointer
+        # Continue AI runs that were interrupted by a stop or crash (N26).
+        resume_interrupted_runs()
         yield
 
 
