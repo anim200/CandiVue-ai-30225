@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings
 
 
@@ -10,6 +11,13 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     database_url: str  # required: the app will not start without it
     cors_origins: str = "http://localhost:5173"
+
+    # AI model (see app/ai/llm.py). SecretStr hides the key in logs and errors.
+    llm_provider: str = "google_genai"
+    llm_model: str = "gemini-2.5-flash"
+    llm_api_key: SecretStr | None = None
+    llm_timeout_seconds: float = 60
+    llm_max_retries: int = 2
 
     @property
     def cors_origin_list(self) -> list[str]:
