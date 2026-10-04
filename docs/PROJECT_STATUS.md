@@ -20,7 +20,10 @@ Update this file at the end of each work session. Every Claude thread reads it.
   - Merged into dev 03-10-2026 (PR #1). Work continues on the same branch until module 2 is complete.
   - Done 03-10-2026 (WBS 2.3 persistent records + LangGraph state): Alembic with first migration (10 tables: users, jobs, job_descriptions, candidates, screening_runs, candidate_scores, interview_sessions, transcript_turns, qa_analyses, assessment_reports), migrations applied on backend start, LangGraph Postgres checkpointer opened at startup, tests in Docker (`docker compose run --rm tests`): tables exist, candidate delete cascades (N19), no protected-attribute columns (N20), graph resumes after restart (N26). Candidates have no account: they join by unique link only.
   - Done 04-10-2026 (#646479 AI model access layer): `app/ai/llm.py` with `invoke_llm()` (timeout, retries with growing pause, one `AIServiceError`), API answers 503 on AI failure (N6), provider set in .env (default Google Gemini free tier, switchable without code change), provider disclosure in README (N18), tests with fake models (no API key needed).
-  - Remaining on this branch: async jobs with status (#646480); frontend foundation (React/Vite container) and role access (#646481, #646482); transport-security note (#646483)
+  - Done 04-10-2026: `LLM_TEMPERATURE` (default 0) so scores are repeatable (F2, B2).
+  - Done 04-10-2026 (#646480 background runs): `app/runs/runner.py` runs long AI work in 2 worker threads; status pending/running/waiting_for_review/completed/failed with plain-language errors; screening progress (processed/total); interrupted runs resume at startup with the same LangGraph thread_id (`graph_config()`); `RunStatusOut` has no scores (N9). All three run tables (screening_runs, qa_analyses, assessment_reports) now share `RunStateMixin`. Alembic now ignores LangGraph's checkpoint* tables (autogenerate had tried to drop them); a test checks models and migrations match.
+  - Feature work must: register its run kind with `register_run_kind()`, use `graph_config()` for the graph, call `save_progress()` per item, and add interviewer-only start/status endpoints (#646482).
+  - Remaining on this branch: frontend foundation (React/Vite container) and role access (#646481, #646482); transport-security note (#646483)
 
 ## Design notes to apply in later modules
 - Two roles: Interviewer logs in with email + password; Candidate authenticates with the unique interview link. Both get a role-based JWT; the backend enforces the role (N9). Candidate token is limited to one session.
@@ -55,7 +58,7 @@ Update this file at the end of each work session. Every Claude thread reads it.
   - #646477 FastAPI, Pydantic, OpenAPI docs, error handling, structured logs
   - #646478 Persistent records + LangGraph state with recovery after restart (done 03-10-2026)
   - #646479 AI model access layer: timeouts, retries, clear failure state (done 04-10-2026)
-  - #646480 Long AI operations run async with processing status
+  - #646480 Long AI operations run async with processing status (done 04-10-2026)
   - #646481 Frontend navigation and connection to backend
   - #646482 Lightweight auth; block Candidate access to scores, rankings, assessments
   - #646483 Secure transport for APIs and media; document local exceptions

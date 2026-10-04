@@ -51,7 +51,23 @@ every time it starts (`alembic upgrade head`), so no manual step is needed.
 
 LangGraph saves workflow state (checkpoints) in the same database, in its
 own `checkpoint*` tables. A stopped or restarted workflow continues from its
-last completed step.
+last completed step. Alembic is set to ignore these tables, so migrations
+never change or drop them.
+
+## Background AI runs
+
+Long AI work (CV screening, interview Q&A analysis, final assessment) runs in
+the background, so the API answers at once and the screen stays responsive.
+
+- Each run has a status: `pending` → `running` → `completed`, `failed`, or
+  `waiting_for_review` (paused until the interviewer reviews the result).
+- Screening runs also show progress, e.g. 12 of 20 CVs.
+- A failed run stores a short, plain-language message (no technical details).
+- If the backend stops in the middle of a run, the run starts again
+  automatically on the next start and continues from its last saved step.
+- Known limitation: background runs execute inside the backend container (two
+  at a time), which is sufficient for the single-machine local setup this
+  project requires.
 
 | Task | Command |
 |---|---|
