@@ -1,24 +1,16 @@
 """CV screening runs and their results (F1, F2 — LangGraph 2)."""
 
-from datetime import datetime
-from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import DateTime, Float, ForeignKey, Text, UniqueConstraint
+from sqlalchemy import Float, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, TimestampMixin, status_column
+from app.db.base import Base, TimestampMixin
+from app.db.models.run import RunStateMixin
 
 
-class RunStatus(StrEnum):
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-
-class ScreeningRun(TimestampMixin, Base):
+class ScreeningRun(RunStateMixin, TimestampMixin, Base):
     """One press of "Screen CVs" for a job."""
 
     __tablename__ = "screening_runs"
@@ -27,12 +19,9 @@ class ScreeningRun(TimestampMixin, Base):
     job_id: Mapped[int] = mapped_column(
         ForeignKey("jobs.id", ondelete="CASCADE"), index=True
     )
-    status: Mapped[RunStatus] = mapped_column(
-        status_column(RunStatus), default=RunStatus.PENDING
-    )
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    error: Mapped[str | None] = mapped_column(Text)  # safe message, no stack trace
+    # Progress shown in the UI, e.g. "12 of 20 CVs" (N25).
+    processed: Mapped[int] = mapped_column(default=0)
+    total: Mapped[int | None]
 
 
 class CandidateScore(TimestampMixin, Base):

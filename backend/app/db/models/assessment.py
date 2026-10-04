@@ -9,10 +9,10 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TimestampMixin, status_column
-from app.db.models.screening import RunStatus
+from app.db.models.run import RunStateMixin
 
 
-class QAAnalysis(TimestampMixin, Base):
+class QAAnalysis(RunStateMixin, TimestampMixin, Base):
     """Q&A pairs, their evaluations and requirement coverage for one interview."""
 
     __tablename__ = "qa_analyses"
@@ -21,11 +21,7 @@ class QAAnalysis(TimestampMixin, Base):
     session_id: Mapped[int] = mapped_column(
         ForeignKey("interview_sessions.id", ondelete="CASCADE"), unique=True
     )
-    status: Mapped[RunStatus] = mapped_column(
-        status_column(RunStatus), default=RunStatus.PENDING
-    )
     results: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
-    error: Mapped[str | None] = mapped_column(Text)
 
 
 class ReviewStatus(StrEnum):
@@ -34,8 +30,12 @@ class ReviewStatus(StrEnum):
     APPROVED = "approved"
 
 
-class AssessmentReport(TimestampMixin, Base):
-    """Consolidated report. The interviewer must approve it (HITL)."""
+class AssessmentReport(RunStateMixin, TimestampMixin, Base):
+    """Consolidated report. The interviewer must approve it (HITL).
+
+    `status` tracks the AI generating the report; `review_status` tracks the
+    interviewer's decision about it.
+    """
 
     __tablename__ = "assessment_reports"
 
