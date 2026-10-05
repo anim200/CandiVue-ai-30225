@@ -23,7 +23,8 @@ Update this file at the end of each work session. Every Claude thread reads it.
   - Done 04-10-2026: `LLM_TEMPERATURE` (default 0) so scores are repeatable (F2, B2).
   - Done 04-10-2026 (#646480 background runs): `app/runs/runner.py` runs long AI work in 2 worker threads; status pending/running/waiting_for_review/completed/failed with plain-language errors; screening progress (processed/total); interrupted runs resume at startup with the same LangGraph thread_id (`graph_config()`); `RunStatusOut` has no scores (N9). All three run tables (screening_runs, qa_analyses, assessment_reports) now share `RunStateMixin`. Alembic now ignores LangGraph's checkpoint* tables (autogenerate had tried to drop them); a test checks models and migrations match.
   - Feature work must: register its run kind with `register_run_kind()`, use `graph_config()` for the graph, call `save_progress()` per item, and add interviewer-only start/status endpoints (#646482).
-  - Remaining on this branch: frontend foundation (React/Vite container) and role access (#646481, #646482); transport-security note (#646483)
+  - Done 05-10-2026 (#646481 frontend): UI design handoff from Claude Design committed in `docs/design_handoff_candivue_ui/` (all screens, synthetic data). `frontend/`: React 19 + Vite 8 + Mantine 9 + React Router 8, plain JavaScript; harbor theme from the handoff; app shell (logo, left menu: Jobs, Interviews, Reports, Hiring Assistant, Knowledge base) with "coming soon" pages, plain-language 404 and crash pages; `src/api/client.js` is the only code that calls the backend (plain-language errors, 15 s timeout); header badge Connected / Server unavailable from `/api/health`. Docker: Node builds, nginx 1.31 serves and forwards `/api` to the backend (same address, no CORS); `frontend` service on 127.0.0.1:5173 (`FRONTEND_PORT`). 5 Vitest tests; npm audit clean.
+  - Remaining on this branch: role access (#646482); transport-security note (#646483)
 
 ## Design notes to apply in later modules
 - Two roles: Interviewer logs in with email + password; Candidate authenticates with the unique interview link. Both get a role-based JWT; the backend enforces the role (N9). Candidate token is limited to one session.
@@ -33,6 +34,14 @@ Update this file at the end of each work session. Every Claude thread reads it.
   - Same microphone hears both speakers: use the in-call mute on the tab not speaking, or a separate mic per tab (headset + laptop mic); headphones against echo.
   - Keep the login token per tab (sessionStorage) so interviewer and candidate tabs do not overwrite each other (WBS 2.4); Incognito window as backup.
   - Use the same browser for both tabs so they can share the webcam.
+
+## UI design decisions (from the design handoff)
+- Build every screen from `docs/design_handoff_candivue_ui/` with Mantine; the `.dc.html` files are references, not code to copy.
+- Still to decide: Live Interview identity layout (1a fixed right column / 1b tabs / 1c strip over video; tabs hide the identity result, so 1a or 1c); biometric retention period and consent wording (N17; design shows "30 days" as a placeholder).
+- #646482: leave out "Forgot password?" and "Keep me signed in" from the login design (not required; "keep me signed in" conflicts with per-tab sessionStorage tokens).
+- Interview Analysis tabs F8, F9, F10 are stretch: build only after F1–F7 and F11 work (§11.4).
+- Dark mode is designed but postponed; add later with Mantine's colour-scheme manager (`localStorage` key `candivue-theme`).
+- Knowledge Base "personal data found" scan is a design proposal that needs its own backend step.
 
 ## Git workflow
 - Branches: main (initial structure only), dev, module/<name> per WBS module (not per task)
@@ -59,6 +68,6 @@ Update this file at the end of each work session. Every Claude thread reads it.
   - #646478 Persistent records + LangGraph state with recovery after restart (done 03-10-2026)
   - #646479 AI model access layer: timeouts, retries, clear failure state (done 04-10-2026)
   - #646480 Long AI operations run async with processing status (done 04-10-2026)
-  - #646481 Frontend navigation and connection to backend
+  - #646481 Frontend navigation and connection to backend (done 05-10-2026)
   - #646482 Lightweight auth; block Candidate access to scores, rankings, assessments
   - #646483 Secure transport for APIs and media; document local exceptions

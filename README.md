@@ -3,16 +3,16 @@
 AI-powered recruitment and interview platform (BJIT AI Trainee final project).
 
 > Work in progress: this README currently covers the platform foundation
-> (backend + database). Architecture, usage, data providers and known
-> limitations will be added as the features are built.
+> (backend, database and frontend skeleton). Architecture, usage, data
+> providers and known limitations will be added as the features are built.
 
 ## Prerequisites
 
 - Docker Desktop (Docker Engine with Docker Compose v2)
 - Git
 
-Nothing else is needed to run the app. Python is only needed to run the
-tests locally.
+Nothing else is needed to run the app. Python and Node.js are only needed to
+run the tests or the frontend development server locally.
 
 ## Setup
 
@@ -33,6 +33,7 @@ Copy-Item .env.example .env       # Windows PowerShell
 | Build the images | `docker compose build` |
 | Run (build if needed, in the background) | `docker compose up --build -d` |
 | Check status | `docker compose ps` |
+| Open the app | <http://localhost:5173> |
 | Follow backend logs | `docker compose logs -f backend` |
 | Stop (keeps the database data) | `docker compose down` |
 | Full reset (deletes the database volume) | `docker compose down -v` |
@@ -87,11 +88,48 @@ On Windows Git Bash, prefix the second command with `MSYS_NO_PATHCONV=1`.
 
 ## Check that it works
 
+- App: <http://localhost:5173> shows the CandiVue AI app with a green
+  **Connected** badge in the header (red **Server unavailable** if the
+  backend cannot be reached).
 - Health check: <http://localhost:8000/api/health> returns
   `{"status":"ok","database":"ok"}`
 - API documentation (OpenAPI): <http://localhost:8000/docs>
 
-The port can be changed with `BACKEND_PORT` in `.env`.
+The ports can be changed with `FRONTEND_PORT` and `BACKEND_PORT` in `.env`.
+If you change `FRONTEND_PORT`, change the port in `CORS_ORIGINS` too.
+
+## Frontend
+
+The interviewer and candidate screens are a single-page web app in
+`frontend/`, built from the design handoff in
+[`docs/design_handoff_candivue_ui/`](docs/design_handoff_candivue_ui/README.md).
+
+| Part | Choice | Why |
+|---|---|---|
+| UI framework | React 19 (JavaScript) | Widely used, large ecosystem, well suited to live screens such as the interview page. |
+| Build tool | Vite | Fast development server with live reload; builds plain HTML/CSS/JS files. |
+| Components | Mantine 9 | Ready-made, accessible components (tables, forms, date pickers, charts, notifications) that fit a data-heavy tool, with no CSS framework to learn. |
+| Navigation | React Router 8 | One address per screen, so pages can be bookmarked and shared between tabs. |
+| Icons / fonts | Tabler Icons, Public Sans, IBM Plex Mono | Installed as npm packages, so the app loads no files from external sites. |
+
+How it runs:
+
+- **Docker:** the `frontend` image builds the app with Node and serves the
+  result with nginx. nginx forwards every `/api/...` request to the backend,
+  so the browser uses one address for both and no CORS is needed.
+- **Development:** `npm run dev` gives live reload on the same address and
+  forwards `/api` to the backend in the same way. Stop the Docker frontend
+  first, because both use port 5173:
+
+```bash
+docker compose stop frontend
+cd frontend
+npm install
+npm run dev                       # http://localhost:5173
+```
+
+All backend calls go through `frontend/src/api/client.js`, which turns any
+failure into a plain-language message (no technical details on screen).
 
 ## Services
 
@@ -100,6 +138,7 @@ The port can be changed with `BACKEND_PORT` in `.env`.
 | `db` | `pgvector/pgvector:0.8.7-pg17-bookworm` | PostgreSQL 17 with pgvector. Data in the named volume `pgdata`. Not exposed to the host. |
 | `backend` | built from `backend/Dockerfile` (target `runtime`) | FastAPI on Python 3.13. Applies migrations on start. |
 | `tests` | built from `backend/Dockerfile` (target `test`) | Only runs on demand (see below). |
+| `frontend` | built from `frontend/Dockerfile` | React app served by nginx 1.31; forwards `/api` to the backend. |
 
 ## AI provider and data sent to it
 
@@ -123,9 +162,10 @@ The port can be changed with `BACKEND_PORT` in `.env`.
 
 ## Security note (local development)
 
-The backend uses plain HTTP and is bound to `127.0.0.1` only, so it is not
-reachable from other machines. This is a local-development exception; it
-must not be exposed on a network without HTTPS.
+The backend and the frontend use plain HTTP and are bound to `127.0.0.1`
+only, so they are not reachable from other machines. This is a
+local-development exception; they must not be exposed on a network without
+HTTPS.
 
 ## Running the tests
 
@@ -143,4 +183,12 @@ python -m venv .venv
 .venv\Scripts\activate            # Windows (source .venv/bin/activate on macOS/Linux)
 pip install -r requirements-dev.txt
 pytest
+```
+
+Frontend tests (no backend needed; requires Node.js 22.22 or later):
+
+```bash
+cd frontend
+npm install
+npm test
 ```
