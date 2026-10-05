@@ -59,5 +59,21 @@ services:
       backend:
         condition: service_healthy  # backend has applied the migrations
 
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      # Bound to localhost only (documented local-development exception, N10).
+      # 5173 is the address the backend allows in CORS_ORIGINS.
+      - "127.0.0.1:${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      backend:
+        condition: service_healthy  # nginx forwards /api to the backend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   pgdata:

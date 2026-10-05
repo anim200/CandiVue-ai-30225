@@ -1,0 +1,8 @@
+# Keep the build context small and free of secrets.
+# (node_modules is installed fresh inside the image by "npm ci".)
+node_modules/
+dist/
+.env
+.env.*
+Dockerfile
+.dockerignore
