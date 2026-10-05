@@ -131,6 +131,11 @@ npm run dev                       # http://localhost:5173
 All backend calls go through `frontend/src/api/client.js`, which turns any
 failure into a plain-language message (no technical details on screen).
 
+The app is responsive: it works on phones, tablets and desktops. Below
+768px wide the left menu folds into a menu button in the header. Every
+screen is checked at phone (375px), tablet (768px) and desktop (1280px)
+width.
+
 ## Services
 
 | Service | Image | Notes |

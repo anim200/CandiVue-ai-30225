@@ -1,13 +1,35 @@
 // Badge in the header showing whether the backend can be reached.
 // Checks when the page opens and then every 30 seconds.
 
-import { Badge, Loader, Tooltip } from '@mantine/core';
+import { Badge, Box, Loader, Tooltip } from '@mantine/core';
 import { IconCheck, IconPlugConnectedX } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 
 import { getHealth } from '../api/client';
 
 const CHECK_EVERY_MS = 30000;
+
+// What the badge shows for each status. "hint" appears as a tooltip.
+const STATES = {
+  checking: {
+    color: 'gray',
+    icon: <Loader size={10} color="gray" />,
+    label: 'Checking connection',
+    hint: 'Checking whether the CandiVue server can be reached.',
+  },
+  connected: {
+    color: 'green',
+    icon: <IconCheck size={14} />,
+    label: 'Connected',
+    hint: 'The CandiVue server can be reached.',
+  },
+  unavailable: {
+    color: 'red',
+    icon: <IconPlugConnectedX size={14} />,
+    label: 'Server unavailable',
+    hint: 'The server is not responding. Your data is safe. This check repeats every 30 seconds.',
+  },
+};
 
 export default function BackendStatus() {
   const [status, setStatus] = useState('checking'); // checking | connected | unavailable
@@ -32,26 +54,15 @@ export default function BackendStatus() {
     };
   }, []);
 
-  if (status === 'checking') {
-    return (
-      <Badge variant="light" color="gray" tt="none" leftSection={<Loader size={10} color="gray" />}>
-        Checking connection
-      </Badge>
-    );
-  }
-
-  if (status === 'connected') {
-    return (
-      <Badge variant="light" color="green" tt="none" leftSection={<IconCheck size={14} />}>
-        Connected
-      </Badge>
-    );
-  }
+  const { color, icon, label, hint } = STATES[status];
 
   return (
-    <Tooltip label="The server is not responding. Your data is safe. This check repeats every 30 seconds.">
-      <Badge variant="light" color="red" tt="none" leftSection={<IconPlugConnectedX size={14} />}>
-        Server unavailable
+    <Tooltip label={hint} multiline w={260}>
+      <Badge variant="light" color={color} tt="none" leftSection={icon} aria-label={label}>
+        {/* On phones only the icon fits; aria-label and the tooltip keep the meaning. */}
+        <Box component="span" visibleFrom="xs">
+          {label}
+        </Box>
       </Badge>
     </Tooltip>
   );

@@ -1,7 +1,10 @@
 // The frame around every interviewer page: header on top, menu on the left,
 // the current page in the middle (<Outlet />).
+// Responsive: on phones and small tablets (below "sm", 768px) the menu is
+// hidden and opens from the burger button in the header.
 
-import { AppShell, Box, Divider, Group, NavLink } from '@mantine/core';
+import { AppShell, Box, Burger, Divider, Group, NavLink } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 import { Fragment } from 'react';
 import { Link, Outlet, useLocation } from 'react-router';
 
@@ -11,13 +14,25 @@ import { NAV_ITEMS } from './navigation';
 
 export default function AppLayout() {
   const { pathname } = useLocation();
+  const [menuOpen, { toggle: toggleMenu, close: closeMenu }] = useDisclosure(false);
 
   return (
-    // Desktop-first (1280px+): below the "sm" breakpoint the menu is hidden.
-    <AppShell header={{ height: 56 }} navbar={{ width: 240, breakpoint: 'sm' }}>
-      <AppShell.Header px={20}>
-        <Group h="100%" justify="space-between">
-          <Logo />
+    <AppShell
+      header={{ height: 56 }}
+      navbar={{ width: 240, breakpoint: 'sm', collapsed: { mobile: !menuOpen } }}
+    >
+      <AppShell.Header px={{ base: 12, sm: 20 }}>
+        <Group h="100%" justify="space-between" wrap="nowrap">
+          <Group gap="sm" wrap="nowrap">
+            <Burger
+              opened={menuOpen}
+              onClick={toggleMenu}
+              hiddenFrom="sm"
+              size="sm"
+              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            />
+            <Logo />
+          </Group>
           <BackendStatus />
         </Group>
       </AppShell.Header>
@@ -32,13 +47,14 @@ export default function AppLayout() {
               label={label}
               leftSection={<Icon size={19} stroke={1.6} />}
               active={pathname.startsWith(path)}
+              onClick={closeMenu} // on phones, close the menu after choosing
             />
           </Fragment>
         ))}
       </AppShell.Navbar>
 
       <AppShell.Main bg="#F5F7F8">
-        <Box px={32} py={24}>
+        <Box px={{ base: 16, sm: 32 }} py={{ base: 16, sm: 24 }}>
           <Outlet />
         </Box>
       </AppShell.Main>

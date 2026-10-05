@@ -37,6 +37,7 @@ Update this file at the end of each work session. Every Claude thread reads it.
 
 ## UI design decisions (from the design handoff)
 - Build every screen from `docs/design_handoff_candivue_ui/` with Mantine; the `.dc.html` files are references, not code to copy.
+- Responsive for all devices (decided 05-10-2026; overrides the handoff's "desktop-first 1280px+"). Mobile/tablet layouts are adapted in code, not designed in Claude Design. Check each screen at 375 / 768 / 1280 px before committing. App shell done: burger menu below 768px, icon-only connection badge on phones.
 - Still to decide: Live Interview identity layout (1a fixed right column / 1b tabs / 1c strip over video; tabs hide the identity result, so 1a or 1c); biometric retention period and consent wording (N17; design shows "30 days" as a placeholder).
 - #646482: leave out "Forgot password?" and "Keep me signed in" from the login design (not required; "keep me signed in" conflicts with per-tab sessionStorage tokens).
 - Interview Analysis tabs F8, F9, F10 are stretch: build only after F1–F7 and F11 work (§11.4).
