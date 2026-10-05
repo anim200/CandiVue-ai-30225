@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css"><style>body{margin:0;background:#ECEEEF;font-family:'Public Sans',system-ui,sans-serif;color:#1A2227;-webkit-font-smoothing:antialiased}a{color:#1C5D65}a:hover{color:#164A51}input{font-family:inherit}.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08)}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:600 10px 'IBM Plex Mono',monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:600 13px/1.2 'Public Sans',sans-serif;color:#1a1a1a}.dv-opts{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}.dv-oid{font:600 10.5px 'IBM Plex Mono',monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 'Public Sans',sans-serif;color:rgba(0,0,0,.6)}.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}.dv-opt:target .dv-oid{background:#23717A;color:#fff}.dv-next{margin:22px 0 0;font:12px/1.5 'Public Sans',sans-serif;color:rgba(0,0,0,.55)}@keyframes cvfadeup{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}@keyframes cvfade{from{opacity:0}to{opacity:1}}@keyframes cvspin{to{transform:rotate(360deg)}}@keyframes cvlook{0%,38%,100%{transform:translate(0,0)}46%,80%{transform:translate(2px,-2px)}88%{transform:translate(-1px,1px)}}@keyframes cvbreathe{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:1}50%{transform:translate(-50%,-50%) scale(1.04);opacity:.6}}@keyframes cvfloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}@keyframes cvshake{0%,100%{transform:none}20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}</style><script src="theme.js"></script></helmet>
+
+<section class="dv-turn" id="t1" data-screen-label="Login">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Interviewer login · <span style="font-family:'IBM Plex Mono';font-weight:500">LoginPage → BrandPanel, LoginForm</span></span></div>
+<div class="dv-opts">
+<div class="dv-opt" id="1a"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Interactive: type an email, toggle password visibility, press Sign in (an email without “@” shows the inline error).</div>
+<div class="dv-card" data-screen-label="1a Login" style="width:1280px;height:800px;display:grid;grid-template-columns:1.15fr 1fr">
+
+<div data-component="BrandPanel" style="position:relative;overflow:hidden;background:radial-gradient(110% 80% at 15% 0%,#1E6670 0%,#123F45 50%,#0B2A2F 100%);color:#fff;padding:48px 56px;display:flex;flex-direction:column">
+<div style="position:absolute;left:78%;top:72%;width:520px;height:520px;border-radius:50%;border:1px solid rgba(255,255,255,.08);transform:translate(-50%,-50%);animation:cvbreathe 9s ease-in-out infinite"></div>
+<div style="position:absolute;left:78%;top:72%;width:780px;height:780px;border-radius:50%;border:1px solid rgba(255,255,255,.06);transform:translate(-50%,-50%);animation:cvbreathe 9s ease-in-out infinite 1.5s"></div>
+<div style="position:absolute;left:78%;top:72%;width:1040px;height:1040px;border-radius:50%;border:1px solid rgba(255,255,255,.04);transform:translate(-50%,-50%);animation:cvbreathe 9s ease-in-out infinite 3s"></div>
+<div style="position:absolute;left:78%;top:72%;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(127,208,216,.22),rgba(127,208,216,0) 70%);transform:translate(-50%,-50%)"></div>
+
+<div style="display:flex;align-items:center;gap:12px;position:relative;animation:cvfade .6s ease-out">
+<div data-component="LogoMark" style="width:44px;height:44px;border-radius:12px;background:linear-gradient(150deg,#3AA0AB 0%,#1B5E66 55%,#123F45 100%);position:relative;flex:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 6px 18px rgba(0,0,0,.25)"><span style="position:absolute;left:9px;top:9px;width:26px;height:26px;border-radius:50%;border:3.7px solid #fff;box-sizing:border-box"></span><span style="position:absolute;left:19.6px;top:15.4px;width:9px;height:9px;border-radius:50%;background:#BDEDF1;animation:cvlook 6s ease-in-out infinite"></span><span style="position:absolute;left:30.4px;top:5.7px;width:6px;height:6px;border-radius:50%;background:#F2C46D;box-shadow:0 0 0 2px #123F45"></span></div>
+<div style="display:flex;align-items:center;gap:8px"><span style="font-size:24px;font-weight:700;letter-spacing:-.025em;line-height:1">Candi<span style="color:#7FD0D8">Vue</span></span><span style="font:600 12px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#BDEDF1;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:4px;padding:3px 6px">AI</span></div>
+</div>
+
+<div style="margin-top:auto;position:relative;display:flex;flex-direction:column;gap:22px;max-width:470px">
+<h1 style="margin:0;font-size:40px;font-weight:700;line-height:1.15;letter-spacing:-.02em;animation:cvfadeup .7s ease-out both .1s;text-wrap:balance">Hiring decisions, backed by evidence.</h1>
+<p style="margin:0;font-size:17px;line-height:1.6;color:#C8E4E7;animation:cvfadeup .7s ease-out both .2s;text-wrap:pretty">CandiVue AI screens CVs, captures interviews and drafts assessments. You review every result and make every decision.</p>
+<div style="display:flex;flex-direction:column;gap:12px;margin-top:6px">
+<div style="display:flex;gap:12px;align-items:center;font-size:15px;animation:cvfadeup .6s ease-out both .35s"><span style="width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);display:inline-flex;align-items:center;justify-content:center"><i class="ti ti-quote" style="font-size:17px;color:#7FD0D8"></i></span>Every score links to a CV excerpt or transcript moment</div>
+<div style="display:flex;gap:12px;align-items:center;font-size:15px;animation:cvfadeup .6s ease-out both .45s"><span style="width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);display:inline-flex;align-items:center;justify-content:center"><i class="ti ti-user-check" style="font-size:17px;color:#7FD0D8"></i></span>Nobody is hired or rejected automatically</div>
+<div style="display:flex;gap:12px;align-items:center;font-size:15px;animation:cvfadeup .6s ease-out both .55s"><span style="width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);display:inline-flex;align-items:center;justify-content:center"><i class="ti ti-lock" style="font-size:17px;color:#7FD0D8"></i></span>Candidates join by private link and never see scores</div>
+</div></div>
+
+<div style="position:absolute;right:56px;top:120px;display:flex;flex-direction:column;gap:14px;align-items:flex-end">
+<div style="padding:10px 14px;border-radius:10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(6px);display:flex;align-items:center;gap:10px;animation:cvfloat 7s ease-in-out infinite"><span style="font:500 12px 'IBM Plex Mono';color:#BDEDF1;background:rgba(127,208,216,.15);border-radius:4px;padding:2px 6px">02:47</span><span style="font-size:13px;color:#E6F3F4">“added pagination and an index…”</span></div>
+<div style="padding:10px 14px;border-radius:10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);display:flex;align-items:center;gap:10px;margin-right:46px;animation:cvfloat 8s ease-in-out infinite 1.2s"><span style="height:20px;padding:0 8px;border-radius:999px;background:rgba(143,211,169,.18);color:#A8E2BE;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-check" style="font-size:12px"></i>Met</span><span style="font-size:13px;color:#E6F3F4">Python web framework</span></div>
+<div style="padding:10px 14px;border-radius:10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);display:flex;align-items:center;gap:12px;margin-right:12px;animation:cvfloat 7.5s ease-in-out infinite 2.4s"><span style="font-size:22px;font-weight:700;line-height:1">82</span><div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:11px;color:#A9C9CC">Candidate C · screening</span><div style="width:110px;height:4px;border-radius:2px;background:rgba(255,255,255,.15)"><div style="width:82%;height:4px;border-radius:2px;background:#7FD0D8"></div></div></div></div>
+</div>
+<div style="position:relative;margin-top:40px;font-size:12px;color:#8FB3B7">Demo environment · synthetic sample data only</div>
+</div>
+
+<div style="background:#fff;display:flex;align-items:center;justify-content:center;padding:40px;position:relative"><span data-cv-theme-toggle="" title="Switch light / dark" style="position:absolute;top:20px;right:20px;width:34px;height:34px;border-radius:8px;border:1px solid #DEE3E6;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:#48535B"><i class="ti ti-moon" style="font-size:17px"></i></span>
+<div data-component="LoginForm" style="width:380px;display:flex;flex-direction:column;gap:20px;animation:cvfadeup .6s ease-out both .15s">
+<div style="display:flex;flex-direction:column;gap:6px"><h2 style="margin:0;font-size:28px;font-weight:700;letter-spacing:-.02em">Welcome back</h2><div style="font-size:15px;color:#48535B">Sign in to your interviewer account</div></div>
+<sc-if value="{{ showErr }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:10px;padding:10px 12px;border-radius:6px;background:#FBE9E7;font-size:14px;line-height:1.5;color:#5A2620;animation:cvshake .4s ease-in-out"><i class="ti ti-alert-circle" style="font-size:18px;color:#B03A2E"></i>That email and password don’t match. Check them and try again.</div></sc-if>
+<div style="display:flex;flex-direction:column;gap:6px"><label style="font-size:14px;font-weight:500">Email</label><div style="position:relative"><i class="ti ti-mail" style="position:absolute;left:12px;top:12px;font-size:17px;color:#8A949A"></i><input value="{{ email }}" onChange="{{ onEmail }}" type="email" placeholder="name@example.com" style="width:100%;box-sizing:border-box;height:42px;border:1px solid {{ emailBd }};border-radius:6px;padding:0 12px 0 38px;font-size:15px;outline:none;transition:border-color .15s,box-shadow .15s" style-focus="border-color:#23717A;box-shadow:0 0 0 3px rgba(35,113,122,.15)"></div><sc-if value="{{ emailErr }}"><div style="font-size:12px;color:#932E24;animation:cvfade .2s">Enter a full email address, like name@example.com</div></sc-if></div>
+<div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><label style="font-size:14px;font-weight:500">Password</label><a href="#1a" style="font-size:13px;font-weight:600">Forgot password?</a></div><div style="position:relative"><i class="ti ti-lock" style="position:absolute;left:12px;top:12px;font-size:17px;color:#8A949A"></i><input value="{{ pw }}" onChange="{{ onPw }}" type="{{ pwType }}" placeholder="Your password" style="width:100%;box-sizing:border-box;height:42px;border:1px solid #C9D0D4;border-radius:6px;padding:0 42px 0 38px;font-size:15px;outline:none;transition:border-color .15s,box-shadow .15s" style-focus="border-color:#23717A;box-shadow:0 0 0 3px rgba(35,113,122,.15)"><span onClick="{{ togglePw }}" title="Show or hide password" style="position:absolute;right:8px;top:7px;width:28px;height:28px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:#66717A"><i class="{{ pwIcon }}" style="font-size:17px"></i></span></div></div>
+<div onClick="{{ toggleRemember }}" style="display:flex;gap:10px;align-items:center;cursor:pointer;font-size:14px;color:#48535B"><span style="width:18px;height:18px;border-radius:4px;border:{{ remBox }};background:{{ remFill }};display:inline-flex;align-items:center;justify-content:center;color:#fff;transition:all .15s"><i class="ti ti-check" style="font-size:13px"></i></span>Keep me signed in on this device</div>
+<span onClick="{{ submit }}" style="height:44px;border-radius:6px;background:#23717A;color:#fff;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;box-shadow:0 1px 2px rgba(16,58,64,.2);transition:background .15s,transform .1s" style-hover="background:#1C5D65" style-active="transform:scale(.99)"><sc-if value="{{ loading }}"><span style="width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;display:inline-block;animation:cvspin .8s linear infinite"></span></sc-if><sc-if value="{{ done }}"><i class="ti ti-circle-check" style="font-size:18px;animation:cvfade .2s"></i></sc-if>{{ btnLabel }}</span>
+<sc-if value="{{ done }}"><div style="font-size:14px;color:#245F3E;text-align:center;animation:cvfadeup .3s">Signed in. <a href="Jobs.dc.html" style="font-weight:600">Go to Jobs</a></div></sc-if>
+<div style="border-top:1px solid #E9ECEE;padding-top:18px;display:flex;gap:12px;align-items:flex-start"><span style="width:32px;height:32px;border-radius:8px;background:#EDF5F6;color:#23717A;display:inline-flex;align-items:center;justify-content:center;flex:none"><i class="ti ti-link" style="font-size:17px"></i></span><div style="font-size:13px;line-height:1.5;color:#48535B"><b style="font-weight:600;color:#1A2227">Are you a candidate?</b> You don’t need an account. Join using the private link in your invitation email.</div></div>
+</div></div>
+</div></div>
+</div>
+<p class="dv-next">Try next: “show the forgot-password flow” · “lighter brand panel” · “add the Iris colour version”</p>
+</section>
+
+<section class="dv-turn" id="t2" data-screen-label="Login states">
+<div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">States (form only)</span></div>
+<div class="dv-opts">
+<div class="dv-opt" id="2a"><div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>Wrong email or password</div><div class="dv-card" style="width:420px;padding:24px;display:flex;flex-direction:column;gap:14px"><div style="display:flex;gap:10px;padding:10px 12px;border-radius:6px;background:#FBE9E7;font-size:14px;line-height:1.5;color:#5A2620"><i class="ti ti-alert-circle" style="font-size:18px;color:#B03A2E"></i>That email and password don’t match. Check them and try again.</div><div style="display:flex;flex-direction:column;gap:6px"><label style="font-size:14px;font-weight:500">Password</label><div style="height:42px;border:1px solid #B03A2E;border-radius:6px"></div></div></div></div>
+<div class="dv-opt" id="2b"><div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a>Signing in (loading)</div><div class="dv-card" style="width:420px;padding:24px"><span style="height:44px;border-radius:6px;background:#23717A;opacity:.8;color:#fff;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px"><span style="width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;display:inline-block;animation:cvspin .8s linear infinite"></span>Signing in…</span></div></div>
+<div class="dv-opt" id="2c"><div class="dv-olabel"><a class="dv-oid" href="#2c">2c</a>Session expired</div><div class="dv-card" style="width:420px;padding:24px"><div style="display:flex;gap:10px;padding:10px 12px;border-radius:6px;background:#E7EEF9;font-size:14px;line-height:1.5;color:#1F3B66"><i class="ti ti-info-circle" style="font-size:18px;color:#2B5FA8"></i>You were signed out after a period of inactivity. Sign in to continue where you left off.</div></div></div>
+<div class="dv-opt" id="2d"><div class="dv-olabel"><a class="dv-oid" href="#2d">2d</a>Service unavailable</div><div class="dv-card" style="width:420px;padding:24px"><div style="display:flex;gap:10px;padding:10px 12px;border-radius:6px;background:#FBE9E7;font-size:14px;line-height:1.5;color:#5A2620"><i class="ti ti-cloud-off" style="font-size:18px;color:#B03A2E"></i>We can’t sign you in right now. Please try again in a few minutes.</div></div></div>
+</div></section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { email: 'interviewer.a@example.com', pw: 'samplepass', show: false, remember: true, status: 'idle', tried: false };
+  componentWillUnmount() { clearTimeout(this.t); }
+  renderVals() {
+    const s = this.state, emailErr = s.tried && !s.email.includes('@');
+    return {
+      email: s.email, pw: s.pw, pwType: s.show ? 'text' : 'password', pwIcon: s.show ? 'ti ti-eye-off' : 'ti ti-eye',
+      onEmail: e => this.setState({ email: e.target.value, status: 'idle' }), onPw: e => this.setState({ pw: e.target.value, status: 'idle' }),
+      togglePw: () => this.setState(x => ({ show: !x.show })), toggleRemember: () => this.setState(x => ({ remember: !x.remember })),
+      remBox: s.remember ? '2px solid #23717A' : '2px solid #A3ADB3', remFill: s.remember ? '#23717A' : '#fff',
+      emailErr, emailBd: emailErr ? '#B03A2E' : '#C9D0D4',
+      showErr: s.status === 'error', loading: s.status === 'loading', done: s.status === 'done',
+      btnLabel: s.status === 'loading' ? 'Signing in…' : s.status === 'done' ? 'Signed in' : 'Sign in',
+      submit: () => {
+        if (s.status === 'loading') return;
+        if (!s.email.includes('@')) { this.setState({ tried: true }); return; }
+        this.setState({ tried: true, status: 'loading' });
+        this.t = setTimeout(() => this.setState({ status: s.pw.length < 6 ? 'error' : 'done' }), 1200);
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css"><style>body{margin:0;background:#ECEEEF;font-family:'Public Sans',system-ui,sans-serif;color:#1A2227;-webkit-font-smoothing:antialiased}a{color:#1C5D65}a:hover{color:#164A51}.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:600 10px 'IBM Plex Mono',monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:600 13px/1.2 'Public Sans',sans-serif;color:#1a1a1a}.dv-opts{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}.dv-oid{font:600 10.5px 'IBM Plex Mono',monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 'Public Sans',sans-serif;color:rgba(0,0,0,.6)}.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}.dv-opt:target .dv-oid{background:#23717A;color:#fff}.dv-next{margin:22px 0 0;font:12px/1.5 'Public Sans',sans-serif;color:rgba(0,0,0,.55)}@keyframes cvspin{to{transform:rotate(360deg)}}@keyframes cvpulse{50%{opacity:.5}}@keyframes cvfadeup{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}@keyframes cvslide{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}@keyframes cvfade{from{opacity:0}to{opacity:1}}@keyframes cvpop{from{opacity:0;transform:scale(.97) translateY(8px)}to{opacity:1;transform:none}}@keyframes cvstripes{to{background-position:28px 0}}@keyframes cvlook{0%,38%,100%{transform:translate(0,0)}46%,80%{transform:translate(2px,-2px)}88%{transform:translate(-1px,1px)}}@keyframes cvspin{to{transform:rotate(360deg)}}@keyframes cvpulse{50%{opacity:.45}}</style><script src="theme.js"></script></helmet>
+
+<section class="dv-turn" id="t1" data-screen-label="CV Screening Results">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">CV Screening Results · <span style="font-family:'IBM Plex Mono';font-weight:500">ScreeningResultsPage → JobHeader, RankingTable, ExcludedList, UnreadableList, CandidateDrawer (ScoreBreakdownCard, RequirementList)</span></span></div>
+<div class="dv-opts">
+<div class="dv-opt" id="1a"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Completed run, side panel open. Click any row to switch candidate; click the overlay to close.</div>
+<div class="dv-card" data-screen-label="1a Screening results" style="width:1280px;position:relative;display:grid;grid-template-columns:240px 1fr;grid-template-rows:56px auto;background:#F5F7F8">
+
+<header data-component="AppShell.Header" style="grid-column:1/-1;height:56px;background:#fff;border-bottom:1px solid #DEE3E6;display:flex;align-items:center;justify-content:space-between;padding:0 20px">
+<div style="display:flex;align-items:center;gap:10px"><div data-component="LogoMark" style="width:30px;height:30px;border-radius:8px;background:linear-gradient(150deg,#2E8F9A 0%,#1B5E66 55%,#123F45 100%);position:relative;flex:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 1px 2px rgba(16,40,50,.25)"><span style="position:absolute;left:6.5px;top:6.5px;width:17px;height:17px;border-radius:50%;border:2.6px solid #fff;box-sizing:border-box"></span><span style="position:absolute;left:13.5px;top:10.5px;width:6px;height:6px;border-radius:50%;background:#BDEDF1"></span><span style="position:absolute;left:20.7px;top:3.9000000000000004px;width:4px;height:4px;border-radius:50%;background:#F2C46D;box-shadow:0 0 0 1px #123F45"></span></div><div data-component="Wordmark" style="display:flex;align-items:center;gap:6px"><span style="font-size:17px;font-weight:700;letter-spacing:-.025em;color:#1A2227;line-height:1">Candi<span style="color:#23717A">Vue</span></span><span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#1C5D65;background:#EDF5F6;border:1px solid #CFE5E8;border-radius:4px;padding:3px 5px">AI</span></div></div>
+<div data-component="UserMenu" style="display:flex;align-items:center;gap:10px;padding:4px 8px;border-radius:6px;cursor:pointer;position:relative" title="Account and appearance"><div style="width:30px;height:30px;border-radius:50%;background:#D5E9EB;color:#1C5D65;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center">IA</div><div style="display:flex;flex-direction:column;line-height:1.2"><span style="font-size:14px;font-weight:600">Interviewer A</span><span style="font-size:12px;color:#66717A">interviewer.a@example.com</span></div><i class="ti ti-chevron-down" style="font-size:16px;color:#66717A"></i></div>
+</header>
+
+<nav data-component="AppShell.Navbar" style="background:#fff;border-right:1px solid #DEE3E6;padding:16px 12px;display:flex;flex-direction:column;gap:2px">
+<div style="height:40px;border-radius:6px;background:#EDF5F6;color:#1C5D65;display:flex;align-items:center;gap:12px;padding:0 12px;font-size:14px;font-weight:600"><i class="ti ti-briefcase" style="font-size:19px"></i>Jobs</div>
+<div style="height:40px;border-radius:6px;color:#1A2227;display:flex;align-items:center;gap:12px;padding:0 12px;font-size:14px;font-weight:500"><i class="ti ti-video" style="font-size:19px;color:#48535B"></i>Interviews</div>
+<div style="height:40px;border-radius:6px;color:#1A2227;display:flex;align-items:center;gap:12px;padding:0 12px;font-size:14px;font-weight:500"><i class="ti ti-file-text" style="font-size:19px;color:#48535B"></i>Reports</div>
+<div style="height:1px;background:#E9ECEE;margin:8px 4px"></div><a href="Hiring Assistant.dc.html" style="height:40px;border-radius:6px;display:flex;align-items:center;gap:12px;padding:0 12px;font-size:14px;font-weight:500;color:#1A2227;text-decoration:none"><i class="ti ti-sparkles" style="font-size:19px;color:#48535B"></i>Hiring Assistant</a>
+<a href="Knowledge Base.dc.html" style="height:40px;border-radius:6px;display:flex;align-items:center;gap:12px;padding:0 12px;font-size:14px;font-weight:500;color:#1A2227;text-decoration:none"><i class="ti ti-books" style="font-size:19px;color:#48535B"></i>Knowledge base</a></nav>
+
+<main style="padding:24px 32px 40px;display:flex;flex-direction:column;gap:20px;min-width:0">
+<div data-component="JobHeader" style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;align-items:center;gap:6px;font-size:13px;color:#66717A"><a href="#1a" style="color:#48535B;text-decoration:none">Jobs</a><i class="ti ti-chevron-right" style="font-size:14px"></i><span>Screening results</span></div>
+<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:20px">
+<div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:26px;font-weight:600;letter-spacing:-.01em;line-height:1.3">Sample Job: Python Backend Developer</h1><div style="display:flex;align-items:center;gap:12px;font-size:14px;color:#48535B"><span>20 CVs received</span><span style="color:#C9D0D4">·</span><span>Last screened 5 Oct 2026, 09:42</span><span style="height:22px;padding:0 9px;border-radius:999px;background:#E7F3EC;color:#245F3E;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px"><i class="ti ti-check" style="font-size:13px"></i>Completed</span></div></div>
+<span style="height:36px;padding:0 18px;border-radius:4px;background:#23717A;color:#fff;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:8px;flex:none;cursor:pointer"><i class="ti ti-player-play" style="font-size:16px"></i>Screen CVs</span>
+</div></div>
+
+<div style="display:flex;gap:10px;align-items:center;padding:10px 14px;border-radius:8px;background:#E7EEF9;font-size:14px;color:#1F3B66"><i class="ti ti-info-circle" style="font-size:18px;color:#2B5FA8"></i>Scores support your decision. CandiVue never rejects or hires anyone automatically.</div>
+
+<div data-component="RankingTable" style="background:#fff;border:1px solid #DEE3E6;border-radius:8px;overflow:hidden">
+<div style="padding:16px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #DEE3E6"><div><div style="font-size:16px;font-weight:600">Ranked candidates</div><div style="font-size:13px;color:#66717A;margin-top:2px">15 candidates met every mandatory requirement. Weights: technical 35%, experience 30%, ATS match 20%, qualifications 15%. The scan icon marks CVs read from an image with text recognition.</div></div></div>
+<div style="display:grid;grid-template-columns:52px minmax(0,1fr) 150px 92px 92px 92px 84px 150px 24px;gap:0 8px;padding:10px 20px;border-bottom:1px solid #DEE3E6;font-size:12px;font-weight:600;color:#66717A;align-items:end;line-height:1.3">
+<div>Rank</div><div>Candidate</div><div>Overall (0–100)</div><div>Technical skills</div><div>Relevant experience</div><div>Qualifi­cations</div><div>ATS CV–JD match</div><div>Status</div><div></div></div>
+<sc-for list="{{ ranked }}" as="r" hint-placeholder-count="15">
+<div onClick="{{ r.select }}" style="display:grid;grid-template-columns:52px minmax(0,1fr) 150px 92px 92px 92px 84px 150px 24px;gap:0 8px;padding:0 20px;height:44px;align-items:center;border-bottom:1px solid #E9ECEE;font-size:14px;cursor:pointer;transition:background .15s;background:{{ r.bg }}" style-hover="background:#F1F4F5">
+<div style="color:#48535B;font-variant-numeric:tabular-nums">{{ r.rank }}</div>
+<div style="font-weight:600;display:flex;align-items:center;gap:6px;min-width:0">{{ r.name }}<sc-if value="{{ r.ocr }}"><span title="Scanned CV: read from an image with text recognition. Worth a quick check against the original." style="display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;color:#48535B;background:#F1F4F5;border:1px solid #E3E7EA;border-radius:4px;padding:1px 5px"><i class="ti ti-scan" style="font-size:12px"></i></span></sc-if></div>
+<div style="display:flex;align-items:center;gap:10px"><b style="font-weight:600;width:22px;font-variant-numeric:tabular-nums">{{ r.overall }}</b><div style="flex:1;height:4px;background:#E9ECEE;border-radius:2px;max-width:90px"><div style="width:{{ r.pct }};height:4px;background:#23717A;border-radius:2px"></div></div></div>
+<div style="font-variant-numeric:tabular-nums;color:#1A2227">{{ r.t }}</div>
+<div style="font-variant-numeric:tabular-nums;color:#1A2227">{{ r.e }}</div>
+<div style="font-variant-numeric:tabular-nums;color:#1A2227">{{ r.q }}</div>
+<div style="font-variant-numeric:tabular-nums;color:#1A2227">{{ r.a }}</div>
+<div><span style="height:22px;padding:0 9px;border-radius:999px;background:{{ r.sbg }};color:{{ r.sfg }};font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:5px;white-space:nowrap"><i class="{{ r.sicon }}" style="font-size:13px"></i>{{ r.status }}</span></div>
+<i class="ti ti-chevron-right" style="font-size:16px;color:#8A949A"></i>
+</div>
+</sc-for>
+</div>
+
+<div data-component="ExcludedList" style="background:#fff;border:1px solid #DEE3E6;border-radius:8px;overflow:hidden">
+<div onClick="{{ toggleExcluded }}" style="padding:14px 20px;display:flex;align-items:center;gap:12px;cursor:pointer" style-hover="background:#F8F9FA">
+<i class="{{ excludedChevron }}" style="font-size:18px;color:#48535B"></i>
+<div style="flex:1"><div style="font-size:15px;font-weight:600">Excluded: failed a mandatory requirement <span style="color:#66717A;font-weight:500">(4)</span></div><div style="font-size:13px;color:#66717A;margin-top:2px">Not ranked. You can still open each CV and decide for yourself.</div></div>
+</div>
+<sc-if value="{{ excludedOpen }}" hint-placeholder-val="{{ true }}">
+<div style="border-top:1px solid #DEE3E6">
+<div style="display:grid;grid-template-columns:160px 280px minmax(0,1fr);gap:0 16px;padding:10px 20px;font-size:12px;font-weight:600;color:#66717A;border-bottom:1px solid #E9ECEE"><div>Candidate</div><div>Mandatory requirement</div><div>Reason</div></div>
+<sc-for list="{{ excluded }}" as="x" hint-placeholder-count="4">
+<div style="display:grid;grid-template-columns:160px 280px minmax(0,1fr);gap:0 16px;padding:12px 20px;font-size:14px;border-bottom:1px solid #E9ECEE;align-items:start;line-height:1.5"><div style="font-weight:600">{{ x.name }}</div><div style="display:flex;gap:6px;align-items:flex-start"><i class="ti ti-x" style="font-size:15px;color:#B03A2E;margin-top:3px"></i>{{ x.req }}</div><div style="color:#48535B;text-wrap:pretty">{{ x.reason }}</div></div>
+</sc-for>
+</div>
+</sc-if>
+</div>
+
+<div data-component="UnreadableList" style="background:#fff;border:1px solid #DEE3E6;border-radius:8px;padding:14px 20px;display:flex;gap:12px;align-items:flex-start">
+<i class="ti ti-file-alert" style="font-size:20px;color:#C08A1E;margin-top:1px"></i>
+<div style="display:flex;flex-direction:column;gap:3px"><div style="font-size:15px;font-weight:600">1 CV could not be read</div><div style="font-size:14px;color:#48535B;line-height:1.5"><b style="font-weight:600;color:#1A2227">Candidate O</b>: the file is password-protected, so it could not be opened. Ask the candidate for an unlocked copy. The other 19 CVs were screened normally.</div></div>
+</div>
+</main>
+
+<sc-if value="{{ drawerOpen }}" hint-placeholder-val="{{ true }}">
+<div onClick="{{ closeDrawer }}" style="position:absolute;inset:56px 0 0 0;background:rgba(26,34,39,.28);animation:cvfade .2s ease-out"></div>
+<aside data-component="CandidateDrawer" style="position:absolute;top:56px;right:0;width:500px;height:980px;background:#fff;border-left:1px solid #DEE3E6;box-shadow:-8px 0 24px rgba(26,34,39,.10);display:flex;flex-direction:column;animation:cvslide .28s cubic-bezier(.2,.8,.2,1)">
+<div style="padding:18px 24px;border-bottom:1px solid #DEE3E6;display:flex;justify-content:space-between;align-items:flex-start">
+<div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:12px;font-weight:600;color:#66717A">Rank {{ sel.rank }} of 15</div><sc-if value="{{ sel.ocr }}"><div style="font-size:12px;color:#48535B;display:flex;align-items:center;gap:4px"><i class="ti ti-scan" style="font-size:13px"></i>Scanned CV, read with text recognition</div></sc-if><div style="font-size:20px;font-weight:600">{{ sel.name }}</div></div>
+<div style="display:flex;gap:8px"><span style="height:32px;padding:0 12px;border-radius:4px;border:1px solid #C9D0D4;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px"><i class="ti ti-file-cv" style="font-size:16px"></i>View CV</span><span onClick="{{ closeDrawer }}" style="width:32px;height:32px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:#48535B" style-hover="background:#F1F4F5"><i class="ti ti-x" style="font-size:18px"></i></span></div>
+</div>
+<div style="flex:1;overflow:auto;padding:20px 24px;display:flex;flex-direction:column;gap:20px">
+<div data-component="ScoreBreakdownCard" style="border:1px solid #DEE3E6;border-radius:8px;padding:18px;display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font-size:16px;font-weight:600">Score breakdown</div><div style="font-size:28px;font-weight:600;font-variant-numeric:tabular-nums">{{ sel.overall }}<span style="font-size:14px;color:#66717A;font-weight:500"> / 100 overall</span></div></div>
+<sc-for list="{{ sel.dims }}" as="d" hint-placeholder-count="4">
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;justify-content:space-between;font-size:14px"><span style="font-weight:600">{{ d.label }} <span style="font-weight:400;color:#66717A;font-size:12px">· weight {{ d.w }}</span></span><b style="font-weight:600;font-variant-numeric:tabular-nums">{{ d.v }}</b></div>
+<div style="height:10px;background:#EDF0F2;border-radius:3px"><div style="width:{{ d.pct }};height:10px;background:#23717A;border-radius:3px"></div></div>
+<div style="font-size:13px;line-height:1.5;color:#48535B;text-wrap:pretty">{{ d.why }}</div>
+</div>
+</sc-for>
+</div>
+<div data-component="RequirementList" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font-size:16px;font-weight:600">Requirements</div><div style="font-size:12px;color:#66717A">{{ sel.reqSummary }}</div></div>
+<sc-for list="{{ sel.reqs }}" as="q" hint-placeholder-count="6">
+<div style="border:1px solid #E9ECEE;border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div style="font-size:14px;font-weight:600;line-height:1.4">{{ q.req }} <span style="font-size:11px;font-weight:600;color:#66717A;border:1px solid #DEE3E6;border-radius:4px;padding:1px 5px;margin-left:4px;vertical-align:1px">{{ q.kind }}</span></div><span style="height:22px;padding:0 9px;border-radius:999px;background:{{ q.bg }};color:{{ q.fg }};font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;flex:none"><i class="{{ q.icon }}" style="font-size:13px"></i>{{ q.status }}</span></div>
+<div style="font-size:13px;line-height:1.5;color:#48535B;text-wrap:pretty">{{ q.ev }}</div>
+<div style="display:flex"><span style="font:500 11px 'IBM Plex Mono';color:#1C5D65;background:#EDF5F6;border-radius:4px;padding:2px 6px">{{ q.src }}</span></div>
+</div>
+</sc-for>
+</div>
+</div>
+</aside>
+</sc-if>
+</div></div>
+</div>
+<p class="dv-next">Try next: “dock the side panel instead of overlaying” · “sortable columns + filter by status” · “show weights as a chip row above the table”</p>
+</section>
+
+<section class="dv-turn" id="t2" data-screen-label="Screening states">
+<div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">Run, empty, loading and error states (main content area; app shell as in <a class="dv-oid" href="#1a">1a</a>)</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="2a"><div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>Running: progress 12 of 20 CVs</div>
+<div class="dv-card" style="width:1040px;background:#F5F7F8;padding:24px 32px;display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;justify-content:space-between;align-items:flex-end"><div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:26px;font-weight:600;letter-spacing:-.01em">Sample Job: Python Backend Developer</div><div style="display:flex;align-items:center;gap:12px;font-size:14px;color:#48535B"><span>20 CVs received</span><span style="height:22px;padding:0 9px;border-radius:999px;background:#E7EEF9;color:#234E8B;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border:1.5px solid #A9C0E4;border-top-color:#2B5FA8;border-radius:50%;display:inline-block;animation:cvspin .9s linear infinite"></span>Running</span></div></div>
+<span style="height:36px;padding:0 18px;border-radius:4px;background:#23717A;color:#fff;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:8px;opacity:.7"><span style="width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;display:inline-block;animation:cvspin .8s linear infinite"></span>Screening…</span></div>
+<div data-component="ScreeningProgress" style="background:#fff;border:1px solid #DEE3E6;border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font-size:16px;font-weight:600">Screening CVs</div><div style="font:500 14px 'IBM Plex Mono';color:#1A2227">12 of 20 CVs</div></div>
+<div style="height:10px;background:#E9ECEE;border-radius:5px"><div style="width:60%;height:10px;background:repeating-linear-gradient(45deg,rgba(255,255,255,.2) 0 7px,transparent 7px 14px),#23717A;background-size:28px 100%,auto;border-radius:5px;animation:cvstripes 1s linear infinite;transition:width .4s"></div></div>
+<div style="font-size:14px;color:#48535B;line-height:1.5">Reading CVs, checking mandatory requirements and scoring each one. You can leave this page; screening continues in the background.</div>
+</div>
+<div style="background:#fff;border:1px solid #DEE3E6;border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:12px">
+<div style="font-size:16px;font-weight:600">Ranked candidates</div>
+<div style="font-size:14px;color:#66717A">The ranking appears when all 20 CVs are screened, so candidates are compared on the same basis.</div>
+<div style="display:flex;flex-direction:column;gap:10px;margin-top:6px;opacity:.6"><div style="height:14px;background:#EDF0F2;border-radius:4px;width:100%"></div><div style="height:14px;background:#EDF0F2;border-radius:4px;width:96%"></div><div style="height:14px;background:#EDF0F2;border-radius:4px;width:92%"></div></div>
+</div></div></div>
+
+<div class="dv-opt" id="2b"><div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a>Failed: plain-language banner, previous results kept</div>
+<div class="dv-card" style="width:1040px;background:#F5F7F8;padding:24px 32px;display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;justify-content:space-between;align-items:flex-end"><div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:26px;font-weight:600;letter-spacing:-.01em">Sample Job: Python Backend Developer</div><div style="display:flex;align-items:center;gap:12px;font-size:14px;color:#48535B"><span>20 CVs received</span><span style="height:22px;padding:0 9px;border-radius:999px;background:#FBE9E7;color:#932E24;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px"><i class="ti ti-alert-triangle" style="font-size:13px"></i>Failed</span></div></div>
+<span style="height:36px;padding:0 18px;border-radius:4px;background:#23717A;color:#fff;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:8px"><i class="ti ti-player-play" style="font-size:16px"></i>Screen CVs</span></div>
+<div data-component="RunErrorAlert" style="display:flex;gap:12px;padding:14px 16px;border-radius:8px;background:#FBE9E7;align-items:flex-start"><i class="ti ti-alert-circle" style="font-size:20px;color:#B03A2E;margin-top:1px"></i><div style="flex:1;display:flex;flex-direction:column;gap:4px"><div style="font-size:15px;font-weight:600;color:#932E24">Screening stopped at 12 of 20 CVs</div><div style="font-size:14px;line-height:1.5;color:#5A2620">The AI service did not respond in time. No CVs were lost. Try again in a few minutes; screening restarts where it stopped.</div></div><span style="height:32px;padding:0 14px;border-radius:4px;background:#fff;border:1px solid #E3B7B1;color:#932E24;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;flex:none"><i class="ti ti-refresh" style="font-size:15px"></i>Try again</span></div>
+<div style="background:#fff;border:1px solid #DEE3E6;border-radius:8px;overflow:hidden">
+<div style="padding:14px 20px;border-bottom:1px solid #DEE3E6;display:flex;justify-content:space-between;align-items:center"><div style="font-size:16px;font-weight:600">Ranked candidates</div><div style="font-size:13px;color:#66717A">Showing the last completed run · 3 Oct 2026, 14:20</div></div>
+<div style="display:grid;grid-template-columns:52px 1fr 150px;padding:0 20px;height:44px;align-items:center;border-bottom:1px solid #E9ECEE;font-size:14px"><div style="color:#48535B">1</div><div style="font-weight:600">Candidate H</div><div style="font-weight:600">85</div></div>
+<div style="display:grid;grid-template-columns:52px 1fr 150px;padding:0 20px;height:44px;align-items:center;font-size:14px"><div style="color:#48535B">2</div><div style="font-weight:600">Candidate C</div><div style="font-weight:600">82</div></div>
+</div></div></div>
+
+<div class="dv-opt" id="2c"><div class="dv-olabel"><a class="dv-oid" href="#2c">2c</a>Empty: no CVs received yet</div>
+<div class="dv-card" style="width:1040px;background:#F5F7F8;padding:24px 32px;display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;justify-content:space-between;align-items:flex-end"><div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:26px;font-weight:600;letter-spacing:-.01em">Sample Job: Python Backend Developer</div><div style="font-size:14px;color:#48535B">0 CVs received</div></div>
+<span style="height:36px;padding:0 18px;border-radius:4px;background:#E9ECEE;color:#8A949A;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:8px"><i class="ti ti-player-play" style="font-size:16px"></i>Screen CVs</span></div>
+<div style="background:#fff;border:1px dashed #C9D0D4;border-radius:8px;padding:56px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
+<span style="width:48px;height:48px;border-radius:50%;background:#EDF5F6;color:#23717A;display:inline-flex;align-items:center;justify-content:center"><i class="ti ti-inbox" style="font-size:24px"></i></span>
+<div style="font-size:17px;font-weight:600">No CVs yet</div>
+<div style="font-size:14px;color:#48535B;max-width:440px;line-height:1.55">CVs sent through this job’s application form appear here automatically. You can screen them once at least one has arrived.</div>
+</div></div></div>
+
+<div class="dv-opt" id="2d"><div class="dv-olabel"><a class="dv-oid" href="#2d">2d</a>Empty: CVs ready, never screened</div>
+<div class="dv-card" style="width:1040px;background:#F5F7F8;padding:24px 32px;display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;justify-content:space-between;align-items:flex-end"><div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:26px;font-weight:600;letter-spacing:-.01em">Sample Job: Python Backend Developer</div><div style="display:flex;align-items:center;gap:12px;font-size:14px;color:#48535B"><span>20 CVs received</span><span style="height:22px;padding:0 9px;border-radius:999px;background:#EEF1F3;color:#3E484F;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px"><i class="ti ti-clock" style="font-size:13px"></i>Not screened</span></div></div>
+<span style="height:36px;padding:0 18px;border-radius:4px;background:#23717A;color:#fff;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:8px"><i class="ti ti-player-play" style="font-size:16px"></i>Screen CVs</span></div>
+<div style="background:#fff;border:1px dashed #C9D0D4;border-radius:8px;padding:56px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
+<span style="width:48px;height:48px;border-radius:50%;background:#EDF5F6;color:#23717A;display:inline-flex;align-items:center;justify-content:center"><i class="ti ti-list-numbers" style="font-size:24px"></i></span>
+<div style="font-size:17px;font-weight:600">20 CVs are ready to screen</div>
+<div style="font-size:14px;color:#48535B;max-width:460px;line-height:1.55">Screening checks each CV against the job’s mandatory requirements, then scores and ranks the rest. It usually takes a few minutes.</div>
+</div></div></div>
+
+<div class="dv-opt" id="2e"><div class="dv-olabel"><a class="dv-oid" href="#2e">2e</a>Loading page data <span style="font-family:'IBM Plex Mono'">Skeleton</span></div>
+<div class="dv-card" style="width:1040px;background:#F5F7F8;padding:24px 32px;display:flex;flex-direction:column;gap:20px;animation:cvpulse 1.6s ease-in-out infinite">
+<div style="display:flex;justify-content:space-between;align-items:flex-end"><div style="display:flex;flex-direction:column;gap:10px"><div style="height:28px;width:420px;background:#E3E7EA;border-radius:6px"></div><div style="height:14px;width:240px;background:#E3E7EA;border-radius:4px"></div></div><div style="height:36px;width:130px;background:#E3E7EA;border-radius:4px"></div></div>
+<div style="background:#fff;border:1px solid #DEE3E6;border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:14px">
+<div style="height:16px;width:180px;background:#EDF0F2;border-radius:4px"></div>
+<div style="display:grid;grid-template-columns:40px 1fr 120px 80px 80px 80px 80px 120px;gap:14px"><div style="height:12px;background:#EDF0F2;border-radius:3px"></div><div style="height:12px;background:#EDF0F2;border-radius:3px"></div><div style="height:12px;background:#EDF0F2;border-radius:3px"></div><div style="height:12px;background:#EDF0F2;border-radius:3px"></div><div style="height:12px;background:#EDF0F2;border-radius:3px"></div><div style="height:12px;background:#EDF0F2;border-radius:3px"></div><div style="height:12px;background:#EDF0F2;border-radius:3px"></div><div style="height:12px;background:#EDF0F2;border-radius:3px"></div></div>
+<div style="display:grid;grid-template-columns:40px 1fr 120px 80px 80px 80px 80px 120px;gap:14px"><div style="height:12px;background:#EDF0F2;border-radius:3px"></div><div style="height:12px;background:#EDF0F2;border-radius:3px"></div><div style="height:12px;background:#EDF0F2;border-radius:3px"></div><div style="height:12px;background:#EDF0F2;border-radius:3px"></div><div style="height:12px;background:#EDF0F2;border-radius:3px"></div><div style="height:12px;background:#EDF0F2;border-radius:3px"></div><div style="height:12px;background:#EDF0F2;border-radius:3px"></div><div style="height:12px;background:#EDF0F2;border-radius:3px"></div></div>
+<div style="display:grid;grid-template-columns:40px 1fr 120px 80px 80px 80px 80px 120px;gap:14px"><div style="height:12px;background:#EDF0F2;border-radius:3px"></div><div style="height:12px;background:#EDF0F2;border-radius:3px"></div><div style="height:12px;background:#EDF0F2;border-radius:3px"></div><div style="height:12px;background:#EDF0F2;border-radius:3px"></div><div style="height:12px;background:#EDF0F2;border-radius:3px"></div><div style="height:12px;background:#EDF0F2;border-radius:3px"></div><div style="height:12px;background:#EDF0F2;border-radius:3px"></div><div style="height:12px;background:#EDF0F2;border-radius:3px"></div></div>
+</div></div></div>
+
+<div class="dv-opt" id="2f"><div class="dv-olabel"><a class="dv-oid" href="#2f">2f</a>Page could not load</div>
+<div class="dv-card" style="width:1040px;background:#F5F7F8;padding:24px 32px">
+<div style="background:#fff;border:1px solid #DEE3E6;border-radius:8px;padding:56px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
+<span style="width:48px;height:48px;border-radius:50%;background:#FBE9E7;color:#B03A2E;display:inline-flex;align-items:center;justify-content:center"><i class="ti ti-cloud-off" style="font-size:24px"></i></span>
+<div style="font-size:17px;font-weight:600">We couldn’t load the screening results</div>
+<div style="font-size:14px;color:#48535B;max-width:440px;line-height:1.55">Check your connection and try again. Your results are saved and will appear once the page loads.</div>
+<span style="height:36px;padding:0 18px;border-radius:4px;background:#fff;border:1px solid #C9D0D4;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:8px;margin-top:6px"><i class="ti ti-refresh" style="font-size:16px"></i>Try again</span>
+</div></div></div>
+
+<div class="dv-opt" id="2g"><div class="dv-olabel"><a class="dv-oid" href="#2g">2g</a>Side panel: loading · error</div>
+<div class="dv-card" style="width:1040px;display:grid;grid-template-columns:1fr 1fr;background:#F5F7F8;gap:1px">
+<div style="background:#fff;padding:20px 24px;display:flex;flex-direction:column;gap:16px;animation:cvpulse 1.6s ease-in-out infinite"><div style="height:12px;width:90px;background:#EDF0F2;border-radius:3px"></div><div style="height:22px;width:160px;background:#E3E7EA;border-radius:4px"></div><div style="border:1px solid #E9ECEE;border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:14px"><div style="height:10px;background:#EDF0F2;border-radius:3px"></div><div style="height:10px;width:80%;background:#EDF0F2;border-radius:3px"></div><div style="height:10px;width:65%;background:#EDF0F2;border-radius:3px"></div><div style="height:10px;width:85%;background:#EDF0F2;border-radius:3px"></div></div></div>
+<div style="background:#fff;padding:20px 24px;display:flex;flex-direction:column;gap:12px"><div style="font-size:20px;font-weight:600">Candidate C</div><div style="display:flex;gap:12px;padding:14px 16px;border-radius:8px;background:#FBE9E7;align-items:flex-start"><i class="ti ti-alert-circle" style="font-size:20px;color:#B03A2E"></i><div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:14px;font-weight:600;color:#932E24">We couldn’t load this breakdown</div><div style="font-size:14px;line-height:1.5;color:#5A2620">The scores are saved. Close the panel and open it again, or try again below.</div><span style="font-size:14px;font-weight:600;color:#932E24;text-decoration:underline;margin-top:4px">Try again</span></div></div></div>
+</div></div>
+
+</div>
+<p class="dv-next">Try next: “show pending (queued) run state” · “partial results streaming in during the run”</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { sel: 'C', open: true, excludedOpen: true };
+  renderVals() {
+    const S = {
+      'New': ['#EEF1F3', '#3E484F', 'ti ti-circle-dot'],
+      'Invitation pending': ['#FBF0D9', '#7A5000', 'ti ti-clock'],
+      'Invited': ['#EDF5F6', '#1C5D65', 'ti ti-mail-check'],
+      'Invitation failed': ['#FBE9E7', '#932E24', 'ti ti-mail-x']
+    };
+    const raw = [
+      ['H',86,90,84,80,88,'Invited'],['C',82,85,80,78,83,'Invitation pending'],['M',79,82,76,80,77,'Invited'],
+      ['A',77,78,79,70,76,'Invitation failed'],['Q',74,76,72,74,73,'New'],['F',71,70,75,68,70,'New'],
+      ['K',69,72,64,72,66,'New'],['B',66,64,70,62,67,'New'],['R',63,66,58,70,60,'New'],['E',61,60,63,58,62,'New'],
+      ['N',58,55,62,60,54,'New'],['T',55,58,50,56,55,'New'],['G',52,50,54,55,49,'New'],['P',49,48,52,46,50,'New'],['J',46,44,48,50,43,'New']
+    ];
+    const ranked = raw.map((r, i) => {
+      const s = S[r[6]];
+      return { id: r[0], rank: i + 1, name: 'Candidate ' + r[0], overall: r[1], pct: r[1] + '%', t: r[2], e: r[3], q: r[4], a: r[5],
+        status: r[6], ocr: r[0] === 'K' || r[0] === 'B', sbg: s[0], sfg: s[1], sicon: s[2],
+        bg: this.state.open && this.state.sel === r[0] ? '#EDF5F6' : 'transparent',
+        select: () => this.setState({ sel: r[0], open: true }) };
+    });
+    const c = ranked.find(r => r.id === this.state.sel) || ranked[1];
+    const lvl = c.rank <= 4 ? 0 : c.rank <= 10 ? 1 : 2;
+    const M = { Met: ['#E7F3EC', '#245F3E', 'ti ti-check'], 'Partially met': ['#FBF0D9', '#7A5000', 'ti ti-circle-half-2'], Unmet: ['#FBE9E7', '#932E24', 'ti ti-x'] };
+    const reqDefs = [
+      ['3+ years backend development with Python', 'Mandatory', ['Met','Met','Met'], ['Backend developer roles since 2021 (about 4 years); Python named in each role.','About 3 years in two backend roles; Python used in both.','Just over 3 years, mostly Python with some Java.'], 'CV · Work history'],
+      ['Python web framework (Django, FastAPI or Flask)', 'Mandatory', ['Met','Met','Met'], ['Built REST services in Django at Sample Company 2; a FastAPI side project is linked.','Flask APIs for an internal tool; no Django or FastAPI mentioned.','Django used in one project; depth not described.'], 'CV · Projects'],
+      ['Relational databases, PostgreSQL preferred', 'Required', ['Met','Partially met','Partially met'], ['Designed PostgreSQL schemas and wrote migrations for a billing service.','Mentions SQL and MySQL. PostgreSQL is not stated.','Lists “SQL” under skills with no example of use.'], 'CV · Skills'],
+      ['Containers (Docker)', 'Required', ['Met','Met','Unmet'], ['Packaged services with Docker and Docker Compose for local development.','Docker listed in two roles.','No container tooling mentioned in the CV.'], 'CV · Work history'],
+      ['Cloud deployment', 'Preferred', ['Partially met','Unmet','Unmet'], ['Deployed to a cloud VM once; no managed cloud services described.','No cloud platform mentioned.','No cloud platform mentioned.'], 'CV · Projects'],
+      ['Bachelor’s in Computer Science or equivalent experience', 'Required', ['Met','Met','Partially met'], ['BSc Computer Science, Sample University.','BSc Software Engineering, Sample University.','Diploma in IT plus 3 years of experience; equivalence is a judgement call.'], 'CV · Education']
+    ];
+    const reqs = reqDefs.map(d => { const st = d[2][lvl]; const m = M[st]; return { req: d[0], kind: d[1], status: st, bg: m[0], fg: m[1], icon: m[2], ev: d[3][lvl], src: d[4] }; });
+    const cnt = k => reqs.filter(r => r.status === k).length;
+    const why = [
+      ['Strong evidence across Python, REST APIs and testing; one gap in cloud tooling.','Solid Python and API work; fewer examples of testing or performance work.','Python is present but described briefly; few concrete outcomes.'],
+      ['Four years in closely matching backend roles with growing responsibility.','Three years of relevant backend work, mostly maintenance tasks.','Experience meets the minimum but is partly outside backend work.'],
+      ['Relevant degree; no certifications listed (none required).','Relevant degree; one online course listed.','Qualification is related; equivalence relies on experience.'],
+      ['CV covers most job description terms by meaning, not just keywords.','CV matches the core terms; several preferred skills are missing.','Partial overlap with the job description; key terms appear only in a skills list.']
+    ];
+    const dims = [['Technical skills','35%',c.t,0],['Relevant experience','30%',c.e,1],['Qualifications','15%',c.q,2],['ATS CV–JD match','20%',c.a,3]]
+      .map(d => ({ label: d[0], w: d[1], v: d[2], pct: d[2] + '%', why: why[d[3]][lvl] }));
+    return {
+      ranked,
+      sel: { name: c.name, rank: c.rank, ocr: c.ocr, overall: c.overall, dims, reqs, reqSummary: cnt('Met') + ' met · ' + cnt('Partially met') + ' partial · ' + cnt('Unmet') + ' unmet' },
+      drawerOpen: this.state.open,
+      closeDrawer: () => this.setState({ open: false }),
+      excludedOpen: this.state.excludedOpen,
+      excludedChevron: this.state.excludedOpen ? 'ti ti-chevron-down' : 'ti ti-chevron-right',
+      toggleExcluded: () => this.setState(s => ({ excludedOpen: !s.excludedOpen })),
+      excluded: [
+        { name: 'Candidate D', req: '3+ years backend development with Python', reason: 'The CV shows about 1 year of backend work (2025 to now). Earlier roles are in technical support.' },
+        { name: 'Candidate I', req: 'Python web framework (Django, FastAPI or Flask)', reason: 'Backend work is in Node.js and Go. No Python web framework is mentioned anywhere in the CV.' },
+        { name: 'Candidate L', req: '3+ years backend development with Python', reason: 'Python appears only in a university course project; professional experience is in front-end development.' },
+        { name: 'Candidate S', req: 'Python web framework (Django, FastAPI or Flask)', reason: 'Python is used for data analysis scripts; no web services or frameworks are described.' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
