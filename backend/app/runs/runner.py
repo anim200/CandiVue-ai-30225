@@ -62,8 +62,14 @@ def start_run(kind: str, run_id: int) -> Future:
 def execute_run(kind: str, run_id: int) -> None:
     """Run the work and record the outcome; errors from the work never escape."""
     run_kind = RUN_KINDS[kind]
-    _update(run_kind.model, run_id, status=RunStatus.RUNNING,
-            started_at=_now(), finished_at=None, error=None)
+    _update(
+        run_kind.model,
+        run_id,
+        status=RunStatus.RUNNING,
+        started_at=_now(),
+        finished_at=None,
+        error=None,
+    )
     logger.info("Run started: %s %d", kind, run_id)
 
     try:
@@ -82,8 +88,7 @@ def execute_run(kind: str, run_id: int) -> None:
         _update(run_kind.model, run_id, status=RunStatus.WAITING_FOR_REVIEW)
         logger.info("Run waiting for review: %s %d", kind, run_id)
     else:
-        _update(run_kind.model, run_id, status=RunStatus.COMPLETED,
-                finished_at=_now())
+        _update(run_kind.model, run_id, status=RunStatus.COMPLETED, finished_at=_now())
         logger.info("Run completed: %s %d", kind, run_id)
 
 
@@ -112,8 +117,7 @@ def resume_interrupted_runs() -> list[Future]:
 
 
 def _fail(model: type, run_id: int, message: str) -> None:
-    _update(model, run_id, status=RunStatus.FAILED, error=message,
-            finished_at=_now())
+    _update(model, run_id, status=RunStatus.FAILED, error=message, finished_at=_now())
 
 
 def _update(model: type, run_id: int, **values) -> None:

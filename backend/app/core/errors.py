@@ -19,7 +19,9 @@ async def handle_unexpected_error(request: Request, exc: Exception) -> JSONRespo
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
-async def handle_ai_service_error(request: Request, exc: AIServiceError) -> JSONResponse:
+async def handle_ai_service_error(
+    request: Request, exc: AIServiceError
+) -> JSONResponse:
     # Already logged in invoke_llm(). 503 = temporary, the user can try again (N6).
     return JSONResponse(
         status_code=503,
