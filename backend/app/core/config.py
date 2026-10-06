@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     # AI model (see app/ai/llm.py). SecretStr hides the key in logs and errors.
     llm_provider: str = "google_genai"
-    llm_model: str = "gemini-3.5-flash"
+    llm_model: str = "gemini-3.5-flash-lite"
     llm_api_key: SecretStr | None = None
     llm_timeout_seconds: float = 60
     llm_max_retries: int = 2

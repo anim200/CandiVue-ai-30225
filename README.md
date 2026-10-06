@@ -167,7 +167,7 @@ width.
 
 | Setting (`.env`) | Default | Meaning |
 |---|---|---|
-| `LLM_PROVIDER` / `LLM_MODEL` | `google_genai` / `gemini-3.5-flash` | Which AI model is used. |
+| `LLM_PROVIDER` / `LLM_MODEL` | `google_genai` / `gemini-3.5-flash-lite` | Which AI model is used. Free tier: daily request limits per model (see <https://ai.dev/rate-limit>). |
 | `LLM_API_KEY` | none | Your own key (Gemini: free from Google AI Studio). |
 | `LLM_TIMEOUT_SECONDS` | `60` | Longest wait for one answer. |
 | `LLM_MAX_RETRIES` | `2` | Extra tries after a failure, with a growing pause. |
