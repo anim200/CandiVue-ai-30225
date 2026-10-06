@@ -7,6 +7,7 @@ import pytest
 os.environ.setdefault(
     "DATABASE_URL", "postgresql+psycopg://test:test@localhost:5432/test"
 )
+os.environ.setdefault("JWT_SECRET", "test-only-secret-that-is-long-enough-0123456789")
 
 from app.db.database import check_database
 

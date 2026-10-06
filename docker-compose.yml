@@ -34,6 +34,11 @@ services:
       LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-60}
       LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-2}
       LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-480}
+      DEMO_INTERVIEWER_EMAIL: ${DEMO_INTERVIEWER_EMAIL:-}
+      DEMO_INTERVIEWER_NAME: ${DEMO_INTERVIEWER_NAME:-Interviewer A}
+      DEMO_INTERVIEWER_PASSWORD: ${DEMO_INTERVIEWER_PASSWORD:-}
     ports:
       # Bound to localhost only (documented local-development exception, N10).
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
@@ -55,6 +60,7 @@ services:
     profiles: ["test"]
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
     depends_on:
       backend:
         condition: service_healthy  # backend has applied the migrations

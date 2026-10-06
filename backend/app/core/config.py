@@ -2,7 +2,7 @@
 
 from functools import lru_cache
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings
 
 
@@ -20,6 +20,16 @@ class Settings(BaseSettings):
     llm_max_retries: int = 2
     # 0 = least random: the same CV and job profile get the same score (F2, B2).
     llm_temperature: float = 0
+
+    # Login tokens (see app/auth). The secret signs every token, so anyone who
+    # knows it could create tokens: required, long, and only in .env.
+    jwt_secret: SecretStr = Field(min_length=32)
+    access_token_minutes: int = Field(default=480, gt=0)  # one working day
+
+    # First interviewer account, created at startup when there is no user yet.
+    demo_interviewer_email: str | None = None
+    demo_interviewer_name: str = "Interviewer A"
+    demo_interviewer_password: SecretStr | None = None
 
     @property
     def cors_origin_list(self) -> list[str]:
