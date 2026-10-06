@@ -3,6 +3,8 @@
 // The address is always /api/...: nginx (Docker) or Vite (npm run dev)
 // forwards it to the backend.
 
+import { clearSession, loadSession } from '../auth/session';
+
 const TIMEOUT_MS = 15000;
 
 export const MESSAGES = {
@@ -19,16 +21,30 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiGet(path) {
+async function request(method, path, body) {
+  const session = loadSession();
+  const headers = { Accept: 'application/json' };
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (session) headers.Authorization = `Bearer ${session.token}`; // who is calling
+
   let response;
   try {
     response = await fetch(`/api${path}`, {
-      headers: { Accept: 'application/json' },
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (error) {
     const message = error.name === 'TimeoutError' ? MESSAGES.timeout : MESSAGES.unreachable;
     throw new ApiError(message, 0);
+  }
+
+  // 401 with a token = the token expired or is no longer valid: sign out.
+  // An interviewer goes back to the login page with a short explanation.
+  if (response.status === 401 && session) {
+    clearSession();
+    if (session.user.role === 'interviewer') window.location.assign('/login?expired=1');
   }
 
   if (!response.ok) {
@@ -47,6 +63,14 @@ async function readDetail(response) {
   } catch {
     return null;
   }
+}
+
+export function apiGet(path) {
+  return request('GET', path);
+}
+
+export function apiPost(path, body) {
+  return request('POST', path, body);
 }
 
 export function getHealth() {
