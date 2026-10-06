@@ -1,6 +1,7 @@
 // Hiring Assistant (design: Hiring Assistant.dc.html). One chat per job:
 // the interviewer describes the role, the assistant saves the profile,
 // may search the knowledge base, writes the JD and waits for review.
+// After approval the JD is posted to the job board (result card in the chat).
 // Interviewers only (route guard + backend, N9).
 
 import { Button } from '@mantine/core';
@@ -23,6 +24,7 @@ import {
 } from './ChatItems';
 import JdCard from './JdCard';
 import JobProgressBar from './JobProgressBar';
+import PostingCard from './PostingCard';
 import { JdEditModal, RejectModal } from './ReviewModals';
 import ThreadList from './ThreadList';
 
@@ -48,8 +50,10 @@ function feedbackBefore(items, jd) {
 }
 
 // Turn the thread items into chat rows; consecutive tool steps share one row.
-function ChatRows({ items, profile, pending, reviewBusy, onApprove, onEdit, onReject }) {
+function ChatRows({ items, profile, pending, reviewBusy, onApprove, onEdit, onReject, onPost, postBusy }) {
   const rows = [];
+  const approvedJd = items.find((item) => item.kind === 'jd' && item.jd.status === 'approved')?.jd;
+  const lastPosting = items.findLastIndex((item) => item.kind === 'posting');
   let steps = [];
   const flushSteps = () => {
     if (steps.length) rows.push(<AssistantRow key={`s${rows.length}`}><StepLines steps={steps} /></AssistantRow>);
@@ -88,6 +92,18 @@ function ChatRows({ items, profile, pending, reviewBusy, onApprove, onEdit, onRe
             onApprove={onApprove}
             onEdit={onEdit}
             onReject={onReject}
+          />
+        </AssistantRow>,
+      );
+    if (item.kind === 'posting')
+      rows.push(
+        <AssistantRow key={index}>
+          <PostingCard
+            result={item}
+            approvedJd={approvedJd}
+            profile={profile}
+            onPost={index === lastPosting && item.status !== 'posted' ? onPost : null}
+            busy={postBusy}
           />
         </AssistantRow>,
       );
@@ -211,6 +227,20 @@ export default function HiringAssistantPage() {
     }
   }
 
+  // Post the approved JD again (after a failure or once the form link is added).
+  async function postAgain() {
+    setSending(true);
+    setReviewError(null);
+    try {
+      setThread(await apiPostAi(`/assistant/jobs/${id}/post`));
+      loadJobs();
+    } catch (error) {
+      setReviewError(error.message);
+    } finally {
+      setSending(false);
+    }
+  }
+
   // Send the review decision: approve, edit or reject (the paused graph continues).
   async function review(decision) {
     setReviewBusy(true);
@@ -310,6 +340,8 @@ export default function HiringAssistantPage() {
                   onApprove={() => review({ action: 'approve' })}
                   onEdit={() => setDialog('edit')}
                   onReject={() => setDialog('reject')}
+                  onPost={postAgain}
+                  postBusy={sending}
                 />
               )}
               {sentText && <UserBubble text={sentText} />}

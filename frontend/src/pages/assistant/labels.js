@@ -8,6 +8,8 @@ export const STAGES = {
   jd_to_approve: { text: 'Job description to approve', attention: true },
   jd_rejected: { text: 'Writing a new version' },
   jd_approved: { text: 'Job description approved' },
+  posted: { text: 'Posted · collecting CVs' },
+  posting_failed: { text: 'Posting failed', attention: true },
 };
 
 // Requirement levels, in the order the profile card lists them.

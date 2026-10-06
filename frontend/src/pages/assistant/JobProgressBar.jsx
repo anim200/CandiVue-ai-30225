@@ -1,5 +1,5 @@
 // Top of the chat: job name, the safety note and the five steps of a job
-// (design: JobProgressBar). Posting, screening and invitations come later.
+// (design: JobProgressBar). Screening and invitations come later.
 
 import { IconArrowLeft, IconCircle, IconCircleCheckFilled, IconEye, IconShieldCheck } from '@tabler/icons-react';
 import { Fragment } from 'react';
@@ -9,11 +9,12 @@ import classes from './Assistant.module.css';
 
 // Which steps are done, and which one needs the interviewer now.
 function stepsFor(job) {
-  const approved = job.stage === 'jd_approved';
+  const posted = job.stage === 'posted';
+  const approved = posted || job.stage === 'jd_approved' || job.stage === 'posting_failed';
   return [
     { label: 'Profile', done: Boolean(job.profile) },
     { label: 'JD approved', done: approved, now: job.stage === 'jd_to_approve' },
-    { label: 'Posted', done: false },
+    { label: 'Posted', done: posted, now: job.stage === 'posting_failed' },
     { label: 'CVs screened', done: false },
     { label: 'Invitations', done: false },
   ];
