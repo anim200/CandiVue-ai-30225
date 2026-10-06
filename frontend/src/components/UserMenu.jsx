@@ -1,13 +1,24 @@
 // The signed-in interviewer in the header, with "Sign out" (design:
-// Jobs.dc.html, UserMenu). Phones show only the initials; the menu itself
-// always shows name and email.
-// Not yet in the menu: "Appearance" (comes with dark mode) and "Help".
+// Jobs.dc.html, UserMenu and frame 2d "User menu open"). Phones show only
+// the initials; the menu itself always shows name and email.
+// Not yet in the menu: "Appearance" (comes with dark mode) and "Help"
+// (no help page yet).
 
 import { Avatar, Box, Group, Menu, Text, UnstyledButton } from '@mantine/core';
-import { IconChevronDown, IconLogout } from '@tabler/icons-react';
+import { IconChevronDown, IconChevronUp, IconLogout } from '@tabler/icons-react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { clearSession, loadSession } from '../auth/session';
+import classes from './UserMenu.module.css';
+
+// Opening animation from the design ("cvpop", 0.2s ease-out).
+const POP = {
+  in: { opacity: 1, transform: 'none' },
+  out: { opacity: 0, transform: 'scale(.97) translateY(8px)' },
+  common: { transformOrigin: 'top right' },
+  transitionProperty: 'opacity, transform',
+};
 
 function initialsOf(name) {
   return name
@@ -20,6 +31,7 @@ function initialsOf(name) {
 
 export default function UserMenu() {
   const navigate = useNavigate();
+  const [opened, setOpened] = useState(false);
   const user = loadSession()?.user;
   if (!user) return null;
 
@@ -28,27 +40,21 @@ export default function UserMenu() {
     navigate('/login', { replace: true });
   }
 
+  const Chevron = opened ? IconChevronUp : IconChevronDown;
+
   return (
     <Menu
+      opened={opened}
+      onChange={setOpened}
       position="bottom-end"
       width={260}
-      styles={{
-        dropdown: {
-          borderColor: '#DEE3E6',
-          borderRadius: 8,
-          padding: 6,
-          boxShadow: '0 10px 30px rgba(26,34,39,.12)',
-        },
-      }}
+      transitionProps={{ transition: POP, duration: 200, timingFunction: 'ease-out' }}
+      classNames={{ dropdown: classes.dropdown, item: classes.item }}
     >
       <Menu.Target>
-        <UnstyledButton aria-label="Account menu" px={8} py={4} style={{ borderRadius: 6 }}>
+        <UnstyledButton aria-label="Account menu" className={classes.target}>
           <Group gap={10} wrap="nowrap">
-            <Avatar
-              size={30}
-              radius="xl"
-              styles={{ placeholder: { background: '#D5E9EB', color: '#1C5D65', fontSize: 12, fontWeight: 700 } }}
-            >
+            <Avatar size={30} radius="xl" classNames={{ placeholder: classes.avatar }}>
               {initialsOf(user.name)}
             </Avatar>
             <Box visibleFrom="sm" style={{ lineHeight: 1.2 }}>
@@ -59,27 +65,24 @@ export default function UserMenu() {
                 {user.email}
               </Text>
             </Box>
-            <IconChevronDown size={16} color="#66717A" />
+            <Chevron size={16} color="#66717A" />
           </Group>
         </UnstyledButton>
       </Menu.Target>
 
       <Menu.Dropdown>
-        <Box px={10} pt={8} pb={10}>
+        <div className={classes.who}>
           <Text fz={14} fw={600}>
             {user.name}
           </Text>
           <Text fz={12} c="dimmed">
             {user.email}
           </Text>
-        </Box>
-        <Menu.Divider />
+        </div>
         <Menu.Item
-          h={36}
-          fz={14}
+          className={classes.signOut}
           leftSection={<IconLogout size={17} />}
           onClick={signOut}
-          styles={{ item: { color: '#932E24' } }}
         >
           Sign out
         </Menu.Item>

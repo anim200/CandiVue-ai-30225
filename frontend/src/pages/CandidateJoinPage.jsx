@@ -5,14 +5,16 @@
 // working link shows a short confirmation in the same style.
 // No account, no scores: candidates only ever see their own interview (N9).
 
-import { Box, Button, Loader, Stack, Text } from '@mantine/core';
-import { IconAlertCircle, IconCircleCheck, IconCloudOff } from '@tabler/icons-react';
+import { Anchor, Box, Button, Stack, Text } from '@mantine/core';
+import { IconAlertCircle, IconCircleCheck, IconCloudOff, IconHelpCircle } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 
 import { apiPost } from '../api/client';
 import { clearSession, saveSession } from '../auth/session';
 import Logo from '../components/Logo';
+import { HELP_EMAIL } from '../config';
+import classes from './CandidateJoinPage.module.css';
 
 // Icon circle colours from the design frames.
 const RED = { bg: '#FBE9E7', color: '#B03A2E' };
@@ -98,20 +100,26 @@ export default function CandidateJoinPage() {
 
   return (
     <Box mih="100vh" bg="#F5F7F8">
-      <Box
-        component="header"
-        h={56}
-        bg="white"
-        px={{ base: 16, sm: 24 }}
-        style={{ borderBottom: '1px solid #DEE3E6', display: 'flex', alignItems: 'center' }}
-      >
+      <header className={classes.header}>
         <Logo />
-      </Box>
+        <span className={classes.help}>
+          <Anchor href={`mailto:${HELP_EMAIL}`} fz={13} className={classes.helpShort}>
+            <IconHelpCircle size={16} />
+            Help
+          </Anchor>
+          <span className={classes.helpFull}>
+            Need help?{' '}
+            <Anchor href={`mailto:${HELP_EMAIL}`} fz={13}>
+              {HELP_EMAIL}
+            </Anchor>
+          </span>
+        </span>
+      </header>
 
       <Box px={{ base: 16, sm: 24 }} py={40} style={{ display: 'flex', justifyContent: 'center' }}>
         {result.status === 'checking' ? (
           <StateCard>
-            <Loader size={28} color="harbor.6" />
+            <span className={classes.spinner} />
             <Text fz={16} fw={600}>
               Opening your interview…
             </Text>

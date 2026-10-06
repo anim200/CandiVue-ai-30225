@@ -4,7 +4,7 @@
 // Left out on purpose (decided for #646482): "Forgot password?" and
 // "Keep me signed in". The light/dark switch comes with dark mode later.
 
-import { Anchor, Box, Button, Loader, PasswordInput, TextInput } from '@mantine/core';
+import { Anchor, Box, Button, PasswordInput, TextInput } from '@mantine/core';
 import {
   IconAlertCircle,
   IconCheck,
@@ -225,9 +225,9 @@ export default function LoginPage() {
             fullWidth
             leftSection={
               stage === 'signingIn' ? (
-                <Loader type="oval" size={15} color="white" />
+                <span className={classes.buttonSpinner} />
               ) : stage === 'signedIn' ? (
-                <IconCircleCheck size={18} />
+                <IconCircleCheck size={18} className={classes.fadeIn} />
               ) : null
             }
           >
