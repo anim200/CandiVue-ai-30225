@@ -53,6 +53,9 @@ def rag_search(
     policies, previous job profiles). Use it only when it helps the JD."""
     with SessionLocal() as db:
         passages = search_knowledge(db, query, collections, RAG_RESULTS)
+        if not passages and collections:
+            # A document may be filed in another collection: search them all.
+            passages = search_knowledge(db, query, None, RAG_RESULTS)
     if not passages:
         return "No matching documents were found.", {"kind": "rag", "passages": []}
     found = [

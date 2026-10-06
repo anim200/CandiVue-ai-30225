@@ -367,3 +367,28 @@ def test_a_never_ending_turn_is_stopped_with_a_clear_message(client, headers, sc
 
     assert response.status_code == 503
     assert response.json()["detail"].startswith("The assistant couldn't finish")
+
+
+def test_rag_search_widens_to_all_collections_when_nothing_found(monkeypatch):
+    passage = Passage(
+        7,
+        "policy.txt",
+        KnowledgeCollection.REFERENCE_LIBRARY,
+        "Hybrid: 2 days at home.",
+        0.8,
+    )
+    searched = []
+
+    def fake_search(db, query, collections, limit):
+        """Only finds the passage when no collection filter is given."""
+        searched.append(collections)
+        return [] if collections else [passage]
+
+    monkeypatch.setattr(tools, "search_knowledge", fake_search)
+
+    _content, artifact = tools.rag_search.func(
+        "hybrid work", [KnowledgeCollection.COMPANY_POLICIES]
+    )
+
+    assert searched == [[KnowledgeCollection.COMPANY_POLICIES], None]
+    assert artifact["passages"][0]["filename"] == "policy.txt"
