@@ -4,6 +4,7 @@ import logging
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import sessionmaker
 
 from app.core.config import get_settings
 
@@ -15,6 +16,15 @@ engine = create_engine(
     pool_pre_ping=True,  # drop dead connections before using them
     connect_args={"connect_timeout": 3},  # fail fast if the database is down
 )
+
+# Opens a database session: `with SessionLocal() as db: ...`
+SessionLocal = sessionmaker(engine)
+
+
+def get_db():
+    """FastAPI dependency: one database session per request, closed afterwards."""
+    with SessionLocal() as db:
+        yield db
 
 
 def check_database() -> bool:

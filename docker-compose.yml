@@ -19,13 +19,26 @@ services:
       retries: 10
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      target: runtime
     restart: unless-stopped
     environment:
       APP_ENV: ${APP_ENV:-development}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      LLM_PROVIDER: ${LLM_PROVIDER:-google_genai}
+      LLM_MODEL: ${LLM_MODEL:-gemini-2.5-flash}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-60}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-2}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-480}
+      DEMO_INTERVIEWER_EMAIL: ${DEMO_INTERVIEWER_EMAIL:-}
+      DEMO_INTERVIEWER_NAME: ${DEMO_INTERVIEWER_NAME:-Interviewer A}
+      DEMO_INTERVIEWER_PASSWORD: ${DEMO_INTERVIEWER_PASSWORD:-}
     ports:
       # Bound to localhost only (documented local-development exception, N10).
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
@@ -34,6 +47,41 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Runs the test suite against the real database. Not started by "up";
+  # run it with: docker compose run --rm tests
+  tests:
+    build:
+      context: ./backend
+      target: test
+    profiles: ["test"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+    depends_on:
+      backend:
+        condition: service_healthy  # backend has applied the migrations
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      # HTTP: always localhost only (documented local-development exception,
+      # N10). 5173 is the address the backend allows in CORS_ORIGINS.
+      - "127.0.0.1:${FRONTEND_PORT:-5173}:80"
+      # HTTPS: only active when certs/ holds a certificate. Localhost by
+      # default; set HTTPS_BIND_ADDRESS=0.0.0.0 to reach it from a phone.
+      - "${HTTPS_BIND_ADDRESS:-127.0.0.1}:${HTTPS_PORT:-5443}:443"
+    volumes:
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      backend:
+        condition: service_healthy  # nginx forwards /api to the backend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
       interval: 10s
       timeout: 5s
       retries: 5
