@@ -8,6 +8,8 @@ from app.db.base import Base, TimestampMixin
 
 
 class User(TimestampMixin, Base):
+    """An interviewer account (candidates have no account)."""
+
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)

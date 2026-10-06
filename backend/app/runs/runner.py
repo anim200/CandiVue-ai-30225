@@ -35,6 +35,8 @@ _executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="run")
 
 @dataclass
 class RunKind:
+    """One kind of background run: its table and the work function to call."""
+
     model: type  # a table with RunStateMixin columns
     # Does the work for one run id. Returns WAITING_FOR_REVIEW when the graph
     # paused for the interviewer; returns None when finished.
@@ -45,6 +47,7 @@ RUN_KINDS: dict[str, RunKind] = {}
 
 
 def register_run_kind(name: str, model: type, work: Callable) -> None:
+    """Tell the runner about a kind of run (its table and work function)."""
     RUN_KINDS[name] = RunKind(model=model, work=work)
 
 
@@ -117,6 +120,7 @@ def resume_interrupted_runs() -> list[Future]:
 
 
 def _fail(model: type, run_id: int, message: str) -> None:
+    """Mark a run as failed with a safe, plain-language message."""
     _update(model, run_id, status=RunStatus.FAILED, error=message, finished_at=_now())
 
 
@@ -130,4 +134,5 @@ def _update(model: type, run_id: int, **values) -> None:
 
 
 def _now() -> datetime:
+    """Return the current time in UTC."""
     return datetime.now(timezone.utc)

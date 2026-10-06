@@ -25,20 +25,24 @@ CANDIDATE_ROUTES: set[str] = set()
 
 
 def guarded_test_app() -> TestClient:
+    """Build a tiny app with one interviewer-only and one candidate-only route."""
     test_app = FastAPI()
 
     @test_app.get("/scores", dependencies=[Depends(require_interviewer)])
     def scores():
+        """Pretend interviewer-only route that returns a score."""
         return {"score": 82}
 
     @test_app.get("/my-interview", dependencies=[Depends(require_candidate)])
     def my_interview():
+        """Pretend candidate-only route."""
         return {"ok": True}
 
     return TestClient(test_app)
 
 
 def auth(role: Role) -> dict:
+    """Return an Authorization header with a token for the given role."""
     return {"Authorization": f"Bearer {create_access_token(1, role)}"}
 
 

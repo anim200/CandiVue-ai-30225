@@ -27,11 +27,14 @@ CANDIDATES_ONLY = "This is only available to the invited candidate."
 
 @dataclass
 class CurrentUser:
+    """Who is calling: their role and id, read from the login token."""
+
     role: Role
     id: int  # user id for an interviewer, interview session id for a candidate
 
 
 def _unauthorized(message: str) -> HTTPException:
+    """Build a 401 error with a plain-language message."""
     return HTTPException(
         status.HTTP_401_UNAUTHORIZED, message, headers={"WWW-Authenticate": "Bearer"}
     )
@@ -62,6 +65,7 @@ def require_interviewer(
 def require_candidate(
     user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> CurrentUser:
+    """Let only the invited candidate through; 403 for everyone else."""
     if user.role != Role.CANDIDATE:
         raise HTTPException(status.HTTP_403_FORBIDDEN, CANDIDATES_ONLY)
     return user

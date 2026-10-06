@@ -16,12 +16,16 @@ from app.db.base import Base, TimestampMixin, status_column
 
 
 class CandidateStatus(StrEnum):
+    """How far a candidate's CV has been processed."""
+
     RECEIVED = "received"  # CV file is in the intake folder
     PARSED = "parsed"
     PARSE_FAILED = "parse_failed"  # this CV failed; the rest of the batch goes on
 
 
 class Candidate(TimestampMixin, Base):
+    """One applicant for a job, with their parsed CV."""
+
     __tablename__ = "candidates"
     # The CV Collector skips a Drive file it has already fetched for this job.
     __table_args__ = (UniqueConstraint("job_id", "drive_file_id"),)

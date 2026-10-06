@@ -52,6 +52,7 @@ const RINGS = [
 
 const SHOW_SIGNED_IN_MS = 600; // briefly show "Signed in" before opening Jobs
 
+// Left side of the login page: logo, animated rings, evidence chips and the headline.
 function BrandPanel() {
   return (
     <div className={classes.brand}>
@@ -120,6 +121,7 @@ function BrandPanel() {
   );
 }
 
+// Interviewer sign-in page (brand panel + sign-in form).
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -144,6 +146,7 @@ export default function LoginPage() {
     return <Navigate to="/jobs" replace />;
   }
 
+  // Check the email, sign in with the backend and show the result.
   async function handleSubmit(event) {
     event.preventDefault();
     if (stage !== 'idle') return; // already signing in: ignore extra clicks

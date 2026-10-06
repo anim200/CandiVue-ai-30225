@@ -12,18 +12,24 @@ from app.db.base import Base, TimestampMixin, status_column
 
 
 class JobStatus(StrEnum):
+    """Whether a job is a draft, open or closed."""
+
     DRAFT = "draft"
     OPEN = "open"
     CLOSED = "closed"
 
 
 class JobBoardStatus(StrEnum):
+    """Whether the job has been posted to the job board."""
+
     NOT_POSTED = "not_posted"
     POSTED = "posted"
     FAILED = "failed"
 
 
 class Job(TimestampMixin, Base):
+    """One job opening and its requirement profile."""
+
     __tablename__ = "jobs"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -45,6 +51,8 @@ class Job(TimestampMixin, Base):
 
 
 class JobDescriptionStatus(StrEnum):
+    """Where a JD draft is in the interviewer's approval."""
+
     DRAFT = "draft"
     APPROVED = "approved"
     REJECTED = "rejected"

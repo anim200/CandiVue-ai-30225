@@ -9,6 +9,7 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def clear_overrides():
+    """Undo any faked dependencies after each test."""
     yield
     app.dependency_overrides.clear()
 

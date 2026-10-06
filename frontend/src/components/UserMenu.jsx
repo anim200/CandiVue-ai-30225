@@ -20,6 +20,7 @@ const POP = {
   transitionProperty: 'opacity, transform',
 };
 
+// Turn a name into up to two initials, e.g. "Interviewer A" -> "IA".
 function initialsOf(name) {
   return name
     .split(' ')
@@ -29,12 +30,14 @@ function initialsOf(name) {
     .toUpperCase();
 }
 
+// Avatar button in the header that opens the account menu.
 export default function UserMenu() {
   const navigate = useNavigate();
   const [opened, setOpened] = useState(false);
   const user = loadSession()?.user;
   if (!user) return null;
 
+  // Sign out of this tab and go to the login page.
   function signOut() {
     clearSession();
     navigate('/login', { replace: true });

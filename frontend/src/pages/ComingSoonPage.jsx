@@ -3,6 +3,7 @@
 import { Paper, Stack, Text, ThemeIcon, Title } from '@mantine/core';
 import { IconTools } from '@tabler/icons-react';
 
+// Placeholder page with a title and a short "not built yet" message.
 export default function ComingSoonPage({ title, description }) {
   return (
     <Stack gap="lg">

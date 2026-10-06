@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { loadSession, saveSession } from '../auth/session';
 import { apiGet, apiPost, MESSAGES } from './client';
 
+// Replace the browser's fetch with a fake that answers with the given handler.
 function fakeFetch(handler) {
   vi.stubGlobal('fetch', vi.fn(handler));
 }
@@ -21,6 +22,7 @@ beforeEach(() => {
   vi.stubGlobal('window', { location: { assign: vi.fn() } });
 });
 
+// Build a fake JSON answer with the given status code.
 function jsonResponse(body, status) {
   return new Response(JSON.stringify(body), {
     status,

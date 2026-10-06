@@ -7,6 +7,8 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    """All app settings, read from environment variables (.env)."""
+
     app_env: str = "development"
     log_level: str = "INFO"
     database_url: str  # required: the app will not start without it
@@ -33,6 +35,7 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> list[str]:
+        """Turn the comma-separated CORS_ORIGINS text into a list."""
         return [
             origin.strip() for origin in self.cors_origins.split(",") if origin.strip()
         ]
@@ -40,4 +43,5 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    """Return the settings, created once and then reused."""
     return Settings()

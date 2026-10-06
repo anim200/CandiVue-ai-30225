@@ -3,6 +3,7 @@
 
 import { Button, Center, Stack, Text, Title } from '@mantine/core';
 
+// Friendly full-page message when a page crashes, with a reload button.
 export default function ErrorPage() {
   return (
     <Center h="100vh" bg="#F5F7F8">

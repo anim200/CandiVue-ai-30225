@@ -16,6 +16,8 @@ NAMING_CONVENTION = {
 
 
 class Base(DeclarativeBase):
+    """The parent class of every database table (with fixed key and index names)."""
+
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 

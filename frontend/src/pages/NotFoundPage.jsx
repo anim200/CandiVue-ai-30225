@@ -3,6 +3,7 @@
 import { Button, Stack, Text, Title } from '@mantine/core';
 import { Link } from 'react-router';
 
+// Shown when no page matches the address.
 export default function NotFoundPage() {
   return (
     <Stack align="flex-start" gap="sm">

@@ -21,6 +21,7 @@ export class ApiError extends Error {
   }
 }
 
+// Send one request to the backend (with the login token) and return the JSON answer, or throw an ApiError with a plain message.
 async function request(method, path, body) {
   const session = loadSession();
   const headers = { Accept: 'application/json' };
@@ -65,14 +66,17 @@ async function readDetail(response) {
   }
 }
 
+// Read data from the backend (GET).
 export function apiGet(path) {
   return request('GET', path);
 }
 
+// Send data to the backend (POST).
 export function apiPost(path, body) {
   return request('POST', path, body);
 }
 
+// Ask the backend whether it and its database are working.
 export function getHealth() {
   return apiGet('/health');
 }

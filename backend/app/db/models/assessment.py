@@ -25,6 +25,8 @@ class QAAnalysis(RunStateMixin, TimestampMixin, Base):
 
 
 class ReviewStatus(StrEnum):
+    """Where a report is in the interviewer's review."""
+
     PENDING_REVIEW = "pending_review"
     CHANGES_REQUESTED = "changes_requested"
     APPROVED = "approved"

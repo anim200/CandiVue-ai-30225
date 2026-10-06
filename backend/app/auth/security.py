@@ -28,6 +28,8 @@ _DUMMY_HASH = _password_hash.hash("not-a-real-password")
 
 
 class Role(StrEnum):
+    """The two roles in CandiVue: interviewer and candidate."""
+
     INTERVIEWER = "interviewer"
     CANDIDATE = "candidate"
 
@@ -37,6 +39,7 @@ class InvalidTokenError(Exception):
 
 
 def hash_password(password: str) -> str:
+    """Turn a password into an Argon2 hash for storing (never store the password)."""
     return _password_hash.hash(password)
 
 
@@ -54,6 +57,7 @@ def hash_link_token(link_token: str) -> str:
 
 
 def create_access_token(subject: int, role: Role) -> str:
+    """Create a signed login token that says who the user is and when it expires."""
     settings = get_settings()
     now = datetime.now(timezone.utc)
     claims = {

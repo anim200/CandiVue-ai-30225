@@ -55,6 +55,7 @@ function messageFor(result) {
   };
 }
 
+// White card used for every state of the link page.
 function StateCard({ children }) {
   return (
     <Box
@@ -72,6 +73,7 @@ function StateCard({ children }) {
   );
 }
 
+// Check the invitation link and show the result to the candidate.
 export default function CandidateJoinPage() {
   const { linkToken } = useParams();
   const [result, setResult] = useState({ status: 'checking' }); // checking | joined | failed

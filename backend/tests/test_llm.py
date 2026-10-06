@@ -18,6 +18,7 @@ from app.core.errors import register_error_handlers
 
 @pytest.fixture(autouse=True)
 def no_wait_between_retries(monkeypatch):
+    """Make retries instant in tests."""
     monkeypatch.setattr(llm, "WAIT_BETWEEN_RETRIES", False)
 
 
@@ -26,6 +27,7 @@ def failing_model(fail_times: int):
     calls = {"count": 0}
 
     def answer(messages):
+        """Fake model: time out the first few calls, then answer "ok"."""
         calls["count"] += 1
         if calls["count"] <= fail_times:
             raise TimeoutError("model did not answer in time")
@@ -62,6 +64,7 @@ def test_api_returns_503_when_ai_fails():
 
     @app.get("/needs-ai")
     def needs_ai():
+        """Pretend route whose AI call fails."""
         raise AIServiceError("The AI service is unavailable.")
 
     response = TestClient(app).get("/needs-ai")

@@ -33,11 +33,15 @@ INTERVIEW_OVER = "This interview has ended, so the link can no longer be used."
 
 
 class LoginRequest(BaseModel):
+    """What the sign-in form sends: email and password (length-checked)."""
+
     email: str = Field(min_length=3, max_length=255)
     password: str = Field(min_length=1, max_length=200)
 
 
 class CandidateJoinRequest(BaseModel):
+    """What the candidate page sends: the token from the invitation link."""
+
     link_token: str = Field(min_length=16, max_length=200)
 
 
@@ -51,6 +55,8 @@ class Me(BaseModel):
 
 
 class TokenResponse(BaseModel):
+    """The answer to a successful sign-in or link join: the token and who it is for."""
+
     access_token: str
     token_type: str = "bearer"
     user: Me
@@ -58,6 +64,7 @@ class TokenResponse(BaseModel):
 
 @router.post("/login", response_model=TokenResponse)
 def login(body: LoginRequest, db: Annotated[Session, Depends(get_db)]) -> TokenResponse:
+    """Check an interviewer's email and password and return a login token."""
     email = body.email.strip().lower()
     user = db.scalar(select(User).where(User.email == email))
 
@@ -100,6 +107,7 @@ def me(
     user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> Me:
+    """Return who is signed in (interviewer details, or the candidate's session id)."""
     if user.role == Role.CANDIDATE:
         return Me(role=Role.CANDIDATE, session_id=user.id)
 

@@ -14,6 +14,7 @@ import UserMenu from '../components/UserMenu';
 import classes from './AppLayout.module.css';
 import { NAV_ITEMS } from './navigation';
 
+// Page frame for interviewers: header, left menu and the current page.
 export default function AppLayout() {
   const { pathname } = useLocation();
   const [menuOpen, { toggle: toggleMenu, close: closeMenu }] = useDisclosure(false);

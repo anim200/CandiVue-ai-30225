@@ -10,6 +10,8 @@ from app.db.base import Base, TimestampMixin, status_column
 
 
 class SessionStatus(StrEnum):
+    """The life of an interview: scheduled, live, ended or cancelled."""
+
     SCHEDULED = "scheduled"
     LIVE = "live"
     ENDED = "ended"
@@ -17,6 +19,8 @@ class SessionStatus(StrEnum):
 
 
 class InvitationStatus(StrEnum):
+    """Whether the interview invitation is waiting, sent or failed."""
+
     PENDING = "pending"  # waiting for the interviewer to confirm
     SENT = "sent"
     FAILED = "failed"
@@ -53,6 +57,8 @@ class InterviewSession(TimestampMixin, Base):
 
 
 class Speaker(StrEnum):
+    """Who said a transcript line: the interviewer or the candidate."""
+
     INTERVIEWER = "interviewer"
     CANDIDATE = "candidate"
 
