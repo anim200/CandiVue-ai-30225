@@ -244,6 +244,10 @@ def test_edit_saves_a_new_version_that_still_needs_approval(
     thread = review(client, headers, job_id, action="edit", content=edited).json()
 
     assert thread["pending_review"]["version"] == 2  # paused again: approve first
+    # The edited version appears in the chat as a card to approve.
+    last = thread["items"][-1]
+    assert last["kind"] == "jd" and last["jd"]["version"] == 2
+    assert last["jd"]["id"] == thread["pending_review"]["jd_id"]
     v1, v2 = load_jds(job_id)
     assert v1.status == JobDescriptionStatus.REJECTED
     assert (

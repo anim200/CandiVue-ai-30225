@@ -52,6 +52,10 @@ def thread_items(db: Session, messages: list) -> list[dict]:
             items.append(
                 {"kind": kind, "text": message_text(message), "action": review}
             )
+            # An edit creates a new version directly: show it as a JD card.
+            edited = db.get(JobDescription, message.additional_kwargs.get("jd_id") or 0)
+            if review == "edit" and edited is not None:
+                items.append({"kind": "jd", "jd": jd_card(edited)})
         elif isinstance(message, AIMessage):
             text = message_text(message).strip()
             if text:

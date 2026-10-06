@@ -126,6 +126,7 @@ def human_review(state: AssistantState) -> dict:
     decision = interrupt({"kind": "jd_approval", "jd_id": draft_id, "version": version})
 
     action = decision["action"]
+    new_jd_id = None  # set when an edit creates a new version
     with SessionLocal() as db:
         draft = db.get(JobDescription, draft_id)
         job = db.get(Job, state["job_id"])
@@ -145,22 +146,25 @@ def human_review(state: AssistantState) -> dict:
             content = JobDescriptionContent.model_validate(decision["content"])
             draft.status = JobDescriptionStatus.REJECTED
             draft.reviewer_feedback = "Replaced by the interviewer's edited version."
-            db.add(
-                JobDescription(
-                    job_id=job.id,
-                    version=version + 1,
-                    content=content.model_dump_json(),
-                    sources=draft.sources,
-                )
+            edited = JobDescription(
+                job_id=job.id,
+                version=version + 1,
+                content=content.model_dump_json(),
+                sources=draft.sources,
             )
+            db.add(edited)
+            db.flush()  # gives the new version its id
+            new_jd_id = edited.id
             note = (
                 f"I edited the job description; it is saved as version {version + 1}."
             )
         db.commit()
     logger.info("JD review: job %d, version %d, %s", state["job_id"], version, action)
     # Shown in the chat as a review note (marked so the screen can style it).
+    # The new version's id lets the screen show it as a card to approve.
+    marks = {"review": action, "jd_id": new_jd_id} if new_jd_id else {"review": action}
     return {
-        "messages": [HumanMessage(note, additional_kwargs={"review": action})],
+        "messages": [HumanMessage(note, additional_kwargs=marks)],
         "review_action": action,
     }
 
