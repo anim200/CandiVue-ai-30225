@@ -1,0 +1,80 @@
+"""Turns a saved chat thread into simple items for the screen.
+
+LangGraph stores LangChain messages; the screen needs plain items such as
+"user message", "assistant message", "profile card", "JD card", "step" or
+"review note". JD cards are read fresh from the database, so they always
+show the current status (e.g. a rejected version says so).
+"""
+
+import json
+
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from sqlalchemy.orm import Session
+
+from app.db.models import JobDescription
+
+# How each tool appears as a small "step" line in the chat.
+STEP_TEXT = {
+    "save_job_profile": "Saved the job profile",
+    "write_job_description": "Wrote a job description draft",
+}
+
+
+def message_text(message) -> str:
+    """Get the plain text of a message (some models send a list of parts)."""
+    if isinstance(message.content, str):
+        return message.content
+    return "".join(
+        part.get("text", "") for part in message.content if isinstance(part, dict)
+    )
+
+
+def jd_card(jd: JobDescription) -> dict:
+    """The data the JD approval card shows."""
+    return {
+        "id": jd.id,
+        "version": jd.version,
+        "status": jd.status.value,
+        "content": json.loads(jd.content),
+        "sources": jd.sources,
+        "feedback": jd.reviewer_feedback,
+        "approved_at": jd.approved_at.isoformat() if jd.approved_at else None,
+    }
+
+
+def thread_items(db: Session, messages: list) -> list[dict]:
+    """Convert the stored messages into screen items, in order."""
+    items = []
+    for message in messages:
+        if isinstance(message, HumanMessage):
+            review = message.additional_kwargs.get("review")
+            kind = "review" if review else "user"
+            items.append(
+                {"kind": kind, "text": message_text(message), "action": review}
+            )
+        elif isinstance(message, AIMessage):
+            text = message_text(message).strip()
+            if text:
+                items.append({"kind": "assistant", "text": text})
+        elif isinstance(message, ToolMessage):
+            artifact = message.artifact or {}
+            kind = artifact.get("kind")
+            if kind == "profile":
+                items.append({"kind": "step", "text": STEP_TEXT["save_job_profile"]})
+                items.append({"kind": "profile", "profile": artifact["profile"]})
+            elif kind == "rag":
+                count = len(artifact.get("passages", []))
+                items.append(
+                    {
+                        "kind": "step",
+                        "text": f"Looked at {count} passages in the knowledge base",
+                    }
+                )
+            elif kind == "jd":
+                jd = db.get(JobDescription, artifact["jd_id"])
+                if jd is not None:
+                    items.append(
+                        {"kind": "step", "text": STEP_TEXT["write_job_description"]}
+                    )
+                    items.append({"kind": "jd", "jd": jd_card(jd)})
+    return items
