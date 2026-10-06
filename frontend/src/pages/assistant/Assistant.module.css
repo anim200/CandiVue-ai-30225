@@ -1,0 +1,558 @@
+/* Hiring Assistant (design: Hiring Assistant.dc.html, frames 1a, 2a-2h, 3a-3b).
+   Layout: thread list (260px) + chat. Phones: one at a time. */
+
+.layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  height: calc(100dvh - 56px);
+}
+
+/* ---- Thread list ---- */
+
+.threads {
+  background: #fafbfb;
+  border-right: 1px solid #dee3e6;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+}
+
+.threadsHead {
+  padding: 16px 14px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.threadsTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #66717a;
+}
+
+.newThread {
+  width: 30px;
+  height: 30px;
+  border-radius: 4px;
+  border: 1px solid #c9d0d4;
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #1a2227;
+}
+
+.newThread:hover {
+  background: #f1f4f5;
+}
+
+.threadItems {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 8px 12px;
+}
+
+.thread {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s;
+}
+
+.thread:hover {
+  background: #f1f4f5;
+}
+
+.threadActive,
+.threadActive:hover {
+  background: #fff;
+  border-color: #d5e9eb;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.threadName {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.threadActive .threadName {
+  font-weight: 600;
+}
+
+.threadStage {
+  font-size: 12px;
+  color: #66717a;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.attention {
+  color: #7a5000;
+}
+
+/* ---- Chat column ---- */
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: #fff;
+}
+
+.progress {
+  padding: 12px 24px;
+  border-bottom: 1px solid #dee3e6;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.progressTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.jobName {
+  font-size: 17px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.safeNote {
+  font-size: 12px;
+  color: #48535b;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #66717a;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.stepDone {
+  color: #245f3e;
+}
+
+.stepNow {
+  color: #7a5000;
+}
+
+.stepLine {
+  flex: 1;
+  height: 2px;
+  background: #dee3e6;
+  min-width: 12px;
+}
+
+.stepLineDone {
+  background: #2d7a4e;
+}
+
+.backLink {
+  display: none;
+  color: #48535b;
+}
+
+/* ---- Messages ---- */
+
+.messages {
+  flex: 1;
+  overflow: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.userBubble {
+  align-self: flex-end;
+  max-width: 70%;
+  background: #edf5f6;
+  color: #103a40;
+  border-radius: 10px 10px 2px 10px;
+  padding: 10px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  animation: fadeUp 0.3s ease-out;
+}
+
+.assistantRow {
+  display: flex;
+  gap: 10px;
+  max-width: 82%;
+  animation: fadeUp 0.35s ease-out;
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #23717a;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.assistantBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.assistantText {
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.stepLines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.stepLineItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #245f3e;
+}
+
+.working {
+  color: #48535b;
+}
+
+.spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #d5e9eb;
+  border-top-color: #23717a;
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 0.8s linear infinite;
+}
+
+.reviewNote {
+  align-self: center;
+  font-size: 12px;
+  color: #66717a;
+  background: #f5f7f8;
+  border-radius: 999px;
+  padding: 4px 12px;
+  animation: fade 0.2s ease-out;
+}
+
+/* ---- Cards ---- */
+
+.profileCard {
+  border: 1px solid #dee3e6;
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 8px 14px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.profileLabel {
+  color: #66717a;
+  font-size: 13px;
+}
+
+.jdCard {
+  border: 1px solid #dee3e6;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.jdPending {
+  border-color: #f0d9a6;
+}
+
+.jdHead {
+  padding: 10px 16px;
+  background: #fafbfb;
+  border-bottom: 1px solid #e9ecee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.jdPending .jdHead {
+  background: #fffaef;
+}
+
+.jdHeadTitle {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.jdBody {
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #1a2227;
+}
+
+.jdAbout {
+  margin: 0;
+}
+
+.jdClamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.jdSection {
+  margin: 12px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #48535b;
+}
+
+.jdList {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.toggle {
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #1c5d65;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.sources {
+  padding: 8px 16px 12px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.sourcesLabel,
+.rejectedNote {
+  font-size: 12px;
+  color: #66717a;
+}
+
+.rejectedNote {
+  margin-left: 6px;
+}
+
+.sourceChip {
+  font: 500 11px var(--mantine-font-family-monospace);
+  color: #1c5d65;
+  background: #edf5f6;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.jdActions {
+  padding: 10px 16px;
+  border-top: 1px solid #e9ecee;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---- Composer ---- */
+
+.composer {
+  padding: 12px 24px 16px;
+  border-top: 1px solid #dee3e6;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.composerRow {
+  display: flex;
+  gap: 8px;
+}
+
+.composerHint {
+  font-size: 12px;
+  color: #7a5000;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.chip {
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #c9d0d4;
+  background: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: inherit;
+  color: inherit;
+}
+
+.chip:hover {
+  background: #f1f4f5;
+}
+
+/* ---- Loading skeleton (frame 2h) ---- */
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 24px;
+  animation: pulse 1.6s infinite;
+}
+
+.skeleton div {
+  background: #edf0f2;
+}
+
+/* ---- Edit dialog: locked requirements ---- */
+
+.lockedChips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.lockedChip {
+  font-size: 13px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #f1f4f5;
+}
+
+.hint {
+  font-size: 12px;
+  color: #66717a;
+}
+
+/* ---- Phones and small tablets: list OR chat ---- */
+
+@media (max-width: 47.99em) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .hideOnPhone {
+    display: none;
+  }
+
+  .backLink {
+    display: inline-flex;
+  }
+
+  .progress,
+  .messages,
+  .composer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .steps {
+    overflow-x: auto;
+  }
+
+  .assistantRow,
+  .userBubble {
+    max-width: 100%;
+  }
+
+  .profileCard {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .profileLabel {
+    margin-top: 6px;
+  }
+}
+
+/* ---- Animations (values from the design) ---- */
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
