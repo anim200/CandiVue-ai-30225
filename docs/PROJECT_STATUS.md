@@ -26,7 +26,8 @@ Update this file at the end of each work session. Every Claude thread reads it.
   - Done 05-10-2026 (#646481 frontend): UI design handoff from Claude Design committed in `docs/design_handoff_candivue_ui/` (all screens, synthetic data). `frontend/`: React 19 + Vite 8 + Mantine 9 + React Router 8, plain JavaScript; harbor theme from the handoff; app shell (logo, left menu: Jobs, Interviews, Reports, Hiring Assistant, Knowledge base) with "coming soon" pages, plain-language 404 and crash pages; `src/api/client.js` is the only code that calls the backend (plain-language errors, 15 s timeout); header badge Connected / Server unavailable from `/api/health`. Docker: Node builds, nginx 1.31 serves and forwards `/api` to the backend (same address, no CORS); `frontend` service on 127.0.0.1:5173 (`FRONTEND_PORT`). 5 Vitest tests; npm audit clean.
   - Done 06-10-2026 (#646482 login + roles): backend `app/auth/` (pwdlib Argon2 passwords, PyJWT HS256 tokens with role interviewer/candidate, `require_interviewer` / `require_candidate` guards, first interviewer created at startup from `DEMO_INTERVIEWER_*` in .env), routes `POST /api/auth/login`, `POST /api/auth/candidate` (link token → token for that one session; refused when ended/cancelled), `GET /api/auth/me`. `JWT_SECRET` (32+ chars) required. Test `test_every_api_route_is_guarded` fails if any /api route lacks the interviewer guard (allowlist: health, login, candidate, me). Frontend: login page from the design (responsive), per-tab session in sessionStorage, token sent by `client.js`, 401 → sign out to `/login?expired=1`, route guard, user menu with Sign out, candidate page `/join/:linkToken`. Login headline is still the design's placeholder: replace with own positioning statement (E6). 45 backend + 9 frontend tests.
   - New routers must use `dependencies=[Depends(require_interviewer)]` (or be listed in the test's allowlist on purpose). Interview-link time window and one-connection rule: build with F3 sessions.
-  - Remaining on this branch: transport-security note (#646483)
+  - Done 06-10-2026 (#646483 transport security, N10): nginx split into `frontend/nginx/` (default.conf HTTP, app.conf shared, https.conf); optional HTTPS on https://localhost:5443, switched on at container start by `enable-https.sh` when `certs/cert.pem` + `key.pem` exist (mkcert; git-ignored); HTTP always 127.0.0.1 only; `HTTPS_BIND_ADDRESS` opt-in for phones on the LAN (camera/mic need HTTPS). Security headers on all responses (CSP, Referrer-Policy no-referrer, X-Frame-Options, nosniff, Permissions-Policy camera/mic self, HSTS on HTTPS). nginx access log hides `/join/<token>`. `.gitattributes` keeps `*.sh` LF. README "Transport security" documents every connection and the local exceptions. Extend the CSP in `frontend/nginx/app.conf` when a feature needs a new source (e.g. WebSocket/WebRTC servers).
+  - **Module 2 (story #646469) complete 06-10-2026**; merged into dev.
 
 ## Design notes to apply in later modules
 - Two roles: Interviewer logs in with email + password; Candidate authenticates with the unique interview link. Both get a role-based JWT; the backend enforces the role (N9). Candidate token is limited to one session.
@@ -52,7 +53,7 @@ Update this file at the end of each work session. Every Claude thread reads it.
 - Git Bash is used for git commands; check the branch name in the prompt before committing
 
 ## Next
-- Set up Cowork project and Claude Code on the repository folder
+- Start the next WBS module on a new module/<name> branch created from dev
 - Technical risk prototype: two-party video call, speech-to-text trial, multi-node LangGraph trial
 
 ## Open decisions (need trainer confirmation)
@@ -64,7 +65,7 @@ Update this file at the end of each work session. Every Claude thread reads it.
 ## Redmine task IDs
 - #646013 Initialize and share the BJIT GitHub repository, README and .gitignore
 - #646476 Platform foundation: backend skeleton, health endpoint, Docker Compose with PostgreSQL + pgvector (closed 02-10-2026)
-- Story #646469 Platform Foundation & Role Access (module/platform-foundation):
+- Story #646469 Platform Foundation & Role Access (module/platform-foundation) — complete 06-10-2026:
   - #646475 Project structure, pinned dependencies, .env.example
   - #646476 Docker/Compose, named volumes, one-command startup
   - #646477 FastAPI, Pydantic, OpenAPI docs, error handling, structured logs
@@ -73,4 +74,4 @@ Update this file at the end of each work session. Every Claude thread reads it.
   - #646480 Long AI operations run async with processing status (done 04-10-2026)
   - #646481 Frontend navigation and connection to backend (done 05-10-2026)
   - #646482 Lightweight auth; block Candidate access to scores, rankings, assessments (done 06-10-2026)
-  - #646483 Secure transport for APIs and media; document local exceptions
+  - #646483 Secure transport for APIs and media; document local exceptions (done 06-10-2026)

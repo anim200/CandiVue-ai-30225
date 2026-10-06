@@ -98,9 +98,10 @@ On Windows Git Bash, prefix the second command with `MSYS_NO_PATHCONV=1`.
 
 ## Check that it works
 
-- App: <http://localhost:5173> shows the CandiVue AI app with a green
-  **Connected** badge in the header (red **Server unavailable** if the
-  backend cannot be reached).
+- App: <http://localhost:5173> opens the sign-in page. After signing in,
+  the header shows a green **Connected** badge (red **Server unavailable**
+  if the backend cannot be reached). With a certificate in `certs/`, the
+  same app is also on <https://localhost:5443> (see "Transport security").
 - Health check: <http://localhost:8000/api/health> returns
   `{"status":"ok","database":"ok"}`
 - API documentation (OpenAPI): <http://localhost:8000/docs>
@@ -153,7 +154,7 @@ width.
 | `db` | `pgvector/pgvector:0.8.7-pg17-bookworm` | PostgreSQL 17 with pgvector. Data in the named volume `pgdata`. Not exposed to the host. |
 | `backend` | built from `backend/Dockerfile` (target `runtime`) | FastAPI on Python 3.13. Applies migrations on start. |
 | `tests` | built from `backend/Dockerfile` (target `test`) | Only runs on demand (see below). |
-| `frontend` | built from `frontend/Dockerfile` | React app served by nginx 1.31; forwards `/api` to the backend. |
+| `frontend` | built from `frontend/Dockerfile` | React app served by nginx 1.31 (HTTP, and HTTPS when `certs/` has a certificate); forwards `/api` to the backend. |
 
 ## AI provider and data sent to it
 
@@ -202,12 +203,56 @@ Known limitations: signing out removes the token from the tab, but the
 token itself stays valid until it expires; there is no limit on login
 attempts and no password-change screen (local demo only).
 
-## Security note (local development)
+## Transport security
 
-The backend and the frontend use plain HTTP and are bound to `127.0.0.1`
-only, so they are not reachable from other machines. This is a
-local-development exception; they must not be exposed on a network without
-HTTPS.
+How each connection is protected (N10):
+
+| Connection | Protection |
+|---|---|
+| Browser → app and API (nginx) | HTTPS on <https://localhost:5443> when a certificate is in `certs/` (see below). Without one: plain HTTP on <http://localhost:5173>, bound to `127.0.0.1` only (local-development exception). |
+| Browser → backend directly (`/docs`, port 8000) | Plain HTTP, bound to `127.0.0.1` only (local-development exception, for the API documentation). |
+| nginx → backend, backend → database | Inside Docker's private network only; never leaves the machine. The database has no published port. |
+| Backend → AI provider (Google Gemini) and other external services | HTTPS (TLS), handled by the providers' client libraries. |
+| Interview audio and video (WebRTC, built with F3) | Always encrypted by the browsers (DTLS-SRTP). |
+
+**Local-development exceptions.** Plain HTTP is used only on `127.0.0.1`,
+so nothing is reachable from other machines. Never open the HTTP ports to a
+network; use HTTPS for that.
+
+**Turn on HTTPS (optional).** Create a certificate that your browser trusts
+with [mkcert](https://github.com/FiloSottile/mkcert) (install once, for
+example `winget install FiloSottile.mkcert` on Windows or
+`brew install mkcert` on macOS), then from the project folder:
+
+```bash
+mkcert -install
+mkcert -cert-file certs/cert.pem -key-file certs/key.pem localhost 127.0.0.1 ::1
+docker compose up -d --build
+```
+
+Open <https://localhost:5443>. The frontend log shows
+`CandiVue: certificate found, HTTPS enabled`. Delete the two `.pem` files
+and restart to go back to HTTP. Certificates are git-ignored.
+
+**Using a phone on the same network.** Browsers only allow camera and
+microphone on HTTPS (or on `localhost`), so a phone needs HTTPS. Add your
+computer's network address to the certificate (for example
+`mkcert -cert-file certs/cert.pem -key-file certs/key.pem localhost 127.0.0.1 192.168.1.20`),
+set `HTTPS_BIND_ADDRESS=0.0.0.0` in `.env`, restart, and install mkcert's
+root certificate on the phone (`mkcert -CAROOT` shows where it is). Plain
+HTTP stays on localhost even then.
+
+**Other protections in nginx** (all responses, including `/api`):
+
+- `Content-Security-Policy`: only CandiVue's own scripts, fonts and API
+  may load; no other site may frame the app.
+- `Referrer-Policy: no-referrer`: addresses such as interview links are
+  never sent to other sites.
+- `X-Content-Type-Options`, `X-Frame-Options`, and a `Permissions-Policy`
+  that allows camera and microphone only for CandiVue itself.
+- `Strict-Transport-Security` when HTTPS is used.
+- The access log hides interview link tokens (`/join/[hidden]`), and nginx
+  does not reveal its version.
 
 ## Running the tests
 
