@@ -1,0 +1,48 @@
+/* User menu, from the design (Jobs.dc.html: UserMenu, frame 2d). */
+
+.target {
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background-color 0.15s;
+}
+
+.target:hover {
+  background-color: #f1f4f5;
+}
+
+.avatar {
+  background: #d5e9eb;
+  color: #1c5d65;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dropdown {
+  border: 1px solid #dee3e6;
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 10px 30px rgba(26, 34, 39, 0.12);
+}
+
+/* Name and email at the top, separated by a thin line. */
+.who {
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid #e9ecee;
+  margin-bottom: 4px;
+}
+
+.item {
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.signOut {
+  color: #932e24;
+}
+
+.signOut:hover,
+.signOut[data-hovered] {
+  background-color: #fbe9e7;
+}
