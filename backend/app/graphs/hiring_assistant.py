@@ -3,8 +3,9 @@ r"""LangGraph 1: the Hiring Assistant (Figure 3), part 1 "Prepare the job".
     START -> load_context -> assistant --(tool call)--> tools --> assistant ...
                                        \--(reply)-----> END
              tools --(a JD was written)--> human_review (interrupt)
-             human_review --approve / reject--> assistant
-             human_review --edit------------> human_review (new version to approve)
+             human_review --approve--> post_to_job_board --> assistant
+             human_review --reject---> assistant (writes a new version)
+             human_review --edit-----> human_review (new version to approve)
 
 - The LLM ("assistant") decides which tool to call; RAG only if useful.
 - human_review PAUSES the graph (LangGraph interrupt) until the interviewer
@@ -27,6 +28,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 
 from app.ai.llm import get_chat_model, invoke_llm
+from app.assistant import posting
 from app.assistant.prompts import ASSISTANT_PROMPT
 from app.assistant.schemas import JobDescriptionContent
 from app.assistant.tools import TOOLS
@@ -170,8 +172,29 @@ def human_review(state: AssistantState) -> dict:
 
 
 def after_review(state: AssistantState) -> str:
-    """An edit needs approval again; approve/reject go back to the LLM."""
-    return "human_review" if state["review_action"] == "edit" else "assistant"
+    """An edit needs approval again; an approval is posted; a rejection goes
+    back to the LLM for a new version."""
+    action = state["review_action"]
+    if action == "edit":
+        return "human_review"
+    return "post_to_job_board" if action == "approve" else "assistant"
+
+
+def posting_message(result: dict) -> HumanMessage:
+    """A chat note with the job board result (marked so the screen shows a card)."""
+    text = {
+        "posted": f"The job board accepted the post: {result['url']}",
+        "needs_form": "The job was not posted: the application form link is missing.",
+    }.get(
+        result["status"], f"The job board did not accept the post: {result['message']}"
+    )
+    return HumanMessage(text, additional_kwargs={"posting": result})
+
+
+def post_to_job_board(state: AssistantState) -> dict:
+    """Approval tool (Figure 3): publish the approved JD on the job board via
+    MCP. Runs only after the interviewer approved; a failure keeps the JD."""
+    return {"messages": [posting_message(posting.post_job(state["job_id"]))]}
 
 
 def build_hiring_assistant(checkpointer):
@@ -188,12 +211,14 @@ def build_hiring_assistant(checkpointer):
         ),
     )
     graph.add_node("human_review", human_review)
+    graph.add_node("post_to_job_board", post_to_job_board)
 
     graph.add_edge(START, "load_context")
     graph.add_edge("load_context", "assistant")
     graph.add_conditional_edges("assistant", after_assistant, ["tools", END])
     graph.add_conditional_edges("tools", after_tools, ["human_review", "assistant"])
     graph.add_conditional_edges(
-        "human_review", after_review, ["human_review", "assistant"]
+        "human_review", after_review, ["human_review", "post_to_job_board", "assistant"]
     )
+    graph.add_edge("post_to_job_board", "assistant")
     return graph.compile(checkpointer=checkpointer)

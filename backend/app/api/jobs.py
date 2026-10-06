@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import CurrentUser, require_interviewer
 from app.db.database import get_db
 from app.db.models import Job, JobDescription
-from app.db.models.job import JobDescriptionStatus, JobStatus
+from app.db.models.job import JobBoardStatus, JobDescriptionStatus, JobStatus
 
 router = APIRouter(
     prefix="/api/jobs", tags=["jobs"], dependencies=[Depends(require_interviewer)]
@@ -32,7 +32,9 @@ class JobOut(BaseModel):
     title: str
     status: JobStatus
     profile: dict[str, Any] | None
-    stage: str  # where the job is: drafting_profile, jd_to_approve, jd_approved ...
+    stage: str  # drafting_profile, jd_to_approve, jd_approved, posted, ...
+    google_form_url: str | None = None
+    job_board_post_url: str | None = None
     updated_at: datetime
 
 
@@ -41,6 +43,10 @@ def job_stage(job: Job, latest_jd: JobDescription | None) -> str:
     if latest_jd is None:
         return "drafting_profile" if not job.profile else "profile_saved"
     if latest_jd.status == JobDescriptionStatus.APPROVED:
+        if job.job_board_status == JobBoardStatus.POSTED:
+            return "posted"
+        if job.job_board_status == JobBoardStatus.FAILED:
+            return "posting_failed"
         return "jd_approved"
     if latest_jd.status == JobDescriptionStatus.DRAFT:
         return "jd_to_approve"
@@ -61,6 +67,8 @@ def to_job_out(db: Session, job: Job) -> JobOut:
         status=job.status,
         profile=job.profile or None,
         stage=job_stage(job, latest),
+        google_form_url=job.google_form_url,
+        job_board_post_url=job.job_board_post_url,
         updated_at=max(job.updated_at, latest.updated_at) if latest else job.updated_at,
     )
 

@@ -13,14 +13,21 @@ from langchain_core.messages import HumanMessage
 from langgraph.errors import GraphRecursionError
 from langgraph.types import Command
 from pydantic import BaseModel, Field, model_validator
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.assistant import posting
 from app.assistant.schemas import JobDescriptionContent
 from app.assistant.thread_view import thread_items
 from app.auth.dependencies import require_interviewer
 from app.db.database import get_db
-from app.db.models import Job
-from app.graphs.hiring_assistant import build_hiring_assistant, thread_config
+from app.db.models import Job, JobDescription
+from app.db.models.job import JobDescriptionStatus
+from app.graphs.hiring_assistant import (
+    build_hiring_assistant,
+    posting_message,
+    thread_config,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +40,7 @@ router = APIRouter(
 NOT_FOUND = "This job no longer exists."
 REVIEW_FIRST = "Please approve, edit or reject the job description first."
 NOTHING_TO_REVIEW = "There is no job description waiting for review."
+APPROVE_FIRST = "Approve a job description before posting it."
 STUCK = "The assistant couldn't finish this request. Please rephrase it or try again."
 
 
@@ -153,4 +161,27 @@ def retry_turn(
     unfinished = bool(snapshot.next)
     if unfinished and not _thread(graph, db, job_id).pending_review:
         _run(graph, None, job_id)
+    return _thread(graph, db, job_id)
+
+
+@router.post("/jobs/{job_id}/post", response_model=ThreadOut)
+def post_again(
+    job_id: int, request: Request, db: Annotated[Session, Depends(get_db)]
+) -> ThreadOut:
+    """Post the approved JD to the job board again: after a failure, or once
+    the application form link has been added. The result joins the chat."""
+    _require_job(db, job_id)
+    graph = _graph(request)
+    if _thread(graph, db, job_id).pending_review:
+        raise HTTPException(status.HTTP_409_CONFLICT, REVIEW_FIRST)
+    approved = db.scalar(
+        select(JobDescription.id).where(
+            JobDescription.job_id == job_id,
+            JobDescription.status == JobDescriptionStatus.APPROVED,
+        )
+    )
+    if approved is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, APPROVE_FIRST)
+    result = posting.post_job(job_id)
+    graph.update_state(thread_config(job_id), {"messages": [posting_message(result)]})
     return _thread(graph, db, job_id)

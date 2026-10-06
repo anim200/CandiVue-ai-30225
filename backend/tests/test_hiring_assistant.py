@@ -191,7 +191,10 @@ def test_profile_then_jd_pauses_for_review_then_approve(
     thread = review(client, headers, job_id, action="approve").json()
 
     assert thread["pending_review"] is None
-    assert thread["items"][-2]["kind"] == "review"
+    # After approval: review note, job board result (no form link in this
+    # test, so "needs_form"), then the assistant's answer.
+    assert [i["kind"] for i in thread["items"][-3:-1]] == ["review", "posting"]
+    assert thread["items"][-2]["status"] == "needs_form"
     assert thread["items"][-1] == {
         "kind": "assistant",
         "text": "Thanks, the job description is approved.",
@@ -392,3 +395,123 @@ def test_rag_search_widens_to_all_collections_when_nothing_found(monkeypatch):
 
     assert searched == [[KnowledgeCollection.COMPANY_POLICIES], None]
     assert artifact["passages"][0]["filename"] == "policy.txt"
+
+
+FORM_URL = "https://forms.gle/SyntheticTestForm"
+
+
+@pytest.fixture
+def job_board(monkeypatch):
+    """Fake job board: records posts; set .fail to make it refuse."""
+    from app.assistant import posting
+    from app.integrations.job_board import JobBoardError
+
+    board = type("Board", (), {"posts": [], "fail": False})()
+
+    def publish(title, html, labels):
+        """Accept the post (or refuse it when .fail is set)."""
+        if board.fail:
+            raise JobBoardError("The job board refused the post (HTTP 403).")
+        board.posts.append((title, html))
+        return {"post_id": "1", "url": "https://example.blogspot.com/p/job.html"}
+
+    monkeypatch.setattr(posting, "publish_job_post", publish)
+    return board
+
+
+def approved_flow(client, headers, scripted, form=True):
+    """Chat until a JD waits for review (optionally saving the form link)."""
+    job_id = new_job(client, headers)
+    scripted += [call("save_job_profile", {"profile": PROFILE})]
+    if form:
+        scripted += [call("save_application_form", {"form_url": FORM_URL}, "cf")]
+    scripted += [call("write_job_description", {}, "cw")]
+    say(client, headers, job_id)
+    return job_id
+
+
+def test_approve_posts_the_job_to_the_board(
+    client, headers, scripted, drafts, job_board
+):
+    job_id = approved_flow(client, headers, scripted)
+    scripted += [AIMessage(content="Your job is posted.")]
+
+    thread = review(client, headers, job_id, action="approve").json()
+
+    posting_items = [i for i in thread["items"] if i["kind"] == "posting"]
+    assert posting_items[-1]["status"] == "posted"
+    assert posting_items[-1]["url"] == "https://example.blogspot.com/p/job.html"
+    title, html = job_board.posts[0]
+    assert title == JD["title"] and FORM_URL in html
+    job = client.get(f"/api/jobs/{job_id}", headers=headers).json()
+    assert job["stage"] == "posted"
+    assert job["job_board_post_url"] == "https://example.blogspot.com/p/job.html"
+
+
+def test_failed_post_keeps_the_jd_and_can_be_tried_again(
+    client, headers, scripted, drafts, job_board
+):
+    job_id = approved_flow(client, headers, scripted)
+    job_board.fail = True
+    scripted += [AIMessage(content="Posting failed; the JD is saved.")]
+
+    thread = review(client, headers, job_id, action="approve").json()
+
+    assert [i for i in thread["items"] if i["kind"] == "posting"][-1][
+        "status"
+    ] == "failed"
+    assert (
+        client.get(f"/api/jobs/{job_id}", headers=headers).json()["stage"]
+        == "posting_failed"
+    )
+    (jd,) = load_jds(job_id)
+    assert jd.status == JobDescriptionStatus.APPROVED  # nothing lost
+
+    job_board.fail = False
+    thread = client.post(f"/api/assistant/jobs/{job_id}/post", headers=headers).json()
+
+    assert [i for i in thread["items"] if i["kind"] == "posting"][-1][
+        "status"
+    ] == "posted"
+    assert (
+        client.get(f"/api/jobs/{job_id}", headers=headers).json()["stage"] == "posted"
+    )
+
+
+def test_without_a_form_link_nothing_is_posted(
+    client, headers, scripted, drafts, job_board
+):
+    job_id = approved_flow(client, headers, scripted, form=False)
+    scripted += [AIMessage(content="Please send the Google Form link.")]
+
+    thread = review(client, headers, job_id, action="approve").json()
+
+    assert [i for i in thread["items"] if i["kind"] == "posting"][-1][
+        "status"
+    ] == "needs_form"
+    assert job_board.posts == []
+
+
+def test_a_non_google_form_link_goes_back_to_the_llm(client, headers, scripted, drafts):
+    job_id = new_job(client, headers)
+    scripted += [
+        call("save_application_form", {"form_url": "https://evil.example.com/apply"}),
+        AIMessage(
+            content="That is not a Google Forms link. Please send the form link."
+        ),
+    ]
+
+    thread = say(client, headers, job_id).json()
+
+    assert thread["items"][-1]["text"].startswith("That is not a Google Forms link")
+    with SessionLocal() as db:
+        assert db.get(Job, job_id).google_form_url is None
+
+
+def test_posting_needs_an_approved_jd(client, headers):
+    job_id = new_job(client, headers)
+
+    assert (
+        client.post(f"/api/assistant/jobs/{job_id}/post", headers=headers).status_code
+        == 409
+    )

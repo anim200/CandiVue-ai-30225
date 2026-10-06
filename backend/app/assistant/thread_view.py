@@ -46,6 +46,11 @@ def thread_items(db: Session, messages: list) -> list[dict]:
     """Convert the stored messages into screen items, in order."""
     items = []
     for message in messages:
+        if isinstance(message, HumanMessage) and message.additional_kwargs.get(
+            "posting"
+        ):
+            items.append({"kind": "posting", **message.additional_kwargs["posting"]})
+            continue
         if isinstance(message, HumanMessage):
             review = message.additional_kwargs.get("review")
             kind = "review" if review else "user"
@@ -66,6 +71,10 @@ def thread_items(db: Session, messages: list) -> list[dict]:
             if kind == "profile":
                 items.append({"kind": "step", "text": STEP_TEXT["save_job_profile"]})
                 items.append({"kind": "profile", "profile": artifact["profile"]})
+            elif kind == "form":
+                items.append(
+                    {"kind": "step", "text": "Saved the application form link"}
+                )
             elif kind == "rag":
                 count = len(artifact.get("passages", []))
                 items.append(

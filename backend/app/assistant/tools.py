@@ -17,6 +17,7 @@ from langgraph.prebuilt import InjectedState
 from sqlalchemy import func, select
 
 from app.assistant import drafting
+from app.assistant.posting import clean_form_url
 from app.assistant.schemas import JobProfile
 from app.db.database import SessionLocal
 from app.db.models import Job, JobDescription
@@ -138,7 +139,21 @@ def write_job_description(
         return message, {"kind": "jd", "jd_id": draft.id}
 
 
-TOOLS = [save_job_profile, rag_search, write_job_description]
+@tool(response_format="content_and_artifact")
+def save_application_form(
+    form_url: str, job_id: Annotated[int, InjectedState("job_id")]
+) -> tuple[str, dict]:
+    """Save the Google Form link applicants use to send their CV. It is put
+    in the job post. Only Google Forms links are accepted."""
+    url = clean_form_url(form_url)  # ValueError goes back to the LLM to fix
+    with SessionLocal() as db:
+        db.get(Job, job_id).google_form_url = url
+        db.commit()
+    logger.info("Application form saved: job %d", job_id)
+    return "The application form link is saved.", {"kind": "form", "url": url}
+
+
+TOOLS = [save_job_profile, rag_search, write_job_description, save_application_form]
 
 
 def _passages_found_so_far(messages: list) -> list[dict]:

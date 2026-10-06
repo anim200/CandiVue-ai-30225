@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     embedding_model: str = "qwen3-embedding:0.6b"
     ollama_base_url: str = "http://ollama:11434"  # the ollama service in Compose
 
+    # Job board MCP server (jobboard-mcp container, Blogger). The Blogger
+    # credentials live only in that container, never in the backend.
+    jobboard_mcp_url: str = "http://jobboard-mcp:8001/mcp"
+
     # Largest document the knowledge base accepts (N8).
     max_upload_mb: int = Field(default=20, gt=0)
 
