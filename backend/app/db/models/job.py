@@ -75,3 +75,8 @@ class JobDescription(TimestampMixin, Base):
     )
     reviewer_feedback: Mapped[str | None] = mapped_column(Text)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Knowledge-base passages the draft was based on (RAG), shown as source
+    # chips on the approval card: [{"document_id", "filename", "collection"}].
+    sources: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, server_default="[]"
+    )

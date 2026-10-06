@@ -14,6 +14,8 @@ EXPECTED_TABLES = {
     "transcript_turns",
     "qa_analyses",
     "assessment_reports",
+    "knowledge_documents",
+    "knowledge_chunks",
 }
 
 # N20: these must never be stored as candidate data.

@@ -23,6 +23,13 @@ class Settings(BaseSettings):
     # 0 = least random: the same CV and job profile get the same score (F2, B2).
     llm_temperature: float = 0
 
+    # Embedding model for the knowledge base (see app/ai/embeddings.py). Uses
+    # the same provider key as the LLM. 768 numbers per passage (pgvector).
+    embedding_model: str = "gemini-embedding-001"
+
+    # Largest document the knowledge base accepts (N8).
+    max_upload_mb: int = Field(default=20, gt=0)
+
     # Login tokens (see app/auth). The secret signs every token, so anyone who
     # knows it could create tokens: required, long, and only in .env.
     jwt_secret: SecretStr = Field(min_length=32)
