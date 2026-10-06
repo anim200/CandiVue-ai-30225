@@ -6,7 +6,7 @@
 import { AppShell, Box, Burger, Group, NavLink } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { Fragment } from 'react';
-import { Link, Outlet, useLocation } from 'react-router';
+import { Link, Outlet, useLocation, useMatches } from 'react-router';
 
 import BackendStatus from '../components/BackendStatus';
 import Logo from '../components/Logo';
@@ -17,6 +17,8 @@ import { NAV_ITEMS } from './navigation';
 // Page frame for interviewers: header, left menu and the current page.
 export default function AppLayout() {
   const { pathname } = useLocation();
+  // Pages marked fullBleed (the Hiring Assistant) fill the area without padding.
+  const fullBleed = useMatches().some((match) => match.handle?.fullBleed);
   const [menuOpen, { toggle: toggleMenu, close: closeMenu }] = useDisclosure(false);
 
   return (
@@ -61,7 +63,7 @@ export default function AppLayout() {
       </AppShell.Navbar>
 
       <AppShell.Main bg="#F5F7F8">
-        <Box px={{ base: 16, sm: 32 }} py={{ base: 16, sm: 24 }}>
+        <Box px={fullBleed ? 0 : { base: 16, sm: 32 }} py={fullBleed ? 0 : { base: 16, sm: 24 }}>
           <Outlet />
         </Box>
       </AppShell.Main>
