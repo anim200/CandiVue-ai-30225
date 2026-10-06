@@ -278,6 +278,11 @@ chat says "The job board is not set up yet".
    `BLOGGER_CLIENT_ID`, `BLOGGER_CLIENT_SECRET`, `BLOGGER_REFRESH_TOKEN`,
    `BLOGGER_BLOG_ID`. Then restart: `docker compose up -d`.
 
+Sign in with the Google account that **owns the blog** (add it as a test
+user first). While the consent screen is in *Testing*, Google ends the
+refresh token after 7 days: the chat then says "The job board sign-in
+failed"; run step 5 again and replace the token (do it before a demo).
+
 The token only allows managing your Blogger blogs. To revoke it, remove
 CandiVue at <https://myaccount.google.com/permissions>.
 
