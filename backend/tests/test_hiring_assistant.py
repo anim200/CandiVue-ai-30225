@@ -339,3 +339,27 @@ def test_long_messages_are_refused(client, headers):
     job_id = new_job(client, headers)
 
     assert say(client, headers, job_id, "x" * 2001).status_code == 422
+
+
+def test_try_again_continues_the_saved_turn(client, headers, scripted):
+    job_id = new_job(client, headers)
+    scripted += [TimeoutError("model did not answer")] * 3  # first + 2 retries fail
+    assert say(client, headers, job_id).status_code == 503
+
+    scripted += [AIMessage(content="What are the must-have skills?")]
+    thread = client.post(f"/api/assistant/jobs/{job_id}/retry", headers=headers).json()
+
+    kinds = [item["kind"] for item in thread["items"]]
+    assert kinds == ["user", "assistant"]  # the message was kept, not sent twice
+    assert thread["items"][-1]["text"] == "What are the must-have skills?"
+
+
+def test_a_never_ending_turn_is_stopped_with_a_clear_message(client, headers, scripted):
+    job_id = new_job(client, headers)
+    endless = {"profile": PROFILE}
+    scripted += [call("save_job_profile", endless, f"c{i}") for i in range(40)]
+
+    response = say(client, headers, job_id)
+
+    assert response.status_code == 503
+    assert response.json()["detail"].startswith("The assistant couldn't finish")

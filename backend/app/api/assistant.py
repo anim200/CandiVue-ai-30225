@@ -10,6 +10,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from langchain_core.messages import HumanMessage
+from langgraph.errors import GraphRecursionError
 from langgraph.types import Command
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
@@ -32,6 +33,7 @@ router = APIRouter(
 NOT_FOUND = "This job no longer exists."
 REVIEW_FIRST = "Please approve, edit or reject the job description first."
 NOTHING_TO_REVIEW = "There is no job description waiting for review."
+STUCK = "The assistant couldn't finish this request. Please rephrase it or try again."
 
 
 class MessageRequest(BaseModel):
@@ -86,6 +88,16 @@ def _thread(graph, db: Session, job_id: int) -> ThreadOut:
     )
 
 
+def _run(graph, graph_input, job_id: int) -> None:
+    """Run one turn of the graph; a turn that never ends (the LLM keeps
+    calling tools) is stopped by the step limit and gets a clear message."""
+    try:
+        graph.invoke(graph_input, thread_config(job_id))
+    except GraphRecursionError:
+        logger.warning("Assistant turn hit the step limit: job %d", job_id)
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, STUCK) from None
+
+
 @router.get("/jobs/{job_id}/thread", response_model=ThreadOut)
 def get_thread(
     job_id: int, request: Request, db: Annotated[Session, Depends(get_db)]
@@ -107,9 +119,7 @@ def send_message(
     graph = _graph(request)
     if _thread(graph, db, job_id).pending_review:
         raise HTTPException(status.HTTP_409_CONFLICT, REVIEW_FIRST)
-    graph.invoke(
-        {"messages": [HumanMessage(body.text)], "job_id": job_id}, thread_config(job_id)
-    )
+    _run(graph, {"messages": [HumanMessage(body.text)], "job_id": job_id}, job_id)
     return _thread(graph, db, job_id)
 
 
@@ -126,5 +136,21 @@ def review_job_description(
     if not _thread(graph, db, job_id).pending_review:
         raise HTTPException(status.HTTP_409_CONFLICT, NOTHING_TO_REVIEW)
     decision = body.model_dump(mode="json", exclude_none=True)
-    graph.invoke(Command(resume=decision), thread_config(job_id))
+    _run(graph, Command(resume=decision), job_id)
+    return _thread(graph, db, job_id)
+
+
+@router.post("/jobs/{job_id}/retry", response_model=ThreadOut)
+def retry_turn(
+    job_id: int, request: Request, db: Annotated[Session, Depends(get_db)]
+) -> ThreadOut:
+    """Continue a chat turn that stopped because the AI failed. The message
+    was already saved, so it is not sent again; the graph resumes from the
+    step that failed."""
+    _require_job(db, job_id)
+    graph = _graph(request)
+    snapshot = graph.get_state(thread_config(job_id))
+    unfinished = bool(snapshot.next)
+    if unfinished and not _thread(graph, db, job_id).pending_review:
+        _run(graph, None, job_id)
     return _thread(graph, db, job_id)
