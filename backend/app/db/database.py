@@ -21,6 +21,12 @@ engine = create_engine(
 SessionLocal = sessionmaker(engine)
 
 
+def get_db():
+    """FastAPI dependency: one database session per request, closed afterwards."""
+    with SessionLocal() as db:
+        yield db
+
+
 def check_database() -> bool:
     """Return True if the database answers a trivial query."""
     try:
