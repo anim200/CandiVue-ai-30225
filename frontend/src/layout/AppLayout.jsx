@@ -10,6 +10,7 @@ import { Link, Outlet, useLocation } from 'react-router';
 
 import BackendStatus from '../components/BackendStatus';
 import Logo from '../components/Logo';
+import UserMenu from '../components/UserMenu';
 import { NAV_ITEMS } from './navigation';
 
 export default function AppLayout() {
@@ -33,7 +34,10 @@ export default function AppLayout() {
             />
             <Logo />
           </Group>
-          <BackendStatus />
+          <Group gap="md" wrap="nowrap">
+            <BackendStatus />
+            <UserMenu />
+          </Group>
         </Group>
       </AppShell.Header>
 
