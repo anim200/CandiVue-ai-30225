@@ -48,7 +48,7 @@ function feedbackBefore(items, jd) {
 }
 
 // Turn the thread items into chat rows; consecutive tool steps share one row.
-function ChatRows({ items, pending, reviewBusy, onApprove, onEdit, onReject }) {
+function ChatRows({ items, profile, pending, reviewBusy, onApprove, onEdit, onReject }) {
   const rows = [];
   let steps = [];
   const flushSteps = () => {
@@ -81,6 +81,7 @@ function ChatRows({ items, pending, reviewBusy, onApprove, onEdit, onReject }) {
         <AssistantRow key={index}>
           <JdCard
             jd={item.jd}
+            profile={profile}
             waiting={pending?.jd_id === item.jd.id}
             busy={reviewBusy}
             previousFeedback={feedbackBefore(items, item.jd)}
@@ -303,6 +304,7 @@ export default function HiringAssistantPage() {
               {thread && (
                 <ChatRows
                   items={thread.items}
+                  profile={job?.profile}
                   pending={pending}
                   reviewBusy={reviewBusy}
                   onApprove={() => review({ action: 'approve' })}

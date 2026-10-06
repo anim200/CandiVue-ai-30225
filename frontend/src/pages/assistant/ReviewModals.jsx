@@ -25,12 +25,24 @@ function requirementChips(profile) {
   );
 }
 
-// Edit dialog: title, about and responsibilities; requirements stay locked.
+// Split a "one per line" text into a list of non-empty lines.
+function toLines(text) {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+// Edit dialog: every written section; requirements stay locked.
 export function JdEditModal({ opened, onClose, jd, job, onSave, busy }) {
-  const [title, setTitle] = useState(jd.content.title);
-  const [about, setAbout] = useState(jd.content.about);
-  const [lines, setLines] = useState(jd.content.responsibilities.join('\n'));
-  const responsibilities = lines.split('\n').map((line) => line.trim()).filter(Boolean);
+  const { content } = jd;
+  const [title, setTitle] = useState(content.title);
+  const [about, setAbout] = useState(content.about);
+  const [lines, setLines] = useState(content.responsibilities.join('\n'));
+  const [arrangement, setArrangement] = useState(content.work_arrangement ?? '');
+  const [offer, setOffer] = useState((content.what_we_offer ?? []).join('\n'));
+  const [equality, setEquality] = useState(content.equal_opportunity ?? '');
+  const responsibilities = toLines(lines);
   const valid = title.trim().length >= 2 && about.trim().length >= 20 && responsibilities.length > 0;
 
   return (
@@ -62,12 +74,36 @@ export function JdEditModal({ opened, onClose, jd, job, onSave, busy }) {
           maxLength={2000}
         />
         <Textarea
-          label="Responsibilities"
+          label="Key responsibilities"
           description="One per line"
           autosize
           minRows={4}
           value={lines}
           onChange={(e) => setLines(e.currentTarget.value)}
+        />
+        <Textarea
+          label="Work arrangement"
+          autosize
+          minRows={2}
+          value={arrangement}
+          onChange={(e) => setArrangement(e.currentTarget.value)}
+          maxLength={800}
+        />
+        <Textarea
+          label="What we offer"
+          description="One per line"
+          autosize
+          minRows={3}
+          value={offer}
+          onChange={(e) => setOffer(e.currentTarget.value)}
+        />
+        <Textarea
+          label="Equal opportunity"
+          autosize
+          minRows={2}
+          value={equality}
+          onChange={(e) => setEquality(e.currentTarget.value)}
+          maxLength={800}
         />
         <div>
           <Group gap={6} mb={6}>
@@ -101,7 +137,16 @@ export function JdEditModal({ opened, onClose, jd, job, onSave, busy }) {
               leftSection={<IconDeviceFloppy size={16} />}
               disabled={!valid}
               loading={busy}
-              onClick={() => onSave({ title: title.trim(), about: about.trim(), responsibilities })}
+              onClick={() =>
+                onSave({
+                  title: title.trim(),
+                  about: about.trim(),
+                  responsibilities,
+                  work_arrangement: arrangement.trim(),
+                  what_we_offer: toLines(offer).slice(0, 8),
+                  equal_opportunity: equality.trim(),
+                })
+              }
             >
               Save as version {jd.version + 1}
             </Button>

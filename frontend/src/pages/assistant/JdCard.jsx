@@ -36,8 +36,40 @@ function JdStatus({ jd, waiting }) {
   );
 }
 
-// The card. `previousFeedback`: why the version before this one was rejected.
-export default function JdCard({ jd, waiting, busy, previousFeedback, onApprove, onEdit, onReject }) {
+// A titled list section of the full description (skipped when empty).
+function ListSection({ title, items }) {
+  if (!items?.length) return null;
+  return (
+    <>
+      <div className={classes.jdSection}>{title}</div>
+      <ul className={classes.jdList}>
+        {items.map((item, index) => (
+          <li key={index}>{item}</li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+// A titled text section of the full description (skipped when empty).
+function TextSection({ title, text }) {
+  if (!text) return null;
+  return (
+    <>
+      <div className={classes.jdSection}>{title}</div>
+      <p className={classes.jdAbout}>{text}</p>
+    </>
+  );
+}
+
+// Requirements come from the job profile (so screening stays consistent).
+function requirementLines(profile, levels) {
+  return (profile?.requirements ?? []).filter((r) => levels.includes(r.level)).map((r) => r.text);
+}
+
+// The card. `profile`: the job profile (for the requirements).
+// `previousFeedback`: why the version before this one was rejected.
+export default function JdCard({ jd, profile, waiting, busy, previousFeedback, onApprove, onEdit, onReject }) {
   const [open, setOpen] = useState(false);
   const { content } = jd;
 
@@ -52,12 +84,22 @@ export default function JdCard({ jd, waiting, busy, previousFeedback, onApprove,
         <p className={`${classes.jdAbout} ${open ? '' : classes.jdClamp}`}>{content.about}</p>
         {open && (
           <>
-            <div className={classes.jdSection}>Responsibilities</div>
-            <ul className={classes.jdList}>
-              {content.responsibilities.map((item, index) => (
-                <li key={index}>{item}</li>
-              ))}
-            </ul>
+            <ListSection title="Key responsibilities" items={content.responsibilities} />
+            <ListSection
+              title="Requirements"
+              items={[
+                // The years line only when no requirement already covers experience.
+                ...(profile?.min_years_experience != null &&
+                !profile.requirements.some((r) => r.category === 'experience')
+                  ? [`${profile.min_years_experience}+ years of relevant experience`]
+                  : []),
+                ...requirementLines(profile, ['mandatory', 'required']),
+              ]}
+            />
+            <ListSection title="Nice to have" items={requirementLines(profile, ['preferred'])} />
+            <TextSection title="Work arrangement" text={content.work_arrangement} />
+            <ListSection title="What we offer" items={content.what_we_offer} />
+            <TextSection title="Equal opportunity" text={content.equal_opportunity} />
           </>
         )}
         <button type="button" className={classes.toggle} onClick={() => setOpen(!open)}>
