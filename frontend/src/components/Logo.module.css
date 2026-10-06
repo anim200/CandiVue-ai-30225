@@ -1,0 +1,20 @@
+/* The pupil "glances" now and then (design: login screen only, 6s). The
+   distances are in logo drawing units (88 per logo). */
+.glance {
+  animation: look 6s ease-in-out infinite;
+}
+
+@keyframes look {
+  0%,
+  38%,
+  100% {
+    transform: translate(0, 0);
+  }
+  46%,
+  80% {
+    transform: translate(4px, -4px);
+  }
+  88% {
+    transform: translate(-2px, 2px);
+  }
+}
