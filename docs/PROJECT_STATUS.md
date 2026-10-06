@@ -28,6 +28,11 @@ Update this file at the end of each work session. Every Claude thread reads it.
   - New routers must use `dependencies=[Depends(require_interviewer)]` (or be listed in the test's allowlist on purpose). Interview-link time window and one-connection rule: build with F3 sessions.
   - Done 06-10-2026 (#646483 transport security, N10): nginx split into `frontend/nginx/` (default.conf HTTP, app.conf shared, https.conf); optional HTTPS on https://localhost:5443, switched on at container start by `enable-https.sh` when `certs/cert.pem` + `key.pem` exist (mkcert; git-ignored); HTTP always 127.0.0.1 only; `HTTPS_BIND_ADDRESS` opt-in for phones on the LAN (camera/mic need HTTPS). Security headers on all responses (CSP, Referrer-Policy no-referrer, X-Frame-Options, nosniff, Permissions-Policy camera/mic self, HSTS on HTTPS). nginx access log hides `/join/<token>`. `.gitattributes` keeps `*.sh` LF. README "Transport security" documents every connection and the local exceptions. Extend the CSP in `frontend/nginx/app.conf` when a feature needs a new source (e.g. WebSocket/WebRTC servers).
   - **Module 2 (story #646469) complete 06-10-2026**; merged into dev.
+- Module 3 Pre-Interview (story #647068, branch module/pre-interview), in requirement order (§4B-2/§4B-8/§4B-9):
+  - Done 06-10-2026: one-line docstring/comment on every function (user rule); route audit test fixed (it did not see included routers; now uses `iter_route_contexts`, Fixes #646482).
+  - Done 06-10-2026 (#647073 part 1, up to JD approval): knowledge base (tables `knowledge_documents`/`knowledge_chunks`, pgvector 768 + HNSW, upload PDF/DOCX/TXT/MD checked by content, text only kept, background indexing via runner, cosine search, retry); Hiring Assistant LangGraph 1 (`app/graphs/hiring_assistant.py`: load_context → assistant ↔ tools [save_job_profile, rag_search, write_job_description] → human_review interrupt: approve / edit (new version, approve again) / reject with feedback (rewrite)); retry path for invalid tool args; 30-step limit → clear 503; `POST .../retry` continues a failed turn; APIs `/api/jobs`, `/api/assistant/jobs/{id}/thread|messages|review|retry`, `/api/knowledge/*`. Screens built from the design: Jobs list, Hiring Assistant (thread list, progress bar, profile and JD cards, edit/reject dialogs, all states), Knowledge Base (collections, dropzone, documents table, search test, all states); responsive. 83 backend tests + 9 frontend tests.
+  - Deviations (announced): "Approve" instead of "Approve and post" until posting exists; no chat date separator (messages have no timestamps); no document preview; KB banner does not claim a personal-data scan (not built); tool steps appear when the answer arrives (no streaming).
+  - Next in order: #647073 part 2 = `post_to_job_board` to **Blogger** via our own small MCP server (one-time OAuth refresh token; private blog; ask the user for Google credentials then), then CV Collector (Google Drive service account, same credentials), #647074–#647079.
 
 ## Design notes to apply in later modules
 - Two roles: Interviewer logs in with email + password; Candidate authenticates with the unique interview link. Both get a role-based JWT; the backend enforces the role (N9). Candidate token is limited to one session.
@@ -54,7 +59,7 @@ Update this file at the end of each work session. Every Claude thread reads it.
 - Git Bash is used for git commands; check the branch name in the prompt before committing
 
 ## Next
-- Start the next WBS module on a new module/<name> branch created from dev
+- Module 3 (module/pre-interview): Blogger posting via own MCP server, then CV collection and screening (see In progress)
 - Technical risk prototype: two-party video call, speech-to-text trial, multi-node LangGraph trial
 
 ## Open decisions (need trainer confirmation)
@@ -76,3 +81,8 @@ Update this file at the end of each work session. Every Claude thread reads it.
   - #646481 Frontend navigation and connection to backend (done 05-10-2026)
   - #646482 Lightweight auth; block Candidate access to scores, rankings, assessments (done 06-10-2026)
   - #646483 Secure transport for APIs and media; document local exceptions (done 06-10-2026)
+- Story #647068 Pre-Interview: Job Profile, CV Screening, Ranking & Scoring (F1, F2) (module/pre-interview):
+  - Story #647069 Job Profile Management: #647073 job profiles + JD via LLM assistant (part 1 done 06-10-2026; posting next)
+  - Story #647070 CV Upload & Parsing: #647074 batch CV upload, type/size checks, per-file status; #647075 extraction, OCR, per-file failure isolation
+  - Story #647071 Semantic Screening & Ranking: #647076 matching with evidence, hard-requirement exclusion, retry paths; #647077 explained ranking (confirm basis with trainer)
+  - Story #647072 Candidate Scoring: #647078 reproducible 0-100 scores, AI weights, justifications; #647079 score breakdown and weights on screen

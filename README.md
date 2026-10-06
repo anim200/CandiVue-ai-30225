@@ -165,16 +165,93 @@ width.
 | `LLM_TIMEOUT_SECONDS` | `60` | Longest wait for one answer. |
 | `LLM_MAX_RETRIES` | `2` | Extra tries after a failure, with a growing pause. |
 | `LLM_TEMPERATURE` | `0` | Randomness of answers. `0` keeps candidate scores repeatable. |
+| `EMBEDDING_MODEL` | `gemini-embedding-001` | Model that turns knowledge-base text into embeddings for search. Uses the same key. |
+| `MAX_UPLOAD_MB` | `20` | Largest knowledge-base document accepted. |
 
 - **Provider:** Google Gemini API (external service). The provider can be
   changed in `.env` without code changes.
-- **What is sent:** job profiles, CV text, interview transcripts and the
-  instructions (prompts) needed to screen and assess candidates.
+- **What is sent:**
+  - Hiring Assistant: the interviewer's chat messages, the job profile,
+    knowledge-base passages found by search, and interviewer feedback on
+    job descriptions.
+  - Knowledge base: the text of uploaded documents (to make embeddings)
+    and search questions.
+  - Later steps: CV text, interview transcripts and the instructions
+    (prompts) needed to screen and assess candidates.
 - **Free-tier notice:** on Gemini's free tier, Google may use the data it
   receives to improve its products. Use only synthetic or sample data with a
   free key, never real candidate data.
 - **If the AI fails** (timeout, outage, wrong key, rate limit) after all
   retries, the API answers `503` with a clear message instead of crashing.
+
+## Hiring Assistant (LangGraph 1)
+
+The interviewer prepares a job by chatting with the Hiring Assistant
+(Figure 3 in `docs/diagrams/`). One chat thread per job, saved in the
+database, so it continues after a restart.
+
+```
+START -> load_context -> assistant --(tool call)--> tools --> assistant ...
+                                   \--(reply)-----> END
+         tools --(a JD was written)--> human_review (pause)
+         human_review --approve / reject--> assistant
+         human_review --edit------------> human_review
+```
+
+- **assistant**: the LLM reads the chat and decides the next step.
+- **tools** (the LLM decides which to call):
+  - `save_job_profile`: title, minimum experience, and every requirement
+    as mandatory / required / preferred.
+  - `rag_search`: searches the knowledge base, only when useful.
+  - `write_job_description`: drafts the JD from the profile and any
+    passages found; records which documents it used.
+- **human_review**: the graph pauses (LangGraph `interrupt`) until the
+  interviewer approves, edits (saved as a new version that still needs
+  approval) or rejects with feedback (the assistant writes a new
+  version). Nothing is posted before approval.
+- **Retry path**: a tool call with invalid arguments goes back to the LLM
+  as an error so it can correct itself; a turn that never ends is stopped
+  after 30 steps with a clear message; "Try again" continues a turn that
+  failed without sending the message twice.
+
+## Knowledge base (RAG)
+
+Documents the Hiring Assistant can search: reference library, company
+policies, previous job profiles, email templates and the interview
+question bank.
+
+- Upload PDF, DOCX, TXT or Markdown (up to `MAX_UPLOAD_MB`). The type is
+  checked from the file's content, not its name.
+- Only the extracted text is stored, cut into overlapping passages; the
+  file itself is not kept.
+- Each passage gets an embedding (768 numbers, stored with pgvector).
+  Search compares the question's embedding with the passages (cosine
+  similarity) and returns the closest ones with a match score.
+- Indexing runs in the background with a visible status; a failed
+  document can be indexed again.
+- Never upload CVs, interview notes or other personal data here.
+
+## Secure by design
+
+Security is built into each part instead of added at the end:
+
+- **Deny by default:** every API route requires the interviewer role
+  unless it is on a short, explicit list; a test fails if a new route
+  forgets the check (`tests/test_auth_routes.py`).
+- **Validate all input:** request bodies have length limits (Pydantic);
+  uploads are checked by size and real file type; file names are cleaned.
+- **Least data:** uploaded files are not kept, only their text; no
+  candidate data in the knowledge base.
+- **AI output is checked:** the profile and JD the LLM writes must match
+  fixed shapes before they are saved; the job id is set by the graph, not
+  by the LLM.
+- **Prompt-injection care:** document text and chat messages are passed
+  to the LLM as data, and the instructions say never to follow
+  instructions found inside them.
+- **Human approval:** nothing is published before the interviewer
+  approves it.
+- **No secrets or personal data in logs or error messages**, pinned and
+  audited dependencies, localhost-only ports (see the sections above).
 
 ## Signing in and roles
 
