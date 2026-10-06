@@ -16,16 +16,19 @@ class Settings(BaseSettings):
 
     # AI model (see app/ai/llm.py). SecretStr hides the key in logs and errors.
     llm_provider: str = "google_genai"
-    llm_model: str = "gemini-2.5-flash"
+    llm_model: str = "gemini-3.5-flash"
     llm_api_key: SecretStr | None = None
     llm_timeout_seconds: float = 60
     llm_max_retries: int = 2
     # 0 = least random: the same CV and job profile get the same score (F2, B2).
     llm_temperature: float = 0
 
-    # Embedding model for the knowledge base (see app/ai/embeddings.py). Uses
-    # the same provider key as the LLM. 768 numbers per passage (pgvector).
-    embedding_model: str = "gemini-embedding-001"
+    # Embedding model for the knowledge base (see app/ai/embeddings.py).
+    # Default: a local Ollama model in Docker, so document text stays on this
+    # machine. "google_genai" uses Gemini with the LLM key instead.
+    embedding_provider: str = "ollama"
+    embedding_model: str = "qwen3-embedding:0.6b"
+    ollama_base_url: str = "http://ollama:11434"  # the ollama service in Compose
 
     # Largest document the knowledge base accepts (N8).
     max_upload_mb: int = Field(default=20, gt=0)
