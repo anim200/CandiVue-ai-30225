@@ -69,9 +69,14 @@ services:
     build: ./frontend
     restart: unless-stopped
     ports:
-      # Bound to localhost only (documented local-development exception, N10).
-      # 5173 is the address the backend allows in CORS_ORIGINS.
+      # HTTP: always localhost only (documented local-development exception,
+      # N10). 5173 is the address the backend allows in CORS_ORIGINS.
       - "127.0.0.1:${FRONTEND_PORT:-5173}:80"
+      # HTTPS: only active when certs/ holds a certificate. Localhost by
+      # default; set HTTPS_BIND_ADDRESS=0.0.0.0 to reach it from a phone.
+      - "${HTTPS_BIND_ADDRESS:-127.0.0.1}:${HTTPS_PORT:-5443}:443"
+    volumes:
+      - ./certs:/etc/nginx/certs:ro
     depends_on:
       backend:
         condition: service_healthy  # nginx forwards /api to the backend
