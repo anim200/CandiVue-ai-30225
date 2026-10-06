@@ -1,0 +1,38 @@
+/* Left menu items, from the design (Jobs.dc.html): 40px high, 6px corners,
+   active = light harbor tint with dark harbor text. */
+
+.navLink {
+  height: 40px;
+  border-radius: 6px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1a2227;
+  transition: background-color 0.15s;
+}
+
+.navLink:hover {
+  background-color: #f1f4f5;
+}
+
+.navLink[data-active],
+.navLink[data-active]:hover {
+  background-color: #edf5f6;
+  color: #1c5d65;
+  font-weight: 600;
+}
+
+.navIcon {
+  margin-right: 12px;
+  color: #48535b;
+}
+
+.navLink[data-active] .navIcon {
+  color: #1c5d65;
+}
+
+.divider {
+  height: 1px;
+  background: #e9ecee;
+  margin: 8px 4px;
+}

@@ -1,0 +1,12 @@
+/* App-wide CSS (the design asks for subtle animations, but people who turn
+   on "reduce motion" in their operating system get none). */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

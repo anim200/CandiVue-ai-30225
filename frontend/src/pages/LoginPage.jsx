@@ -1,30 +1,29 @@
-// Interviewer sign-in (design: Login.dc.html). Candidates never sign in here:
-// they use the private link in their invitation email.
-// Responsive: phones and tablets show only the form; desktops also show the
-// brand panel on the left.
+// Interviewer sign-in, built from the design (Login.dc.html: frame 1a and the
+// states in section 2). Candidates never sign in here: they use the private
+// link in their invitation email.
+// Left out on purpose (decided for #646482): "Forgot password?" and
+// "Keep me signed in". The light/dark switch comes with dark mode later.
 
+import { Anchor, Box, Button, Loader, PasswordInput, TextInput } from '@mantine/core';
 import {
-  Alert,
-  Box,
-  Button,
-  Center,
-  Group,
-  Paper,
-  PasswordInput,
-  SimpleGrid,
-  Stack,
-  Text,
-  TextInput,
-  ThemeIcon,
-  Title,
-} from '@mantine/core';
-import { IconAlertTriangle, IconCheck, IconClock } from '@tabler/icons-react';
-import { useState } from 'react';
-import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router';
+  IconAlertCircle,
+  IconCheck,
+  IconCircleCheck,
+  IconCloudOff,
+  IconInfoCircle,
+  IconLink,
+  IconLock,
+  IconMail,
+  IconQuote,
+  IconUserCheck,
+} from '@tabler/icons-react';
+import { useEffect, useState } from 'react';
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router';
 
 import { apiPost } from '../api/client';
 import { clearSession, loadSession, saveSession } from '../auth/session';
 import Logo from '../components/Logo';
+import classes from './LoginPage.module.css';
 
 // Placeholder positioning from the design; to be replaced by the trainee's
 // own positioning statement (product naming deliverable, E6).
@@ -33,46 +32,91 @@ const INTRO =
   'CandiVue AI screens CVs, captures interviews and drafts assessments. ' +
   'You review every result and make every decision.';
 const PRINCIPLES = [
-  'Every score links to a CV excerpt or transcript moment',
-  'Nobody is hired or rejected automatically',
-  'Candidates join by private link and never see scores',
+  { icon: IconQuote, text: 'Every score links to a CV excerpt or transcript moment' },
+  { icon: IconUserCheck, text: 'Nobody is hired or rejected automatically' },
+  { icon: IconLock, text: 'Candidates join by private link and never see scores' },
 ];
+
+// Messages from the design's state frames (section 2).
+const WRONG_LOGIN = 'That email and password don’t match. Check them and try again.';
+const SERVICE_DOWN = 'We can’t sign you in right now. Please try again in a few minutes.';
+const SESSION_ENDED = 'You were signed out because your session ended. Sign in to continue.';
+const EMAIL_HINT = 'Enter a full email address, like name@example.com';
+
+// Breathing rings: size, line opacity and start delay, from the design.
+const RINGS = [
+  { size: 520, opacity: 0.08, delay: '0s' },
+  { size: 780, opacity: 0.06, delay: '1.5s' },
+  { size: 1040, opacity: 0.04, delay: '3s' },
+];
+
+const SHOW_SIGNED_IN_MS = 600; // briefly show "Signed in" before opening Jobs
 
 function BrandPanel() {
   return (
-    <Stack
-      visibleFrom="md"
-      justify="space-between"
-      p={48}
-      style={{
-        background: 'radial-gradient(120% 90% at 20% 0%, #1E6670 0%, #123F45 55%, #0B2A2F 100%)',
-      }}
-    >
-      <Logo onDark />
-      <Stack gap="lg" maw={460}>
-        <Title order={1} fz={36} lh={1.2} c="white">
-          {HEADLINE}
-        </Title>
-        <Text c="rgba(255,255,255,.75)" fz={16} lh={1.6}>
-          {INTRO}
-        </Text>
-        <Stack gap="sm">
-          {PRINCIPLES.map((principle) => (
-            <Group key={principle} gap="sm" wrap="nowrap">
-              <ThemeIcon size={22} radius="xl" color="rgba(255,255,255,.12)">
-                <IconCheck size={14} color="#7FD0D8" />
-              </ThemeIcon>
-              <Text c="white" fz={14}>
-                {principle}
-              </Text>
-            </Group>
+    <div className={classes.brand}>
+      {RINGS.map((ring) => (
+        <div
+          key={ring.size}
+          className={classes.ring}
+          style={{
+            width: ring.size,
+            height: ring.size,
+            border: `1px solid rgba(255,255,255,${ring.opacity})`,
+            animationDelay: ring.delay,
+          }}
+        />
+      ))}
+      <div className={classes.glow} />
+
+      <div className={classes.logoRow}>
+        <Logo size="lg" onDark glance />
+      </div>
+
+      {/* Synthetic examples of the evidence CandiVue links to. */}
+      <div className={classes.chips} aria-hidden="true">
+        <div className={classes.chip}>
+          <span className={classes.timestamp}>02:47</span>
+          “added pagination and an index…”
+        </div>
+        <div className={classes.chip} style={{ marginRight: 46, animationDuration: '8s', animationDelay: '1.2s' }}>
+          <span className={classes.met}>
+            <IconCheck size={12} />
+            Met
+          </span>
+          Python web framework
+        </div>
+        <div
+          className={classes.chip}
+          style={{ marginRight: 12, gap: 12, animationDuration: '7.5s', animationDelay: '2.4s' }}
+        >
+          <span className={classes.score}>82</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span className={classes.scoreLabel}>Candidate C · screening</span>
+            <div className={classes.scoreTrack}>
+              <div className={classes.scoreBar} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className={classes.story}>
+        <h1 className={classes.headline}>{HEADLINE}</h1>
+        <p className={classes.intro}>{INTRO}</p>
+        <div className={classes.principles}>
+          {PRINCIPLES.map(({ icon: Icon, text }, index) => (
+            <div key={text} className={classes.principle} style={{ animationDelay: `${0.35 + index * 0.1}s` }}>
+              <span className={classes.principleIcon}>
+                <Icon size={17} />
+              </span>
+              {text}
+            </div>
           ))}
-        </Stack>
-      </Stack>
-      <Text c="rgba(255,255,255,.55)" fz={12}>
-        Demo environment · synthetic sample data only
-      </Text>
-    </Stack>
+        </div>
+      </div>
+
+      <div className={classes.demoNote}>Demo environment · synthetic sample data only</div>
+    </div>
   );
 }
 
@@ -83,96 +127,132 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState(null);
-  const [error, setError] = useState(null);
-  const [signingIn, setSigningIn] = useState(false);
+  const [error, setError] = useState(null); // { text, serviceDown }
+  const [errorKey, setErrorKey] = useState(0); // restarts the shake on each new error
+  const [stage, setStage] = useState('idle'); // idle | signingIn | signedIn
+  const goTo = location.state?.from ?? '/jobs';
+
+  // After "Signed in" has been visible for a moment, open the app.
+  useEffect(() => {
+    if (stage !== 'signedIn') return undefined;
+    const timer = setTimeout(() => navigate(goTo, { replace: true }), SHOW_SIGNED_IN_MS);
+    return () => clearTimeout(timer);
+  }, [stage, goTo, navigate]);
 
   // Already signed in as an interviewer: nothing to do here.
-  if (loadSession()?.user.role === 'interviewer') {
+  if (stage === 'idle' && loadSession()?.user.role === 'interviewer') {
     return <Navigate to="/jobs" replace />;
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (stage !== 'idle') return; // already signing in: ignore extra clicks
     if (!email.includes('@')) {
-      setEmailError('Enter a full email address, like name@example.com');
+      setEmailError(EMAIL_HINT);
       return;
     }
     setEmailError(null);
     setError(null);
-    setSigningIn(true);
+    setStage('signingIn');
     clearSession(); // signing in replaces any older session in this tab
     try {
       const result = await apiPost('/auth/login', { email, password });
       saveSession({ token: result.access_token, user: result.user });
-      navigate(location.state?.from ?? '/jobs', { replace: true });
+      setStage('signedIn');
     } catch (err) {
-      setError(err.message);
-      setSigningIn(false);
+      // 401 = wrong email or password; anything else = we could not check.
+      setError(err.status === 401 ? { text: WRONG_LOGIN } : { text: SERVICE_DOWN, serviceDown: true });
+      setErrorKey((key) => key + 1);
+      setStage('idle');
     }
   }
 
+  const showExpired = searchParams.get('expired') && !error && stage === 'idle';
+
   return (
-    <SimpleGrid cols={{ base: 1, md: 2 }} spacing={0} mih="100vh">
+    <div className={classes.page}>
       <BrandPanel />
 
-      <Center bg="white" px={{ base: 'md', sm: 'xl' }} py="xl">
-        <Stack w="100%" maw={380} gap="lg">
+      <div className={classes.formSide}>
+        <form className={classes.form} onSubmit={handleSubmit} noValidate>
+          {/* On wide screens the logo is in the brand panel. */}
           <Box hiddenFrom="md">
             <Logo />
           </Box>
 
           <div>
-            <Title order={1} fz={26}>
-              Welcome back
-            </Title>
-            <Text c="dimmed">Sign in to your interviewer account</Text>
+            <h2 className={classes.title}>Welcome back</h2>
+            <div className={classes.subtitle}>Sign in to your interviewer account</div>
           </div>
 
-          {searchParams.get('expired') && !error && (
-            <Alert color="blue" icon={<IconClock size={18} />}>
-              Your session has expired. Please sign in again.
-            </Alert>
+          {showExpired && (
+            <div className={`${classes.message} ${classes.info}`} role="status">
+              <IconInfoCircle size={18} />
+              {SESSION_ENDED}
+            </div>
           )}
           {error && (
-            <Alert color="red" icon={<IconAlertTriangle size={18} />}>
-              {error}
-            </Alert>
+            <div key={errorKey} className={`${classes.message} ${classes.error}`} role="alert">
+              {error.serviceDown ? <IconCloudOff size={18} /> : <IconAlertCircle size={18} />}
+              {error.text}
+            </div>
           )}
 
-          <form onSubmit={handleSubmit} noValidate>
-            <Stack gap="md">
-              <TextInput
-                label="Email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(event) => setEmail(event.currentTarget.value)}
-                error={emailError}
-                required
-              />
-              <PasswordInput
-                label="Password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(event) => setPassword(event.currentTarget.value)}
-                required
-              />
-              <Button type="submit" size="md" fullWidth loading={signingIn}>
-                Sign in
-              </Button>
-            </Stack>
-          </form>
+          <TextInput
+            label="Email"
+            type="email"
+            autoComplete="email"
+            placeholder="name@example.com"
+            leftSection={<IconMail size={17} color="#8A949A" />}
+            value={email}
+            onChange={(event) => setEmail(event.currentTarget.value)}
+            error={emailError}
+            classNames={{ input: classes.input, label: classes.label, error: classes.fieldError }}
+          />
+          <PasswordInput
+            label="Password"
+            autoComplete="current-password"
+            placeholder="Your password"
+            leftSection={<IconLock size={17} color="#8A949A" />}
+            value={password}
+            onChange={(event) => setPassword(event.currentTarget.value)}
+            classNames={{ input: classes.input, label: classes.label }}
+          />
 
-          <Paper withBorder radius="md" p="md" bg="#F5F7F8">
-            <Text fz={14} fw={600}>
-              Are you a candidate?
-            </Text>
-            <Text fz={14} c="dimmed">
-              You don&apos;t need an account. Join using the private link in your invitation email.
-            </Text>
-          </Paper>
-        </Stack>
-      </Center>
-    </SimpleGrid>
+          <Button
+            type="submit"
+            className={classes.submit}
+            fullWidth
+            leftSection={
+              stage === 'signingIn' ? (
+                <Loader type="oval" size={15} color="white" />
+              ) : stage === 'signedIn' ? (
+                <IconCircleCheck size={18} />
+              ) : null
+            }
+          >
+            {{ idle: 'Sign in', signingIn: 'Signing in…', signedIn: 'Signed in' }[stage]}
+          </Button>
+          {stage === 'signedIn' && (
+            <div className={classes.signedIn}>
+              Signed in.{' '}
+              <Anchor component={Link} to={goTo} fw={600} fz={14}>
+                Go to Jobs
+              </Anchor>
+            </div>
+          )}
+
+          <div className={classes.candidateNote}>
+            <span className={classes.candidateIcon}>
+              <IconLink size={17} />
+            </span>
+            <div>
+              <b>Are you a candidate?</b> You don’t need an account. Join using the private link in
+              your invitation email.
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

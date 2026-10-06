@@ -3,7 +3,7 @@
 // Responsive: on phones and small tablets (below "sm", 768px) the menu is
 // hidden and opens from the burger button in the header.
 
-import { AppShell, Box, Burger, Divider, Group, NavLink } from '@mantine/core';
+import { AppShell, Box, Burger, Group, NavLink } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { Fragment } from 'react';
 import { Link, Outlet, useLocation } from 'react-router';
@@ -11,6 +11,7 @@ import { Link, Outlet, useLocation } from 'react-router';
 import BackendStatus from '../components/BackendStatus';
 import Logo from '../components/Logo';
 import UserMenu from '../components/UserMenu';
+import classes from './AppLayout.module.css';
 import { NAV_ITEMS } from './navigation';
 
 export default function AppLayout() {
@@ -41,16 +42,17 @@ export default function AppLayout() {
         </Group>
       </AppShell.Header>
 
-      <AppShell.Navbar px={12} py={16}>
+      <AppShell.Navbar px={12} py={16} style={{ gap: 2 }}>
         {NAV_ITEMS.map(({ path, label, icon: Icon, dividerBefore }) => (
           <Fragment key={path}>
-            {dividerBefore && <Divider my="sm" />}
+            {dividerBefore && <div className={classes.divider} />}
             <NavLink
               component={Link}
               to={path}
               label={label}
               leftSection={<Icon size={19} stroke={1.6} />}
               active={pathname.startsWith(path)}
+              classNames={{ root: classes.navLink, section: classes.navIcon }}
               onClick={closeMenu} // on phones, close the menu after choosing
             />
           </Fragment>

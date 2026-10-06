@@ -9,6 +9,7 @@ import '@fontsource/ibm-plex-mono/400.css';
 import '@fontsource/ibm-plex-mono/500.css';
 import '@fontsource/ibm-plex-mono/600.css';
 import '@mantine/core/styles.css';
+import './styles/global.css';
 
 import { MantineProvider } from '@mantine/core';
 import { StrictMode } from 'react';
