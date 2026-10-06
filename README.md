@@ -167,7 +167,8 @@ width.
 
 | Setting (`.env`) | Default | Meaning |
 |---|---|---|
-| `LLM_PROVIDER` / `LLM_MODEL` | `google_genai` / `gemini-3.5-flash-lite` | Which AI model is used. Free tier: daily request limits per model (see <https://ai.dev/rate-limit>). |
+| `LLM_PROVIDER` / `LLM_MODEL` | `google_genai` / `gemini-3.5-flash-lite` | Which AI model is used until the interviewer picks one under the chat. |
+| `LLM_MODELS` | `gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite` | Models the interviewer may switch to under the chat (allowed list). |
 | `LLM_API_KEY` | none | Your own key (Gemini: free from Google AI Studio). |
 | `LLM_TIMEOUT_SECONDS` | `60` | Longest wait for one answer. |
 | `LLM_MAX_RETRIES` | `2` | Extra tries after a failure, with a growing pause. |
@@ -193,11 +194,30 @@ Other external services (N18):
 | Service | What it receives |
 |---|---|
 | Blogger (Google), through `jobboard-mcp` | The approved job description (title, text, requirements) and the Google Form link. No candidate data. |
+
 - **Free-tier notice:** on Gemini's free tier, Google may use the data it
   receives to improve its products. Use only synthetic or sample data with a
   free key, never real candidate data.
 - **If the AI fails** (timeout, outage, wrong key, rate limit) after all
   retries, the API answers `503` with a clear message instead of crashing.
+
+**Choosing the model and seeing the quota.** Under the Hiring Assistant's
+chat box the interviewer can switch the AI model (only models in
+`LLM_MODELS`). The choice is saved (table `llm_models`) and used for every
+AI call. Gemini's free tier has a daily request limit **per model** (for
+example 20 a day for `gemini-3.5-flash`), and one job needs about 5-8
+requests.
+
+- Google has no API that tells how much quota is left, so CandiVue counts
+  its own requests per model and day (the count restarts at midnight
+  Pacific time, like Google's).
+- When Google answers "limit reached" (HTTP 429), the limit and the reset
+  time are read from Google's answer and shown: "20 of 20 requests today ·
+  limit reached, resets in 13 h". A daily limit is not retried (it would
+  only fail again); a short per-minute limit is.
+- Requests made with the same key elsewhere are not counted. "Usage on
+  Google" opens <https://ai.dev/rate-limit> for Google's exact numbers.
+- API: `GET /api/ai/models`, `PUT /api/ai/model` (interviewers only).
 
 ## Hiring Assistant (LangGraph 1)
 
@@ -209,9 +229,12 @@ database, so it continues after a restart.
 START -> load_context -> assistant --(tool call)--> tools --> assistant ...
                                    \--(reply)-----> END
          tools --(a JD was written)--> human_review (pause)
-         human_review --approve----> post_to_job_board --> assistant
+         human_review --approve----> confirm_posting (pause)
          human_review --reject-----> assistant
          human_review --edit-------> human_review
+         confirm_posting --post----> post_to_job_board --> assistant
+         confirm_posting --skip----> assistant
+         tools --(request_job_posting)--> confirm_posting
 ```
 
 - **assistant**: the LLM reads the chat and decides the next step.
@@ -223,11 +246,17 @@ START -> load_context -> assistant --(tool call)--> tools --> assistant ...
     passages found; records which documents it used.
   - `save_application_form`: saves the Google Form link applicants use
     to send their CV (only Google Forms links are accepted).
+  - `request_job_posting`: when the interviewer later asks to post a job
+    they did not post, this asks them again. It cannot post by itself.
 - **human_review**: the graph pauses (LangGraph `interrupt`) until the
   interviewer approves, edits (saved as a new version that still needs
   approval) or rejects with feedback (the assistant writes a new
   version). Nothing is posted before approval.
-- **post_to_job_board**: runs only after approval. Posts the approved JD
+- **confirm_posting**: after approval the graph pauses again and asks
+  "Post this job to the job board?" with **Post to job board** and
+  **Don't post**. Don't post keeps the JD approved (job list: "Approved ·
+  not posted"); the interviewer can ask in the chat to post it later.
+- **post_to_job_board**: runs only after the interviewer chose Post. Posts the approved JD
   and the form link to the job board (see below) and adds the result to
   the chat. If the form link is missing, it asks for it first; if the
   job board fails after 3 tries, the chat shows **Try again** and
