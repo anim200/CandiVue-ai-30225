@@ -49,6 +49,9 @@ Before the first start, also set in `.env`:
 | Full reset (deletes the database volume) | `docker compose down -v` |
 | Full reset including built images | `docker compose down -v --rmi local` |
 
+The first start also downloads the Ollama image and the embedding model
+(a few GB in total), so it takes several minutes once.
+
 After a full reset, run `docker compose up --build -d` again. The database
 is recreated from scratch and the pgvector extension is enabled
 automatically.
@@ -154,18 +157,20 @@ width.
 | `db` | `pgvector/pgvector:0.8.7-pg17-bookworm` | PostgreSQL 17 with pgvector. Data in the named volume `pgdata`. Not exposed to the host. |
 | `backend` | built from `backend/Dockerfile` (target `runtime`) | FastAPI on Python 3.13. Applies migrations on start. |
 | `tests` | built from `backend/Dockerfile` (target `test`) | Only runs on demand (see below). |
+| `ollama` | `ollama/ollama:0.35.1` | Local embedding model for the knowledge base. Not exposed to the host; models kept in the `ollama_models` volume. |
+| `ollama-pull` | `ollama/ollama:0.35.1` | One-time job: downloads the embedding model on the first start, then exits. |
 | `frontend` | built from `frontend/Dockerfile` | React app served by nginx 1.31 (HTTP, and HTTPS when `certs/` has a certificate); forwards `/api` to the backend. |
 
 ## AI provider and data sent to it
 
 | Setting (`.env`) | Default | Meaning |
 |---|---|---|
-| `LLM_PROVIDER` / `LLM_MODEL` | `google_genai` / `gemini-2.5-flash` | Which AI model is used. |
+| `LLM_PROVIDER` / `LLM_MODEL` | `google_genai` / `gemini-3.5-flash` | Which AI model is used. |
 | `LLM_API_KEY` | none | Your own key (Gemini: free from Google AI Studio). |
 | `LLM_TIMEOUT_SECONDS` | `60` | Longest wait for one answer. |
 | `LLM_MAX_RETRIES` | `2` | Extra tries after a failure, with a growing pause. |
 | `LLM_TEMPERATURE` | `0` | Randomness of answers. `0` keeps candidate scores repeatable. |
-| `EMBEDDING_MODEL` | `gemini-embedding-001` | Model that turns knowledge-base text into embeddings for search. Uses the same key. |
+| `EMBEDDING_PROVIDER` / `EMBEDDING_MODEL` | `ollama` / `qwen3-embedding:0.6b` | Model that turns knowledge-base text into embeddings for search. Runs locally in Docker (no key). `google_genai` / `gemini-embedding-001` uses Gemini with the LLM key instead. |
 | `MAX_UPLOAD_MB` | `20` | Largest knowledge-base document accepted. |
 
 - **Provider:** Google Gemini API (external service). The provider can be
@@ -174,8 +179,10 @@ width.
   - Hiring Assistant: the interviewer's chat messages, the job profile,
     knowledge-base passages found by search, and interviewer feedback on
     job descriptions.
-  - Knowledge base: the text of uploaded documents (to make embeddings)
-    and search questions.
+  - Knowledge base: **nothing**. Embeddings are made by the local Ollama
+    model, so document text and search questions stay on this machine.
+    Only passages that the Hiring Assistant chooses to use are sent, as
+    part of the chat.
   - Later steps: CV text, interview transcripts and the instructions
     (prompts) needed to screen and assess candidates.
 - **Free-tier notice:** on Gemini's free tier, Google may use the data it
@@ -224,7 +231,10 @@ question bank.
   checked from the file's content, not its name.
 - Only the extracted text is stored, cut into overlapping passages; the
   file itself is not kept.
-- Each passage gets an embedding (768 numbers, stored with pgvector).
+- Each passage gets an embedding (1024 numbers, stored with pgvector),
+  made by `qwen3-embedding:0.6b` running locally in the `ollama` container
+  (CPU is enough). The model (about 640 MB) is downloaded automatically on
+  the first start and kept in the `ollama_models` volume.
   Search compares the question's embedding with the passages (cosine
   similarity) and returns the closest ones with a match score.
 - Indexing runs in the background with a visible status; a failed
