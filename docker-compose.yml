@@ -37,6 +37,7 @@ services:
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-ollama}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-qwen3-embedding:0.6b}
       OLLAMA_BASE_URL: http://ollama:11434
+      JOBBOARD_MCP_URL: http://jobboard-mcp:8001/mcp
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-20}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-480}
@@ -51,6 +52,8 @@ services:
         condition: service_healthy
       ollama-pull:
         condition: service_completed_successfully  # embedding model is ready
+      jobboard-mcp:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 10s
@@ -81,6 +84,33 @@ services:
     depends_on:
       ollama:
         condition: service_healthy
+
+  # Job board MCP server: posts approved job descriptions to Blogger (§4B-2,
+  # §4B-6). Only this container gets the Blogger credentials. No "ports":
+  # only the backend can reach it.
+  jobboard-mcp:
+    build:
+      context: ./jobboard-mcp
+      target: runtime
+    restart: unless-stopped
+    environment:
+      BLOGGER_CLIENT_ID: ${BLOGGER_CLIENT_ID:-}
+      BLOGGER_CLIENT_SECRET: ${BLOGGER_CLIENT_SECRET:-}
+      BLOGGER_REFRESH_TOKEN: ${BLOGGER_REFRESH_TOKEN:-}
+      BLOGGER_BLOG_ID: ${BLOGGER_BLOG_ID:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8001), 2)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Tests for the job board MCP server (no real Blogger calls).
+  # Run: docker compose run --rm --build jobboard-tests
+  jobboard-tests:
+    build:
+      context: ./jobboard-mcp
+      target: test
+    profiles: ["test"]
 
   # Runs the test suite against the real database. Not started by "up";
   # run it with: docker compose run --rm tests
