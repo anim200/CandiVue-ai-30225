@@ -159,6 +159,8 @@ width.
 | `tests` | built from `backend/Dockerfile` (target `test`) | Only runs on demand (see below). |
 | `ollama` | `ollama/ollama:0.35.1` | Local embedding model for the knowledge base. Not exposed to the host; models kept in the `ollama_models` volume. |
 | `ollama-pull` | `ollama/ollama:0.35.1` | One-time job: downloads the embedding model on the first start, then exits. |
+| `jobboard-mcp` | built from `jobboard-mcp/Dockerfile` (target `runtime`) | Our small MCP server that posts approved JDs to Blogger. The only service that holds the Blogger credentials. Not exposed to the host. |
+| `jobboard-tests` | built from `jobboard-mcp/Dockerfile` (target `test`) | Only runs on demand (see below). |
 | `frontend` | built from `frontend/Dockerfile` | React app served by nginx 1.31 (HTTP, and HTTPS when `certs/` has a certificate); forwards `/api` to the backend. |
 
 ## AI provider and data sent to it
@@ -185,6 +187,12 @@ width.
     part of the chat.
   - Later steps: CV text, interview transcripts and the instructions
     (prompts) needed to screen and assess candidates.
+
+Other external services (N18):
+
+| Service | What it receives |
+|---|---|
+| Blogger (Google), through `jobboard-mcp` | The approved job description (title, text, requirements) and the Google Form link. No candidate data. |
 - **Free-tier notice:** on Gemini's free tier, Google may use the data it
   receives to improve its products. Use only synthetic or sample data with a
   free key, never real candidate data.
@@ -201,8 +209,9 @@ database, so it continues after a restart.
 START -> load_context -> assistant --(tool call)--> tools --> assistant ...
                                    \--(reply)-----> END
          tools --(a JD was written)--> human_review (pause)
-         human_review --approve / reject--> assistant
-         human_review --edit------------> human_review
+         human_review --approve----> post_to_job_board --> assistant
+         human_review --reject-----> assistant
+         human_review --edit-------> human_review
 ```
 
 - **assistant**: the LLM reads the chat and decides the next step.
@@ -212,14 +221,65 @@ START -> load_context -> assistant --(tool call)--> tools --> assistant ...
   - `rag_search`: searches the knowledge base, only when useful.
   - `write_job_description`: drafts the JD from the profile and any
     passages found; records which documents it used.
+  - `save_application_form`: saves the Google Form link applicants use
+    to send their CV (only Google Forms links are accepted).
 - **human_review**: the graph pauses (LangGraph `interrupt`) until the
   interviewer approves, edits (saved as a new version that still needs
   approval) or rejects with feedback (the assistant writes a new
   version). Nothing is posted before approval.
+- **post_to_job_board**: runs only after approval. Posts the approved JD
+  and the form link to the job board (see below) and adds the result to
+  the chat. If the form link is missing, it asks for it first; if the
+  job board fails after 3 tries, the chat shows **Try again** and
+  **Copy job description**.
 - **Retry path**: a tool call with invalid arguments goes back to the LLM
   as an error so it can correct itself; a turn that never ends is stopped
   after 30 steps with a clear message; "Try again" continues a turn that
   failed without sending the message twice.
+
+## Job board (Blogger)
+
+Approved JDs are posted to a **private Blogger blog** (free, no paid API),
+through our own small MCP server in `jobboard-mcp/`:
+
+```
+backend --MCP (create_job_post)--> jobboard-mcp --HTTPS--> Blogger API v3
+```
+
+The backend only knows the MCP address; the Google credentials stay in
+the `jobboard-mcp` container. Without them the app still works and the
+chat says "The job board is not set up yet".
+
+**One-time setup** (about 10 minutes, with your own Google account):
+
+1. **Blog:** on <https://www.blogger.com> create a blog, then
+   *Settings → Permissions → Reader access → Private* (only you can read
+   it; it is a demo job board). The **blog ID** is the number in the
+   address bar of the blog's dashboard (`.../blog/posts/<blog ID>`).
+2. **Google Cloud project:** on <https://console.cloud.google.com> create
+   a project and enable **Blogger API v3** (*APIs & Services → Library*).
+3. **OAuth consent screen:** user type *External*, status *Testing*, and
+   add your own Google account as a test user.
+4. **OAuth client:** *Credentials → Create credentials → OAuth client ID*,
+   type **Desktop app**. Keep the client ID and secret private.
+5. **Refresh token** (on your computer, not in Docker):
+
+   ```bash
+   cd jobboard-mcp
+   python -m venv .venv
+   .venv\Scripts\activate            # Windows (source .venv/bin/activate on macOS/Linux)
+   pip install -r requirements-dev.txt
+   python get_refresh_token.py <client ID> <client secret>
+   ```
+
+   A browser opens; sign in with the same account and allow access. The
+   script prints `BLOGGER_REFRESH_TOKEN=...`.
+6. Put the four values in `.env` (never in code or chat):
+   `BLOGGER_CLIENT_ID`, `BLOGGER_CLIENT_SECRET`, `BLOGGER_REFRESH_TOKEN`,
+   `BLOGGER_BLOG_ID`. Then restart: `docker compose up -d`.
+
+The token only allows managing your Blogger blogs. To revoke it, remove
+CandiVue at <https://myaccount.google.com/permissions>.
 
 ## Knowledge base (RAG)
 
@@ -260,6 +320,10 @@ Security is built into each part instead of added at the end:
   instructions found inside them.
 - **Human approval:** nothing is published before the interviewer
   approves it.
+- **Least privilege for integrations:** only `jobboard-mcp` holds the
+  Blogger credentials (one OAuth scope: Blogger); the backend cannot use
+  them directly. The posted page escapes all JD text, and only Google
+  Forms links (HTTPS) are accepted as the application link.
 - **No secrets or personal data in logs or error messages**, pinned and
   audited dependencies, localhost-only ports (see the sections above).
 
@@ -357,6 +421,13 @@ python -m venv .venv
 .venv\Scripts\activate            # Windows (source .venv/bin/activate on macOS/Linux)
 pip install -r requirements-dev.txt
 pytest
+```
+
+Job board MCP server tests (Blogger is replaced by a fake, no
+credentials needed):
+
+```bash
+docker compose run --rm --build jobboard-tests
 ```
 
 Frontend tests (no backend needed; requires Node.js 22.22 or later):
