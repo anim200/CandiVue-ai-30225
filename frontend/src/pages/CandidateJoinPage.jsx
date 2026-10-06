@@ -1,10 +1,12 @@
 // Where the private link in the invitation email leads: /join/<link token>.
-// Swaps the link for a candidate session in this tab. The real candidate
-// screens (consent, device check, the call) are built with F3/F7.
+// Swaps the link for a candidate session in this tab (design: Candidate
+// Join.dc.html, states 3a, 3e, 3i and 3j). The next real screens (welcome,
+// consent, device check, the call) are built with F3/F7; until then a
+// working link shows a short confirmation in the same style.
 // No account, no scores: candidates only ever see their own interview (N9).
 
-import { Alert, Box, Center, Loader, Paper, Stack, Text, ThemeIcon, Title } from '@mantine/core';
-import { IconAlertTriangle, IconCheck } from '@tabler/icons-react';
+import { Box, Button, Loader, Stack, Text } from '@mantine/core';
+import { IconAlertCircle, IconCircleCheck, IconCloudOff } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 
@@ -12,12 +14,70 @@ import { apiPost } from '../api/client';
 import { clearSession, saveSession } from '../auth/session';
 import Logo from '../components/Logo';
 
+// Icon circle colours from the design frames.
+const RED = { bg: '#FBE9E7', color: '#B03A2E' };
+const GREEN = { bg: '#E7F3EC', color: '#2D7A4E' };
+
+// What to show for each result of the link check (wording from the design).
+function messageFor(result) {
+  if (result.status === 'joined') {
+    return {
+      icon: IconCircleCheck,
+      tint: GREEN,
+      title: 'Your interview link works',
+      text: 'On the day of your interview, this page will help you check your camera and microphone and join the call. You don’t need an account.',
+    };
+  }
+  if (result.httpStatus === 404) {
+    return {
+      icon: IconAlertCircle,
+      tint: RED,
+      title: 'We don’t recognise this link',
+      text: 'Open the link straight from your invitation email. Copying it by hand can miss characters.',
+    };
+  }
+  if (result.httpStatus === 410) {
+    return {
+      icon: IconCircleCheck,
+      tint: GREEN,
+      title: 'The interview has ended',
+      text: 'Thank you for your time. The team will contact you by email about next steps. You can close this tab.',
+    };
+  }
+  return {
+    icon: IconCloudOff,
+    tint: RED,
+    title: 'We couldn’t connect you',
+    text: 'Check your internet connection and try again. Your interview slot is kept.',
+    canRetry: true,
+  };
+}
+
+function StateCard({ children }) {
+  return (
+    <Box
+      bg="white"
+      w="100%"
+      maw={400}
+      px={24}
+      py={28}
+      style={{ border: '1px solid #DEE3E6', borderRadius: 8 }}
+    >
+      <Stack align="center" gap={10} ta="center">
+        {children}
+      </Stack>
+    </Box>
+  );
+}
+
 export default function CandidateJoinPage() {
   const { linkToken } = useParams();
   const [result, setResult] = useState({ status: 'checking' }); // checking | joined | failed
+  const [attempt, setAttempt] = useState(0); // "Try again" checks the link once more
 
   useEffect(() => {
     let active = true; // ignore the answer if the page was left meanwhile
+    setResult({ status: 'checking' });
     clearSession(); // a link always starts a fresh candidate session
     apiPost('/auth/candidate', { link_token: linkToken })
       .then((answer) => {
@@ -26,58 +86,61 @@ export default function CandidateJoinPage() {
         setResult({ status: 'joined' });
       })
       .catch((error) => {
-        if (active) setResult({ status: 'failed', message: error.message });
+        if (active) setResult({ status: 'failed', httpStatus: error.status });
       });
     return () => {
       active = false;
     };
-  }, [linkToken]);
+  }, [linkToken, attempt]);
+
+  const message = result.status === 'checking' ? null : messageFor(result);
+  const Icon = message?.icon;
 
   return (
     <Box mih="100vh" bg="#F5F7F8">
-      <Box bg="white" px={{ base: 'md', sm: 'xl' }} py="md" style={{ borderBottom: '1px solid #DEE3E6' }}>
+      <Box
+        component="header"
+        h={56}
+        bg="white"
+        px={{ base: 16, sm: 24 }}
+        style={{ borderBottom: '1px solid #DEE3E6', display: 'flex', alignItems: 'center' }}
+      >
         <Logo />
       </Box>
 
-      <Center px="md" py={{ base: 'xl', sm: 64 }}>
-        <Paper withBorder radius="md" p={{ base: 'lg', sm: 'xl' }} w="100%" maw={620}>
-          {result.status === 'checking' && (
-            <Stack align="center" gap="sm" py="lg">
-              <Loader />
-              <Text c="dimmed">Checking your interview link…</Text>
-            </Stack>
-          )}
-
-          {result.status === 'joined' && (
-            <Stack align="center" gap="sm" ta="center" py="lg">
-              <ThemeIcon size={48} radius="xl" color="green" variant="light">
-                <IconCheck size={26} />
-              </ThemeIcon>
-              <Title order={1} fz={24}>
-                Your interview link works
-              </Title>
-              <Text c="dimmed" maw={460}>
-                On the day of your interview, this page will help you check your camera and
-                microphone and join the call. You don&apos;t need an account.
-              </Text>
-            </Stack>
-          )}
-
-          {result.status === 'failed' && (
-            <Stack gap="md">
-              <Title order={1} fz={24}>
-                We couldn&apos;t open your interview
-              </Title>
-              <Alert color="red" icon={<IconAlertTriangle size={18} />}>
-                {result.message}
-              </Alert>
-              <Text c="dimmed" fz={14}>
-                If you think this is a mistake, contact the person who invited you.
-              </Text>
-            </Stack>
-          )}
-        </Paper>
-      </Center>
+      <Box px={{ base: 16, sm: 24 }} py={40} style={{ display: 'flex', justifyContent: 'center' }}>
+        {result.status === 'checking' ? (
+          <StateCard>
+            <Loader size={28} color="harbor.6" />
+            <Text fz={16} fw={600}>
+              Opening your interview…
+            </Text>
+          </StateCard>
+        ) : (
+          <StateCard>
+            <Box
+              w={48}
+              h={48}
+              bg={message.tint.bg}
+              c={message.tint.color}
+              style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Icon size={24} />
+            </Box>
+            <Text fz={17} fw={600}>
+              {message.title}
+            </Text>
+            <Text fz={14} lh={1.55} c="#48535B">
+              {message.text}
+            </Text>
+            {message.canRetry && (
+              <Button mt={4} onClick={() => setAttempt((count) => count + 1)}>
+                Try again
+              </Button>
+            )}
+          </StateCard>
+        )}
+      </Box>
     </Box>
   );
 }

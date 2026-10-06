@@ -1,31 +1,32 @@
 // Badge in the header showing whether the backend can be reached.
 // Checks when the page opens and then every 30 seconds.
 
-import { Badge, Box, Loader, Tooltip } from '@mantine/core';
+import { Box, Loader, Tooltip } from '@mantine/core';
 import { IconCheck, IconPlugConnectedX } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 
 import { getHealth } from '../api/client';
+import StatusBadge from './StatusBadge';
 
 const CHECK_EVERY_MS = 30000;
 
 // What the badge shows for each status. "hint" appears as a tooltip.
 const STATES = {
   checking: {
-    color: 'gray',
-    icon: <Loader size={10} color="gray" />,
+    tone: 'neutral',
+    icon: <Loader size={10} color="#3E484F" />,
     label: 'Checking connection',
     hint: 'Checking whether the CandiVue server can be reached.',
   },
   connected: {
-    color: 'green',
-    icon: <IconCheck size={14} />,
+    tone: 'success',
+    icon: <IconCheck size={13} />,
     label: 'Connected',
     hint: 'The CandiVue server can be reached.',
   },
   unavailable: {
-    color: 'red',
-    icon: <IconPlugConnectedX size={14} />,
+    tone: 'danger',
+    icon: <IconPlugConnectedX size={13} />,
     label: 'Server unavailable',
     hint: 'The server is not responding. Your data is safe. This check repeats every 30 seconds.',
   },
@@ -54,16 +55,16 @@ export default function BackendStatus() {
     };
   }, []);
 
-  const { color, icon, label, hint } = STATES[status];
+  const { tone, icon, label, hint } = STATES[status];
 
   return (
     <Tooltip label={hint} multiline w={260}>
-      <Badge variant="light" color={color} tt="none" leftSection={icon} aria-label={label}>
+      <StatusBadge tone={tone} icon={icon} aria-label={label}>
         {/* On phones only the icon fits; aria-label and the tooltip keep the meaning. */}
         <Box component="span" visibleFrom="xs">
           {label}
         </Box>
-      </Badge>
+      </StatusBadge>
     </Tooltip>
   );
 }
