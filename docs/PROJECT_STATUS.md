@@ -24,7 +24,9 @@ Update this file at the end of each work session. Every Claude thread reads it.
   - Done 04-10-2026 (#646480 background runs): `app/runs/runner.py` runs long AI work in 2 worker threads; status pending/running/waiting_for_review/completed/failed with plain-language errors; screening progress (processed/total); interrupted runs resume at startup with the same LangGraph thread_id (`graph_config()`); `RunStatusOut` has no scores (N9). All three run tables (screening_runs, qa_analyses, assessment_reports) now share `RunStateMixin`. Alembic now ignores LangGraph's checkpoint* tables (autogenerate had tried to drop them); a test checks models and migrations match.
   - Feature work must: register its run kind with `register_run_kind()`, use `graph_config()` for the graph, call `save_progress()` per item, and add interviewer-only start/status endpoints (#646482).
   - Done 05-10-2026 (#646481 frontend): UI design handoff from Claude Design committed in `docs/design_handoff_candivue_ui/` (all screens, synthetic data). `frontend/`: React 19 + Vite 8 + Mantine 9 + React Router 8, plain JavaScript; harbor theme from the handoff; app shell (logo, left menu: Jobs, Interviews, Reports, Hiring Assistant, Knowledge base) with "coming soon" pages, plain-language 404 and crash pages; `src/api/client.js` is the only code that calls the backend (plain-language errors, 15 s timeout); header badge Connected / Server unavailable from `/api/health`. Docker: Node builds, nginx 1.31 serves and forwards `/api` to the backend (same address, no CORS); `frontend` service on 127.0.0.1:5173 (`FRONTEND_PORT`). 5 Vitest tests; npm audit clean.
-  - Remaining on this branch: role access (#646482); transport-security note (#646483)
+  - Done 06-10-2026 (#646482 login + roles): backend `app/auth/` (pwdlib Argon2 passwords, PyJWT HS256 tokens with role interviewer/candidate, `require_interviewer` / `require_candidate` guards, first interviewer created at startup from `DEMO_INTERVIEWER_*` in .env), routes `POST /api/auth/login`, `POST /api/auth/candidate` (link token → token for that one session; refused when ended/cancelled), `GET /api/auth/me`. `JWT_SECRET` (32+ chars) required. Test `test_every_api_route_is_guarded` fails if any /api route lacks the interviewer guard (allowlist: health, login, candidate, me). Frontend: login page from the design (responsive), per-tab session in sessionStorage, token sent by `client.js`, 401 → sign out to `/login?expired=1`, route guard, user menu with Sign out, candidate page `/join/:linkToken`. Login headline is still the design's placeholder: replace with own positioning statement (E6). 45 backend + 9 frontend tests.
+  - New routers must use `dependencies=[Depends(require_interviewer)]` (or be listed in the test's allowlist on purpose). Interview-link time window and one-connection rule: build with F3 sessions.
+  - Remaining on this branch: transport-security note (#646483)
 
 ## Design notes to apply in later modules
 - Two roles: Interviewer logs in with email + password; Candidate authenticates with the unique interview link. Both get a role-based JWT; the backend enforces the role (N9). Candidate token is limited to one session.
@@ -39,7 +41,7 @@ Update this file at the end of each work session. Every Claude thread reads it.
 - Build every screen from `docs/design_handoff_candivue_ui/` with Mantine; the `.dc.html` files are references, not code to copy.
 - Responsive for all devices (decided 05-10-2026; overrides the handoff's "desktop-first 1280px+"). Mobile/tablet layouts are adapted in code, not designed in Claude Design. Check each screen at 375 / 768 / 1280 px before committing. App shell done: burger menu below 768px, icon-only connection badge on phones.
 - Still to decide: Live Interview identity layout (1a fixed right column / 1b tabs / 1c strip over video; tabs hide the identity result, so 1a or 1c); biometric retention period and consent wording (N17; design shows "30 days" as a placeholder).
-- #646482: leave out "Forgot password?" and "Keep me signed in" from the login design (not required; "keep me signed in" conflicts with per-tab sessionStorage tokens).
+- Login (#646482, done): "Forgot password?" and "Keep me signed in" left out (not required; "keep me signed in" conflicts with per-tab sessionStorage tokens).
 - Interview Analysis tabs F8, F9, F10 are stretch: build only after F1–F7 and F11 work (§11.4).
 - Dark mode is designed but postponed; add later with Mantine's colour-scheme manager (`localStorage` key `candivue-theme`).
 - Knowledge Base "personal data found" scan is a design proposal that needs its own backend step.
@@ -70,5 +72,5 @@ Update this file at the end of each work session. Every Claude thread reads it.
   - #646479 AI model access layer: timeouts, retries, clear failure state (done 04-10-2026)
   - #646480 Long AI operations run async with processing status (done 04-10-2026)
   - #646481 Frontend navigation and connection to backend (done 05-10-2026)
-  - #646482 Lightweight auth; block Candidate access to scores, rankings, assessments
+  - #646482 Lightweight auth; block Candidate access to scores, rankings, assessments (done 06-10-2026)
   - #646483 Secure transport for APIs and media; document local exceptions

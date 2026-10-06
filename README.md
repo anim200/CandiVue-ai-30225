@@ -26,6 +26,16 @@ Copy-Item .env.example .env       # Windows PowerShell
 
 `.env` is git-ignored. Never commit it.
 
+Before the first start, also set in `.env`:
+
+- `JWT_SECRET`: a long random value (32+ characters) that signs login
+  tokens. Create one with
+  `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
+- `DEMO_INTERVIEWER_PASSWORD`: the password of the first interviewer
+  account (8+ characters). The account is created on the first start; later
+  changes to these settings do not change an existing account (use a full
+  reset to start again).
+
 ## Commands
 
 | Task | Command |
@@ -164,6 +174,33 @@ width.
   free key, never real candidate data.
 - **If the AI fails** (timeout, outage, wrong key, rate limit) after all
   retries, the API answers `503` with a clear message instead of crashing.
+
+## Signing in and roles
+
+There are two roles (N9). The backend checks the role on every request,
+not only the screens.
+
+| Role | How they get in | What they can use |
+|---|---|---|
+| Interviewer | Email and password at <http://localhost:5173/login>. The first account comes from `DEMO_INTERVIEWER_EMAIL` / `DEMO_INTERVIEWER_PASSWORD` in `.env`. | Everything for interviewers: jobs, screening, interviews, reports. |
+| Candidate | No account. The private link in the invitation email (`/join/<link>`) gives a token for that one interview only. | Their own interview only. Never scores, rankings, transcripts or reports. |
+
+- Passwords are stored as Argon2 hashes, never as text. Interview links are
+  stored only as SHA-256 hashes.
+- Sign-in gives a signed token (JWT) valid for `ACCESS_TOKEN_MINUTES`
+  (default 480, one working day). After it expires the user signs in again.
+- A wrong email and a wrong password give the same message, so the login
+  form does not reveal which accounts exist. Logs never contain emails or
+  passwords.
+- The token is kept per browser tab (`sessionStorage`), so an interviewer
+  tab and a candidate tab can run side by side (two-tab demo). Closing the
+  tab signs out.
+- A test (`backend/tests/test_auth_routes.py`) checks every API route and
+  fails if one is missing the interviewer check.
+
+Known limitations: signing out removes the token from the tab, but the
+token itself stays valid until it expires; there is no limit on login
+attempts and no password-change screen (local demo only).
 
 ## Security note (local development)
 
