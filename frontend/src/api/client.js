@@ -6,6 +6,8 @@
 import { clearSession, loadSession } from '../auth/session';
 
 const TIMEOUT_MS = 15000;
+const AI_TIMEOUT_MS = 120000; // an AI turn (e.g. writing a JD) can take a while
+const UPLOAD_TIMEOUT_MS = 60000;
 
 export const MESSAGES = {
   unreachable: 'Cannot reach the CandiVue server. Check that it is running and try again.',
@@ -22,10 +24,13 @@ export class ApiError extends Error {
 }
 
 // Send one request to the backend (with the login token) and return the JSON answer, or throw an ApiError with a plain message.
-async function request(method, path, body) {
+// body: a plain object (sent as JSON) or FormData (file uploads).
+// timeoutMs: AI requests may take longer than the default.
+async function request(method, path, body, timeoutMs = TIMEOUT_MS) {
   const session = loadSession();
+  const isForm = body instanceof FormData;
   const headers = { Accept: 'application/json' };
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (body !== undefined && !isForm) headers['Content-Type'] = 'application/json';
   if (session) headers.Authorization = `Bearer ${session.token}`; // who is calling
 
   let response;
@@ -33,8 +38,8 @@ async function request(method, path, body) {
     response = await fetch(`/api${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      body: body === undefined || isForm ? body : JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
     const message = error.name === 'TimeoutError' ? MESSAGES.timeout : MESSAGES.unreachable;
@@ -52,7 +57,7 @@ async function request(method, path, body) {
     const detail = await readDetail(response);
     throw new ApiError(detail ?? MESSAGES.failed, response.status);
   }
-  return response.json();
+  return response.status === 204 ? null : response.json(); // 204 = done, no content
 }
 
 // The backend puts its safe, plain message in "detail" (FastAPI style).
@@ -74,6 +79,21 @@ export function apiGet(path) {
 // Send data to the backend (POST).
 export function apiPost(path, body) {
   return request('POST', path, body);
+}
+
+// Ask the AI to do something (POST). Allows up to 2 minutes, like nginx.
+export function apiPostAi(path, body) {
+  return request('POST', path, body, AI_TIMEOUT_MS);
+}
+
+// Upload files (POST as multipart form data).
+export function apiUpload(path, formData) {
+  return request('POST', path, formData, UPLOAD_TIMEOUT_MS);
+}
+
+// Delete something on the backend (DELETE).
+export function apiDelete(path) {
+  return request('DELETE', path);
 }
 
 // Ask the backend whether it and its database are working.
