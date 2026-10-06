@@ -1,0 +1,111 @@
+/* Jobs list (design: Jobs.dc.html, frame 1a and states 2a-2c). */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #dee3e6;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Desktop: a 6-column table. Phones: title + badge, other columns hidden. */
+.row,
+.head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px 190px 130px 120px 24px;
+  gap: 0 12px;
+  align-items: center;
+  padding: 0 20px;
+}
+
+.head {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #dee3e6;
+  font-size: 12px;
+  font-weight: 600;
+  color: #66717a;
+}
+
+.row {
+  height: 52px;
+  border-bottom: 1px solid #e9ecee;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+  width: 100%;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  background: none;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.row:hover,
+.row:focus-visible {
+  background: #f1f4f5;
+  outline: none;
+}
+
+.jobTitle {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.number {
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  color: #48535b;
+}
+
+.chevron {
+  color: #8a949a;
+}
+
+@media (max-width: 47.99em) {
+  .head {
+    display: none;
+  }
+
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto 16px;
+    height: auto;
+    min-height: 56px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .wide {
+    display: none;
+  }
+}
