@@ -22,9 +22,6 @@ from app.integrations.job_board import JobBoardError, publish_job_post
 logger = logging.getLogger(__name__)
 
 FORM_HOSTS = {"docs.google.com", "forms.gle"}
-DEMO_NOTE = (
-    "Demo posting: synthetic data only. Please do not apply with real personal data."
-)
 
 
 def clean_form_url(url: str) -> str:
@@ -73,7 +70,6 @@ def render_post_html(
 
     return "".join(
         [
-            f"<p><em>{html.escape(DEMO_NOTE)}</em></p>",
             _text("About the role", content.about),
             _list("Key responsibilities", content.responsibilities),
             _list("Requirements", requirements),
@@ -84,7 +80,8 @@ def render_post_html(
             "<h3>How to apply</h3>",
             (
                 f'<p><a href="{html.escape(form_url, quote=True)}">'
-                "Apply through the application form</a> and upload your CV there.</p>"
+                "Apply through our application form</a> and upload your CV "
+                "(PDF or Word).</p>"
             ),
         ]
     )

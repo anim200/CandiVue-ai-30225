@@ -64,7 +64,7 @@ def test_post_html_is_escaped_and_complete():
     assert "FastAPI or Django" in body and "PostgreSQL" in body
     assert "<h3>Nice to have</h3><ul><li>Cloud</li></ul>" in body
     assert f'href="{FORM}"' in body
-    assert "Demo posting" in body
+    assert "synthetic" not in body.lower()  # a clean, professional post
 
 
 def test_publish_retries_then_succeeds(monkeypatch):
