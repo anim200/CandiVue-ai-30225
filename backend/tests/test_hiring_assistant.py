@@ -90,7 +90,7 @@ def drafts(monkeypatch):
 def scripted(monkeypatch):
     """Install a scripted LLM; tests fill its list of replies."""
     model = ScriptedModel(replies=[])
-    monkeypatch.setattr(hiring_assistant, "get_chat_model", lambda: model)
+    monkeypatch.setattr(llm, "get_chat_model", lambda name: model)
     monkeypatch.setattr(llm, "WAIT_BETWEEN_RETRIES", False)
     return model.replies
 
@@ -145,6 +145,15 @@ def review(client, headers, job_id, **decision):
     )
 
 
+def decide(client, headers, job_id, action):
+    """Answer "Post this job to the job board?" ("post" or "skip")."""
+    return client.post(
+        f"/api/assistant/jobs/{job_id}/post-decision",
+        headers=headers,
+        json={"action": action},
+    )
+
+
 def load_jds(job_id) -> list[JobDescription]:
     """All JD versions of a job, oldest first."""
     with SessionLocal() as db:
@@ -190,19 +199,25 @@ def test_profile_then_jd_pauses_for_review_then_approve(
 
     thread = review(client, headers, job_id, action="approve").json()
 
-    assert thread["pending_review"] is None
-    # After approval: review note, job board result (no form link in this
-    # test, so "needs_form"), then the assistant's answer.
-    assert [i["kind"] for i in thread["items"][-3:-1]] == ["review", "posting"]
-    assert thread["items"][-2]["status"] == "needs_form"
-    assert thread["items"][-1] == {
-        "kind": "assistant",
-        "text": "Thanks, the job description is approved.",
-    }
+    # After approval the graph pauses again and asks whether to post.
+    assert thread["pending_review"]["kind"] == "post_confirmation"
+    assert thread["items"][-1]["kind"] == "review"
     (jd,) = load_jds(job_id)
     assert jd.status == JobDescriptionStatus.APPROVED and jd.approved_at is not None
     with SessionLocal() as db:
         assert db.get(Job, job_id).status == JobStatus.OPEN
+    job = client.get(f"/api/jobs/{job_id}", headers=headers).json()
+    assert job["stage"] == "post_to_confirm"
+
+    thread = decide(client, headers, job_id, "skip").json()
+
+    # "Don't post": nothing is posted; the assistant answers.
+    assert thread["pending_review"] is None
+    assert [i["kind"] for i in thread["items"][-2:]] == ["review", "assistant"]
+    assert thread["items"][-2]["action"] == "skip"
+    assert not [i for i in thread["items"] if i["kind"] == "posting"]
+    job = client.get(f"/api/jobs/{job_id}", headers=headers).json()
+    assert job["stage"] == "jd_approved"
 
 
 def test_reject_rewrites_with_the_feedback(client, headers, scripted, drafts):
@@ -435,8 +450,10 @@ def test_approve_posts_the_job_to_the_board(
 ):
     job_id = approved_flow(client, headers, scripted)
     scripted += [AIMessage(content="Your job is posted.")]
+    review(client, headers, job_id, action="approve")
+    assert job_board.posts == []  # nothing is posted before "Post"
 
-    thread = review(client, headers, job_id, action="approve").json()
+    thread = decide(client, headers, job_id, "post").json()
 
     posting_items = [i for i in thread["items"] if i["kind"] == "posting"]
     assert posting_items[-1]["status"] == "posted"
@@ -454,8 +471,9 @@ def test_failed_post_keeps_the_jd_and_can_be_tried_again(
     job_id = approved_flow(client, headers, scripted)
     job_board.fail = True
     scripted += [AIMessage(content="Posting failed; the JD is saved.")]
+    review(client, headers, job_id, action="approve")
 
-    thread = review(client, headers, job_id, action="approve").json()
+    thread = decide(client, headers, job_id, "post").json()
 
     assert [i for i in thread["items"] if i["kind"] == "posting"][-1][
         "status"
@@ -483,8 +501,9 @@ def test_without_a_form_link_nothing_is_posted(
 ):
     job_id = approved_flow(client, headers, scripted, form=False)
     scripted += [AIMessage(content="Please send the Google Form link.")]
+    review(client, headers, job_id, action="approve")
 
-    thread = review(client, headers, job_id, action="approve").json()
+    thread = decide(client, headers, job_id, "post").json()
 
     assert [i for i in thread["items"] if i["kind"] == "posting"][-1][
         "status"
@@ -515,3 +534,64 @@ def test_posting_needs_an_approved_jd(client, headers):
         client.post(f"/api/assistant/jobs/{job_id}/post", headers=headers).status_code
         == 409
     )
+
+
+def test_dont_post_then_ask_in_the_chat_to_post(
+    client, headers, scripted, drafts, job_board
+):
+    job_id = approved_flow(client, headers, scripted)
+    scripted += [AIMessage(content="Fine, I will not post it.")]
+    review(client, headers, job_id, action="approve")
+    decide(client, headers, job_id, "skip")
+    scripted += [call("request_job_posting", {}, "cp")]
+
+    thread = say(client, headers, job_id, "Please post the job now.").json()
+
+    # The assistant cannot post by itself: it asks again.
+    assert thread["pending_review"]["kind"] == "post_confirmation"
+    assert job_board.posts == []
+    scripted += [AIMessage(content="It is posted.")]
+
+    thread = decide(client, headers, job_id, "post").json()
+
+    assert [i for i in thread["items"] if i["kind"] == "posting"][-1][
+        "status"
+    ] == "posted"
+    assert len(job_board.posts) == 1
+
+
+def test_chat_waits_for_the_post_decision(client, headers, scripted, drafts):
+    job_id = approved_flow(client, headers, scripted)
+    review(client, headers, job_id, action="approve")
+
+    response = say(client, headers, job_id, "Another message")
+
+    assert response.status_code == 409
+    assert "Post or Don't post" in response.json()["detail"]
+
+
+def test_post_decision_needs_a_question(client, headers, scripted, drafts):
+    job_id = approved_flow(client, headers, scripted)  # JD waits for review
+
+    assert decide(client, headers, job_id, "post").status_code == 409
+
+
+def test_asking_to_post_needs_an_approved_jd(client, headers):
+    job_id = new_job(client, headers)
+
+    with pytest.raises(ValueError, match="approve one first"):
+        tools.request_job_posting.func(job_id)
+
+
+def test_the_same_profile_saved_twice_is_shown_once():
+    from langchain_core.messages import ToolMessage
+
+    from app.assistant.thread_view import thread_items
+
+    saved = ToolMessage(
+        "saved", tool_call_id="c1", artifact={"kind": "profile", "profile": PROFILE}
+    )
+
+    items = thread_items(None, [saved, saved])
+
+    assert [i["kind"] for i in items] == ["step", "profile"]

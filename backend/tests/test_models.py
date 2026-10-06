@@ -16,6 +16,7 @@ EXPECTED_TABLES = {
     "assessment_reports",
     "knowledge_documents",
     "knowledge_chunks",
+    "llm_models",
 }
 
 # N20: these must never be stored as candidate data.

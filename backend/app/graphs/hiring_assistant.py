@@ -3,14 +3,19 @@ r"""LangGraph 1: the Hiring Assistant (Figure 3), part 1 "Prepare the job".
     START -> load_context -> assistant --(tool call)--> tools --> assistant ...
                                        \--(reply)-----> END
              tools --(a JD was written)--> human_review (interrupt)
-             human_review --approve--> post_to_job_board --> assistant
+             human_review --approve--> confirm_posting (interrupt)
              human_review --reject---> assistant (writes a new version)
              human_review --edit-----> human_review (new version to approve)
+             confirm_posting --post---> post_to_job_board --> assistant
+             confirm_posting --skip---> assistant (job stays unposted)
+             tools --(request_job_posting)--> confirm_posting (ask again later)
 
 - The LLM ("assistant") decides which tool to call; RAG only if useful.
 - human_review PAUSES the graph (LangGraph interrupt) until the interviewer
   approves, edits or rejects the JD (§4B-7). The paused state is saved by the
   checkpointer, so it survives a restart (N26).
+- confirm_posting PAUSES again and asks "Post this job to the job board?".
+  Only the interviewer's "Post" click publishes it.
 - One thread per job: thread_id "assistant-job-<id>".
 - Retry path (§8.2): a tool call with invalid arguments is sent back to the
   LLM as an error message so it can correct itself.
@@ -27,14 +32,14 @@ from langgraph.types import interrupt
 from pydantic import ValidationError
 from sqlalchemy import select
 
-from app.ai.llm import get_chat_model, invoke_llm
+from app.ai.llm import invoke_llm
 from app.assistant import posting
 from app.assistant.prompts import ASSISTANT_PROMPT
 from app.assistant.schemas import JobDescriptionContent
 from app.assistant.tools import TOOLS
 from app.db.database import SessionLocal
 from app.db.models import Job, JobDescription
-from app.db.models.job import JobDescriptionStatus, JobStatus
+from app.db.models.job import JobBoardStatus, JobDescriptionStatus, JobStatus
 from app.runs.runner import graph_config
 
 logger = logging.getLogger(__name__)
@@ -83,12 +88,12 @@ def load_context(state: AssistantState) -> dict:
 
 def assistant(state: AssistantState) -> dict:
     """The LLM reads the chat and decides: reply, or call a tool."""
-    model = get_chat_model().bind_tools(TOOLS)
     prompt = [
         SystemMessage(f"{ASSISTANT_PROMPT}\n\n{state['context']}"),
         *state["messages"],
     ]
-    return {"messages": [invoke_llm(prompt, model=model)]}
+    answer = invoke_llm(prompt, prepare=lambda model: model.bind_tools(TOOLS))
+    return {"messages": [answer]}
 
 
 def after_assistant(state: AssistantState) -> str:
@@ -98,12 +103,16 @@ def after_assistant(state: AssistantState) -> str:
 
 
 def after_tools(state: AssistantState) -> str:
-    """After a new JD draft, pause for the interviewer; otherwise back to the LLM."""
+    """After a new JD draft, pause for the interviewer; after a request to
+    post, ask the interviewer to confirm; otherwise back to the LLM."""
     for message in reversed(state["messages"]):
         if not isinstance(message, ToolMessage):
             break
-        if (message.artifact or {}).get("kind") == "jd":
+        kind = (message.artifact or {}).get("kind")
+        if kind == "jd":
             return "human_review"
+        if kind == "post_request":
+            return "confirm_posting"
     return "assistant"
 
 
@@ -172,12 +181,62 @@ def human_review(state: AssistantState) -> dict:
 
 
 def after_review(state: AssistantState) -> str:
-    """An edit needs approval again; an approval is posted; a rejection goes
-    back to the LLM for a new version."""
+    """An edit needs approval again; after an approval the interviewer is
+    asked whether to post; a rejection goes back to the LLM for a new version."""
     action = state["review_action"]
     if action == "edit":
         return "human_review"
-    return "post_to_job_board" if action == "approve" else "assistant"
+    return "confirm_posting" if action == "approve" else "assistant"
+
+
+def confirm_posting(state: AssistantState) -> dict:
+    """Pause and ask "Post this job to the job board?" (Post / Don't post)."""
+    with SessionLocal() as db:
+        job = db.get(Job, state["job_id"])
+        approved = db.scalar(
+            select(JobDescription)
+            .where(
+                JobDescription.job_id == job.id,
+                JobDescription.status == JobDescriptionStatus.APPROVED,
+            )
+            .order_by(JobDescription.version.desc())
+            .limit(1)
+        )
+        if approved is None:
+            return {"review_action": None}
+        # Shown as "Post to job board?" in the job list while we wait.
+        job.job_board_status = JobBoardStatus.AWAITING_CONFIRMATION
+        db.commit()
+        question = {
+            "kind": "post_confirmation",
+            "jd_id": approved.id,
+            "version": approved.version,
+            "has_form": bool(job.google_form_url),
+        }
+
+    # The graph stops here until the interviewer clicks Post or Don't post.
+    decision = interrupt(question)
+
+    action = decision["action"]  # "post" or "skip"
+    with SessionLocal() as db:
+        # post_job() records the outcome; "skip" leaves the job unposted.
+        db.get(Job, state["job_id"]).job_board_status = JobBoardStatus.NOT_POSTED
+        db.commit()
+    note = (
+        "Post it to the job board."
+        if action == "post"
+        else "Don't post it now. I will ask you later."
+    )
+    logger.info("Posting decision: job %d, %s", state["job_id"], action)
+    return {
+        "messages": [HumanMessage(note, additional_kwargs={"review": action})],
+        "review_action": action,
+    }
+
+
+def after_confirm(state: AssistantState) -> str:
+    """Post only when the interviewer chose "Post"; otherwise back to the LLM."""
+    return "post_to_job_board" if state["review_action"] == "post" else "assistant"
 
 
 def posting_message(result: dict) -> HumanMessage:
@@ -211,14 +270,20 @@ def build_hiring_assistant(checkpointer):
         ),
     )
     graph.add_node("human_review", human_review)
+    graph.add_node("confirm_posting", confirm_posting)
     graph.add_node("post_to_job_board", post_to_job_board)
 
     graph.add_edge(START, "load_context")
     graph.add_edge("load_context", "assistant")
     graph.add_conditional_edges("assistant", after_assistant, ["tools", END])
-    graph.add_conditional_edges("tools", after_tools, ["human_review", "assistant"])
     graph.add_conditional_edges(
-        "human_review", after_review, ["human_review", "post_to_job_board", "assistant"]
+        "tools", after_tools, ["human_review", "confirm_posting", "assistant"]
+    )
+    graph.add_conditional_edges(
+        "human_review", after_review, ["human_review", "confirm_posting", "assistant"]
+    )
+    graph.add_conditional_edges(
+        "confirm_posting", after_confirm, ["post_to_job_board", "assistant"]
     )
     graph.add_edge("post_to_job_board", "assistant")
     return graph.compile(checkpointer=checkpointer)

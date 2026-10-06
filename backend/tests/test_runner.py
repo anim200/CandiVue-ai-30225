@@ -7,7 +7,7 @@ deleted at the end.
 
 import pytest
 
-from app.ai.llm import AIServiceError
+from app.ai.errors import AIServiceError
 from app.db.database import SessionLocal
 from app.db.models import Job, ScreeningRun
 from app.db.models.run import RunStatus

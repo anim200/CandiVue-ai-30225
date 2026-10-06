@@ -18,7 +18,7 @@ from langchain_core.embeddings import Embeddings
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_ollama import OllamaEmbeddings
 
-from app.ai.llm import AIServiceError
+from app.ai.errors import AIServiceError
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,9 @@ def embed_documents(texts: list[str]) -> list[list[float]]:
     except Exception as exc:
         # Only the error type: the message could contain document text.
         logger.warning("Embedding failed: %s", type(exc).__name__)
-        raise AIServiceError("The AI service is unavailable.") from exc
+        raise AIServiceError(
+            "The AI service is unavailable. Please try again later."
+        ) from exc
 
 
 def embed_query(text: str) -> list[float]:
@@ -66,4 +68,6 @@ def embed_query(text: str) -> list[float]:
         return get_embedding_model().embed_query(text)
     except Exception as exc:
         logger.warning("Embedding failed: %s", type(exc).__name__)
-        raise AIServiceError("The AI service is unavailable.") from exc
+        raise AIServiceError(
+            "The AI service is unavailable. Please try again later."
+        ) from exc

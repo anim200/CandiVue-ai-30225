@@ -21,7 +21,7 @@ from app.assistant.posting import clean_form_url
 from app.assistant.schemas import JobProfile
 from app.db.database import SessionLocal
 from app.db.models import Job, JobDescription
-from app.db.models.job import JobDescriptionStatus
+from app.db.models.job import JobBoardStatus, JobDescriptionStatus
 from app.db.models.knowledge import KnowledgeCollection
 from app.knowledge.search import search_knowledge
 
@@ -153,7 +153,35 @@ def save_application_form(
     return "The application form link is saved.", {"kind": "form", "url": url}
 
 
-TOOLS = [save_job_profile, rag_search, write_job_description, save_application_form]
+@tool(response_format="content_and_artifact")
+def request_job_posting(
+    job_id: Annotated[int, InjectedState("job_id")],
+) -> tuple[str, dict]:
+    """Ask the interviewer to confirm posting the approved job description
+    to the job board. Call it when the interviewer asks to post the job.
+    This does not post: the interviewer must click "Post"."""
+    with SessionLocal() as db:
+        job = db.get(Job, job_id)
+        approved = db.scalar(
+            select(JobDescription.id).where(
+                JobDescription.job_id == job_id,
+                JobDescription.status == JobDescriptionStatus.APPROVED,
+            )
+        )
+        if approved is None:
+            raise ValueError("No job description is approved yet: approve one first.")
+        if job.job_board_status == JobBoardStatus.POSTED:
+            raise ValueError(f"The job is already posted: {job.job_board_post_url}")
+    return "The interviewer is asked to confirm the post.", {"kind": "post_request"}
+
+
+TOOLS = [
+    save_job_profile,
+    rag_search,
+    write_job_description,
+    save_application_form,
+    request_job_posting,
+]
 
 
 def _passages_found_so_far(messages: list) -> list[dict]:

@@ -23,6 +23,7 @@ class JobBoardStatus(StrEnum):
     """Whether the job has been posted to the job board."""
 
     NOT_POSTED = "not_posted"
+    AWAITING_CONFIRMATION = "awaiting_confirmation"  # asked "post it?"
     POSTED = "posted"
     FAILED = "failed"
 

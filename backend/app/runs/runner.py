@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
-from app.ai.llm import AIServiceError
+from app.ai.errors import AIServiceError
 from app.db.database import SessionLocal
 from app.db.models.run import RunStatus
 

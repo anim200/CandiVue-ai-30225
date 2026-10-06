@@ -45,6 +45,7 @@ def jd_card(jd: JobDescription) -> dict:
 def thread_items(db: Session, messages: list) -> list[dict]:
     """Convert the stored messages into screen items, in order."""
     items = []
+    last_profile = None  # the model sometimes saves the same profile twice
     for message in messages:
         if isinstance(message, HumanMessage) and message.additional_kwargs.get(
             "posting"
@@ -68,7 +69,10 @@ def thread_items(db: Session, messages: list) -> list[dict]:
         elif isinstance(message, ToolMessage):
             artifact = message.artifact or {}
             kind = artifact.get("kind")
-            if kind == "profile":
+            if kind == "post_request":
+                items.append({"kind": "step", "text": "Asked you to confirm the post"})
+            elif kind == "profile" and artifact["profile"] != last_profile:
+                last_profile = artifact["profile"]
                 items.append({"kind": "step", "text": STEP_TEXT["save_job_profile"]})
                 items.append({"kind": "profile", "profile": artifact["profile"]})
             elif kind == "form":

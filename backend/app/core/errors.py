@@ -9,7 +9,7 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from app.ai.llm import AIServiceError
+from app.ai.errors import AIServiceError
 
 logger = logging.getLogger(__name__)
 
@@ -23,11 +23,12 @@ async def handle_unexpected_error(request: Request, exc: Exception) -> JSONRespo
 async def handle_ai_service_error(
     request: Request, exc: AIServiceError
 ) -> JSONResponse:
-    # Already logged in invoke_llm(). 503 = temporary, the user can try again (N6).
     """Answer 503 with a clear message when the AI service is unavailable."""
+    # Already logged in invoke_llm(). 503 = temporary, the user can try again (N6).
+    # Our own message (e.g. "model X reached its usage limit"), never prompt text.
     return JSONResponse(
         status_code=503,
-        content={"detail": "The AI service is unavailable. Please try again later."},
+        content={"detail": str(exc)},
     )
 
 

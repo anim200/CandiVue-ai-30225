@@ -1,4 +1,5 @@
-"""Hiring Assistant API: read a job's chat, send a message, review the JD.
+"""Hiring Assistant API: read a job's chat, send a message, review the JD,
+confirm posting it.
 
 Interviewers only (N9); the candidate never sees the assistant (§4B-10).
 Every request runs the graph until it answers or pauses for review; the
@@ -40,6 +41,8 @@ router = APIRouter(
 NOT_FOUND = "This job no longer exists."
 REVIEW_FIRST = "Please approve, edit or reject the job description first."
 NOTHING_TO_REVIEW = "There is no job description waiting for review."
+NOTHING_TO_CONFIRM = "There is no post waiting for your confirmation."
+CONFIRM_FIRST = "Please choose Post or Don't post first."
 APPROVE_FIRST = "Approve a job description before posting it."
 STUCK = "The assistant couldn't finish this request. Please rephrase it or try again."
 
@@ -65,6 +68,12 @@ class ReviewRequest(BaseModel):
         if self.action == "edit" and self.content is None:
             raise ValueError("The edited job description is missing.")
         return self
+
+
+class PostDecisionRequest(BaseModel):
+    """The interviewer's answer to "Post this job to the job board?"."""
+
+    action: Literal["post", "skip"]
 
 
 class ThreadOut(BaseModel):
@@ -96,6 +105,13 @@ def _thread(graph, db: Session, job_id: int) -> ThreadOut:
     )
 
 
+def _pending_kind(graph, db: Session, job_id: int) -> str | None:
+    """What the paused graph is waiting for: "jd_approval",
+    "post_confirmation" or None."""
+    pending = _thread(graph, db, job_id).pending_review
+    return pending["kind"] if pending else None
+
+
 def _run(graph, graph_input, job_id: int) -> None:
     """Run one turn of the graph; a turn that never ends (the LLM keeps
     calling tools) is stopped by the step limit and gets a clear message."""
@@ -125,8 +141,10 @@ def send_message(
     """Send a chat message; the assistant answers (calling tools if needed)."""
     _require_job(db, job_id)
     graph = _graph(request)
-    if _thread(graph, db, job_id).pending_review:
-        raise HTTPException(status.HTTP_409_CONFLICT, REVIEW_FIRST)
+    waiting = _pending_kind(graph, db, job_id)
+    if waiting:
+        message = CONFIRM_FIRST if waiting == "post_confirmation" else REVIEW_FIRST
+        raise HTTPException(status.HTTP_409_CONFLICT, message)
     _run(graph, {"messages": [HumanMessage(body.text)], "job_id": job_id}, job_id)
     return _thread(graph, db, job_id)
 
@@ -141,10 +159,26 @@ def review_job_description(
     """Approve, edit or reject the JD; the paused graph continues from there."""
     _require_job(db, job_id)
     graph = _graph(request)
-    if not _thread(graph, db, job_id).pending_review:
+    if _pending_kind(graph, db, job_id) != "jd_approval":
         raise HTTPException(status.HTTP_409_CONFLICT, NOTHING_TO_REVIEW)
     decision = body.model_dump(mode="json", exclude_none=True)
     _run(graph, Command(resume=decision), job_id)
+    return _thread(graph, db, job_id)
+
+
+@router.post("/jobs/{job_id}/post-decision", response_model=ThreadOut)
+def decide_posting(
+    job_id: int,
+    body: PostDecisionRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+) -> ThreadOut:
+    """Answer "Post this job to the job board?": post it now, or not."""
+    _require_job(db, job_id)
+    graph = _graph(request)
+    if _pending_kind(graph, db, job_id) != "post_confirmation":
+        raise HTTPException(status.HTTP_409_CONFLICT, NOTHING_TO_CONFIRM)
+    _run(graph, Command(resume={"action": body.action}), job_id)
     return _thread(graph, db, job_id)
 
 
@@ -172,8 +206,8 @@ def post_again(
     the application form link has been added. The result joins the chat."""
     _require_job(db, job_id)
     graph = _graph(request)
-    if _thread(graph, db, job_id).pending_review:
-        raise HTTPException(status.HTTP_409_CONFLICT, REVIEW_FIRST)
+    if _pending_kind(graph, db, job_id):
+        raise HTTPException(status.HTTP_409_CONFLICT, CONFIRM_FIRST)
     approved = db.scalar(
         select(JobDescription.id).where(
             JobDescription.job_id == job_id,

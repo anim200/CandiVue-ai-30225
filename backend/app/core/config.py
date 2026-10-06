@@ -16,7 +16,9 @@ class Settings(BaseSettings):
 
     # AI model (see app/ai/llm.py). SecretStr hides the key in logs and errors.
     llm_provider: str = "google_genai"
-    llm_model: str = "gemini-3.5-flash-lite"
+    llm_model: str = "gemini-3.5-flash-lite"  # used until the interviewer picks one
+    # Models the interviewer may pick under the chat (comma-separated).
+    llm_models: str = "gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite"
     llm_api_key: SecretStr | None = None
     llm_timeout_seconds: float = 60
     llm_max_retries: int = 2
@@ -46,6 +48,12 @@ class Settings(BaseSettings):
     demo_interviewer_email: str | None = None
     demo_interviewer_name: str = "Interviewer A"
     demo_interviewer_password: SecretStr | None = None
+
+    @property
+    def llm_model_list(self) -> list[str]:
+        """The models that may be chosen; the default model is always one."""
+        names = [name.strip() for name in self.llm_models.split(",") if name.strip()]
+        return names if self.llm_model in names else [self.llm_model, *names]
 
     @property
     def cors_origin_list(self) -> list[str]:

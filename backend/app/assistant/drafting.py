@@ -8,7 +8,7 @@ import json
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.ai.llm import get_chat_model, invoke_llm
+from app.ai.llm import invoke_llm
 from app.assistant.prompts import JD_WRITER_PROMPT
 from app.assistant.schemas import JobDescriptionContent, JobProfile
 
@@ -28,7 +28,7 @@ def draft_job_description(
         f"INTERVIEWER FEEDBACK ON THE LAST VERSION:\n{feedback or '(none)'}\n\n"
         f"EXTRA NOTES FROM THE CHAT:\n{notes or '(none)'}"
     )
-    model = get_chat_model().with_structured_output(JobDescriptionContent)
     return invoke_llm(
-        [SystemMessage(JD_WRITER_PROMPT), HumanMessage(request)], model=model
+        [SystemMessage(JD_WRITER_PROMPT), HumanMessage(request)],
+        prepare=lambda model: model.with_structured_output(JobDescriptionContent),
     )

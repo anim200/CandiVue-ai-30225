@@ -47,6 +47,8 @@ def job_stage(job: Job, latest_jd: JobDescription | None) -> str:
             return "posted"
         if job.job_board_status == JobBoardStatus.FAILED:
             return "posting_failed"
+        if job.job_board_status == JobBoardStatus.AWAITING_CONFIRMATION:
+            return "post_to_confirm"
         return "jd_approved"
     if latest_jd.status == JobDescriptionStatus.DRAFT:
         return "jd_to_approve"
