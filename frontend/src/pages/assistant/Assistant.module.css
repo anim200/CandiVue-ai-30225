@@ -420,6 +420,38 @@
   gap: 4px;
 }
 
+/* Waiting for the interviewer: amber like a JD to approve. */
+.postConfirm {
+  border-color: #f0d9a6;
+  background: #fffaef;
+}
+
+/* ---- AI model picker (under the composer; not in the design) ---- */
+
+.modelBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #66717a;
+}
+
+.modelSelect {
+  width: 210px;
+}
+
+.modelBlocked {
+  color: #7a5000;
+}
+
+.modelLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+}
+
 /* ---- Composer ---- */
 
 .composer {
@@ -538,6 +570,10 @@
 
   .profileLabel {
     margin-top: 6px;
+  }
+
+  .modelLink {
+    margin-left: 0;
   }
 }
 

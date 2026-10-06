@@ -1,5 +1,6 @@
 // Message box at the bottom of the chat (design: ChatComposer). While a JD
-// waits for review it is locked, because the review comes first.
+// waits for review, or a post waits for confirmation, it is locked, because
+// that decision comes first. `footer`: the AI model picker.
 
 import { Button, TextInput } from '@mantine/core';
 import { IconEye, IconSend } from '@tabler/icons-react';
@@ -7,7 +8,7 @@ import { IconEye, IconSend } from '@tabler/icons-react';
 import classes from './Assistant.module.css';
 
 // The input with its Send button; Enter sends too.
-export default function ChatComposer({ value, onChange, onSend, sending, locked }) {
+export default function ChatComposer({ value, onChange, onSend, sending, locked, footer }) {
   const canSend = value.trim().length > 0 && !sending && !locked;
 
   return (
@@ -21,7 +22,7 @@ export default function ChatComposer({ value, onChange, onSend, sending, locked 
       {locked && (
         <div className={classes.composerHint}>
           <IconEye size={14} />
-          Approve, edit or reject the job description to continue the chat.
+          {locked}
         </div>
       )}
       <div className={classes.composerRow}>
@@ -39,6 +40,7 @@ export default function ChatComposer({ value, onChange, onSend, sending, locked 
           Send
         </Button>
       </div>
+      {footer}
     </form>
   );
 }

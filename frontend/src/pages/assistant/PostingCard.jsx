@@ -1,8 +1,15 @@
-// The job board result in the chat (design: PostingResultCard in frame 1a,
-// "Posting failed" frame 2e). Three cases: posted, failed, form link missing.
+// The job board cards in the chat (design: PostingResultCard in frame 1a,
+// "Posting failed" frame 2e): the "Post this job?" question after approval,
+// and the result: posted, failed or form link missing.
 
-import { Anchor, Group, Text } from '@mantine/core';
-import { IconAlertTriangle, IconCircleCheck, IconForms } from '@tabler/icons-react';
+import { Anchor, Button, Group, Text } from '@mantine/core';
+import {
+  IconAlertTriangle,
+  IconCircleCheck,
+  IconForms,
+  IconSpeakerphone,
+  IconWorldUpload,
+} from '@tabler/icons-react';
 import { useState } from 'react';
 
 import classes from './Assistant.module.css';
@@ -17,6 +24,34 @@ function jdAsText(jd, profile) {
   if (c.what_we_offer?.length) lines.push('', 'What we offer', ...c.what_we_offer.map((o) => `- ${o}`));
   if (c.equal_opportunity) lines.push('', c.equal_opportunity);
   return lines.join('\n');
+}
+
+// "Post this job to the job board?" with Post / Don't post (the graph waits
+// for this answer). question: the pending_review from the backend.
+export function PostConfirmCard({ question, onDecide, busy }) {
+  return (
+    <div className={`${classes.postingCard} ${classes.postConfirm}`}>
+      <IconSpeakerphone size={20} color="#C08A1E" style={{ flex: 'none' }} />
+      <div className={classes.postingBody}>
+        <Text fz={14} fw={600}>
+          Post this job to the job board?
+        </Text>
+        <Text fz={14} c="#48535B" lh={1.5}>
+          {question.has_form
+            ? `I’ll publish job description version ${question.version} on the job board with your application form link.`
+            : `Job description version ${question.version} is approved, but the application form link is missing. If you post now, I’ll ask for the link first.`}
+        </Text>
+        <Group gap={8} mt={6}>
+          <Button variant="default" size="xs" onClick={() => onDecide('skip')} disabled={busy}>
+            Don’t post
+          </Button>
+          <Button size="xs" leftSection={<IconWorldUpload size={14} />} onClick={() => onDecide('post')} loading={busy}>
+            Post to job board
+          </Button>
+        </Group>
+      </div>
+    </div>
+  );
 }
 
 // One posting result card. onPost: post again (only on the newest card).

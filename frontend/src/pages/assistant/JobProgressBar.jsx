@@ -10,11 +10,11 @@ import classes from './Assistant.module.css';
 // Which steps are done, and which one needs the interviewer now.
 function stepsFor(job) {
   const posted = job.stage === 'posted';
-  const approved = posted || job.stage === 'jd_approved' || job.stage === 'posting_failed';
+  const approved = posted || ['jd_approved', 'post_to_confirm', 'posting_failed'].includes(job.stage);
   return [
     { label: 'Profile', done: Boolean(job.profile) },
     { label: 'JD approved', done: approved, now: job.stage === 'jd_to_approve' },
-    { label: 'Posted', done: posted, now: job.stage === 'posting_failed' },
+    { label: 'Posted', done: posted, now: ['post_to_confirm', 'posting_failed'].includes(job.stage) },
     { label: 'CVs screened', done: false },
     { label: 'Invitations', done: false },
   ];

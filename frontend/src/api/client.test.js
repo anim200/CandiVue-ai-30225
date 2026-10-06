@@ -4,7 +4,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { loadSession, saveSession } from '../auth/session';
-import { apiGet, apiPost, MESSAGES } from './client';
+import { apiGet, apiPost, apiPut, MESSAGES } from './client';
 
 // Replace the browser's fetch with a fake that answers with the given handler.
 function fakeFetch(handler) {
@@ -97,6 +97,17 @@ test('sends JSON for a POST', async () => {
   expect(options.method).toBe('POST');
   expect(options.headers['Content-Type']).toBe('application/json');
   expect(JSON.parse(options.body)).toEqual({ email: 'a@example.com', password: 'x' });
+});
+
+test('sends JSON for a PUT (e.g. choosing the AI model)', async () => {
+  fakeFetch(async () => jsonResponse({ models: [] }, 200));
+
+  await apiPut('/ai/model', { name: 'gemini-3.5-flash-lite' });
+
+  const [path, options] = fetch.mock.calls[0];
+  expect(path).toBe('/api/ai/model');
+  expect(options.method).toBe('PUT');
+  expect(JSON.parse(options.body)).toEqual({ name: 'gemini-3.5-flash-lite' });
 });
 
 test('an expired session signs the interviewer out and opens the login page', async () => {

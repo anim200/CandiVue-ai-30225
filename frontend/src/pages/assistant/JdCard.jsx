@@ -1,6 +1,6 @@
 // One job description version (design: JdApprovalCard, frames 1a and 2a).
 // While it waits for review it gets the three actions: reject with
-// feedback, edit, approve and post.
+// feedback, edit, approve (posting is asked next).
 
 import { Button } from '@mantine/core';
 import { IconCheck, IconCircleCheck, IconEye, IconPencil, IconX } from '@tabler/icons-react';
@@ -132,7 +132,7 @@ export default function JdCard({ jd, profile, waiting, busy, previousFeedback, o
             Edit
           </Button>
           <Button leftSection={<IconCheck size={15} />} onClick={onApprove} loading={busy}>
-            Approve and post
+            Approve
           </Button>
         </div>
       )}

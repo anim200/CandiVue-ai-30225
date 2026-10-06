@@ -1,7 +1,9 @@
 // Hiring Assistant (design: Hiring Assistant.dc.html). One chat per job:
 // the interviewer describes the role, the assistant saves the profile,
 // may search the knowledge base, writes the JD and waits for review.
-// After approval the JD is posted to the job board (result card in the chat).
+// After approval it asks "Post this job to the job board?" (Post / Don't
+// post); the job board result appears as a card. The AI model can be
+// switched under the chat box.
 // Interviewers only (route guard + backend, N9).
 
 import { Button } from '@mantine/core';
@@ -9,7 +11,7 @@ import { IconPlus, IconSparkles } from '@tabler/icons-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 
-import { apiGet, apiPost, apiPostAi } from '../../api/client';
+import { apiGet, apiPost, apiPostAi, apiPut } from '../../api/client';
 import { EmptyState, ErrorBanner } from '../../components/Feedback';
 import classes from './Assistant.module.css';
 import ChatComposer from './ChatComposer';
@@ -24,7 +26,8 @@ import {
 } from './ChatItems';
 import JdCard from './JdCard';
 import JobProgressBar from './JobProgressBar';
-import PostingCard from './PostingCard';
+import ModelPicker from './ModelPicker';
+import PostingCard, { PostConfirmCard } from './PostingCard';
 import { JdEditModal, RejectModal } from './ReviewModals';
 import ThreadList from './ThreadList';
 
@@ -86,7 +89,7 @@ function ChatRows({ items, profile, pending, reviewBusy, onApprove, onEdit, onRe
           <JdCard
             jd={item.jd}
             profile={profile}
-            waiting={pending?.jd_id === item.jd.id}
+            waiting={pending?.kind === 'jd_approval' && pending.jd_id === item.jd.id}
             busy={reviewBusy}
             previousFeedback={feedbackBefore(items, item.jd)}
             onApprove={onApprove}
@@ -102,7 +105,7 @@ function ChatRows({ items, profile, pending, reviewBusy, onApprove, onEdit, onRe
             result={item}
             approvedJd={approvedJd}
             profile={profile}
-            onPost={index === lastPosting && item.status !== 'posted' ? onPost : null}
+            onPost={index === lastPosting && item.status !== 'posted' && !pending ? onPost : null}
             busy={postBusy}
           />
         </AssistantRow>,
@@ -125,11 +128,13 @@ export default function HiringAssistantPage() {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [sentText, setSentText] = useState(null); // shown at once, before the answer
-  const [turnFailed, setTurnFailed] = useState(false);
+  const [turnFailed, setTurnFailed] = useState(null); // the error message, or null
   const [reviewBusy, setReviewBusy] = useState(false);
   const [reviewError, setReviewError] = useState(null);
   const [dialog, setDialog] = useState(null); // 'edit' | 'reject' | null
   const [creating, setCreating] = useState(false);
+  const [models, setModels] = useState(null); // { models, usage_url } for the picker
+  const [modelBusy, setModelBusy] = useState(false);
   const endRef = useRef(null);
 
   // Load all jobs for the thread list (also refreshes their stage lines).
@@ -163,13 +168,23 @@ export default function HiringAssistantPage() {
     }
   }, []);
 
+  // Load the AI models and today's usage (refreshed after every AI turn).
+  const loadModels = useCallback(async () => {
+    try {
+      setModels(await apiGet('/ai/models'));
+    } catch {
+      // the picker just stays hidden; the chat still works
+    }
+  }, []);
+
   useEffect(() => {
     loadJobs();
-  }, [loadJobs]);
+    loadModels();
+  }, [loadJobs, loadModels]);
 
   useEffect(() => {
     setSentText(null);
-    setTurnFailed(false);
+    setTurnFailed(null);
     setReviewError(null);
     if (id) loadThread(id);
   }, [id, loadThread]);
@@ -197,33 +212,35 @@ export default function HiringAssistantPage() {
     setDraft('');
     setSentText(text);
     setSending(true);
-    setTurnFailed(false);
+    setTurnFailed(null);
     try {
       setThread(await apiPostAi(`/assistant/jobs/${id}/messages`, { text }));
       setSentText(null);
       loadJobs();
-    } catch {
-      setTurnFailed(true); // the message is saved; "Try again" continues
+    } catch (error) {
+      setTurnFailed(error.message); // the message is saved; "Try again" continues
       await refreshThread(id);
       setSentText(null);
       loadJobs();
     } finally {
       setSending(false);
+      loadModels();
     }
   }
 
   // Continue a turn that failed (the backend kept the message).
   async function retryTurn() {
     setSending(true);
-    setTurnFailed(false);
+    setTurnFailed(null);
     try {
       setThread(await apiPostAi(`/assistant/jobs/${id}/retry`));
       setSentText(null);
       loadJobs();
-    } catch {
-      setTurnFailed(true);
+    } catch (error) {
+      setTurnFailed(error.message);
     } finally {
       setSending(false);
+      loadModels();
     }
   }
 
@@ -241,19 +258,32 @@ export default function HiringAssistantPage() {
     }
   }
 
-  // Send the review decision: approve, edit or reject (the paused graph continues).
-  async function review(decision) {
+  // Switch the AI model for every AI call (counts and limits are per model).
+  async function chooseModel(name) {
+    setModelBusy(true);
+    try {
+      setModels(await apiPut('/ai/model', { name }));
+    } catch (error) {
+      setReviewError(error.message);
+    } finally {
+      setModelBusy(false);
+    }
+  }
+
+  // Send a decision the paused graph waits for: the JD review (approve,
+  // edit, reject) or the posting question (post, skip).
+  async function decide(path, decision) {
     setReviewBusy(true);
     setReviewError(null);
     try {
-      setThread(await apiPostAi(`/assistant/jobs/${id}/review`, decision));
+      setThread(await apiPostAi(`/assistant/jobs/${id}/${path}`, decision));
       setDialog(null);
       loadJobs();
     } catch (error) {
       setDialog(null);
       if (error.status === 503) {
         // The decision was saved; only the assistant's answer failed.
-        setTurnFailed(true);
+        setTurnFailed(error.message);
         await refreshThread(id);
         loadJobs();
       } else {
@@ -261,8 +291,12 @@ export default function HiringAssistantPage() {
       }
     } finally {
       setReviewBusy(false);
+      loadModels();
     }
   }
+
+  // The JD review: approve, edit or reject.
+  const review = (decision) => decide('review', decision);
 
   if (jobsFailed) {
     return (
@@ -278,6 +312,12 @@ export default function HiringAssistantPage() {
   const pending = thread?.pending_review ?? null;
   const pendingJd = thread?.items.find((item) => item.kind === 'jd' && item.jd.id === pending?.jd_id)?.jd;
   const isEmpty = thread && thread.items.length === 0 && !sentText;
+  // What locks the chat box (and the hint shown above it), if anything.
+  const lockedHint = !pending
+    ? null
+    : pending.kind === 'post_confirmation'
+      ? 'Choose Post or Don’t post to continue the chat.'
+      : 'Approve, edit or reject the job description to continue the chat.';
 
   return (
     <div className={classes.layout}>
@@ -344,11 +384,20 @@ export default function HiringAssistantPage() {
                   postBusy={sending}
                 />
               )}
+              {pending?.kind === 'post_confirmation' && (
+                <AssistantRow>
+                  <PostConfirmCard
+                    question={pending}
+                    busy={reviewBusy}
+                    onDecide={(action) => decide('post-decision', { action })}
+                  />
+                </AssistantRow>
+              )}
               {sentText && <UserBubble text={sentText} />}
               {sending && <WorkingLine />}
               {turnFailed && (
                 <ErrorBanner title="I couldn’t answer just now." onRetry={retryTurn}>
-                  Your message is saved. Try again in a moment.
+                  {turnFailed} Your message is saved.
                 </ErrorBanner>
               )}
               {reviewError && <ErrorBanner title="That didn’t work.">{reviewError}</ErrorBanner>}
@@ -359,7 +408,17 @@ export default function HiringAssistantPage() {
               onChange={setDraft}
               onSend={send}
               sending={sending}
-              locked={Boolean(pending)}
+              locked={lockedHint}
+              footer={
+                models && (
+                  <ModelPicker
+                    models={models.models}
+                    usageUrl={models.usage_url}
+                    onChange={chooseModel}
+                    busy={modelBusy || sending || reviewBusy}
+                  />
+                )
+              }
             />
           </>
         )}

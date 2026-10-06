@@ -81,6 +81,11 @@ export function apiPost(path, body) {
   return request('POST', path, body);
 }
 
+// Change something on the backend (PUT).
+export function apiPut(path, body) {
+  return request('PUT', path, body);
+}
+
 // Ask the AI to do something (POST). Allows up to 2 minutes, like nginx.
 export function apiPostAi(path, body) {
   return request('POST', path, body, AI_TIMEOUT_MS);

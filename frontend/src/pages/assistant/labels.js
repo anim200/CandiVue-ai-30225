@@ -7,7 +7,8 @@ export const STAGES = {
   profile_saved: { text: 'Profile saved' },
   jd_to_approve: { text: 'Job description to approve', attention: true },
   jd_rejected: { text: 'Writing a new version' },
-  jd_approved: { text: 'Job description approved' },
+  jd_approved: { text: 'Approved · not posted' },
+  post_to_confirm: { text: 'Post to job board?', attention: true },
   posted: { text: 'Posted · collecting CVs' },
   posting_failed: { text: 'Posting failed', attention: true },
 };
