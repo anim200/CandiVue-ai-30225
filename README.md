@@ -161,6 +161,7 @@ width.
 | `ollama-pull` | `ollama/ollama:0.35.1` | One-time job: downloads the embedding model on the first start, then exits. |
 | `jobboard-mcp` | built from `jobboard-mcp/Dockerfile` (target `runtime`) | Our small MCP server that posts approved JDs to Blogger. The only service that holds the Blogger credentials. Not exposed to the host. |
 | `jobboard-tests` | built from `jobboard-mcp/Dockerfile` (target `test`) | Only runs on demand (see below). |
+| `cv-collector` | built from `backend/Dockerfile` (target `runtime`), command `python -m app.collector` | Copies new CVs from the Google Form into the `cv_intake` volume every few minutes. The only service that holds the Google key (read-only). No ports. |
 | `frontend` | built from `frontend/Dockerfile` | React app served by nginx 1.31 (HTTP, and HTTPS when `certs/` has a certificate); forwards `/api` to the backend. |
 
 ## AI provider and data sent to it
@@ -194,6 +195,7 @@ Other external services (N18):
 | Service | What it receives |
 |---|---|
 | Blogger (Google), through `jobboard-mcp` | The approved job description (title, text, requirements) and the Google Form link. No candidate data. |
+| Google Forms, Google Drive and Google Sheets | Applicants send their name, email address, the job they apply for and their CV file through the form; Google stores the file in Drive and the answers in the response Sheet. The `cv-collector` only **reads** them. |
 
 - **Free-tier notice:** on Gemini's free tier, Google may use the data it
   receives to improve its products. Use only synthetic or sample data with a
@@ -315,6 +317,56 @@ failed"; run step 5 again and replace the token (do it before a demo).
 The token only allows managing your Blogger blogs. To revoke it, remove
 CandiVue at <https://myaccount.google.com/permissions>.
 
+## CV Collector (Google Drive)
+
+Applicants apply through the Google Form linked in the job post (§4B-9):
+
+```
+Google Form ─► Drive (CV file) + response Sheet (name, email, job, CV link)
+                     │  read-only service account
+   cv-collector (every 5 min) ─► cv_intake volume: job-<id>/<candidate>.pdf|docx
+                              └► candidates table: received / rejected + reason
+```
+
+- **Which job?** The job post opens the form with "Position applied for"
+  already filled in, e.g. `JOB-12 · Python Developer`
+  (`GOOGLE_FORM_POSITION_FIELD`). Answers without a job reference, without
+  consent or without a CV are skipped; a CV already collected is never
+  downloaded again.
+- **Checks (N8):** PDF or Word (DOCX) only, decided by the file's content,
+  and at most `MAX_CV_MB` (checked before downloading). A rejected file is
+  not saved; the reason is recorded. One bad answer never stops the others.
+- **Storage:** the files are in the `cv_intake` named volume (never in the
+  project folder or git, N14); only the data about them is in PostgreSQL.
+  Look at them in Docker Desktop → Volumes → `candivue_cv_intake`.
+- The Jobs page shows **CVs received**; `GET /api/jobs/{id}/cvs` lists them
+  (interviewers only).
+- Without the settings below, the collector waits and logs "not set up yet".
+
+**One-time setup** (same Google Cloud project as the job board):
+
+1. **APIs:** *APIs & Services → Library*: enable **Google Drive API** and
+   **Google Sheets API**.
+2. **Service account:** *IAM & Admin → Service accounts → Create service
+   account*, name `cv-collector`, **no roles**. Open it → *Keys → Add key →
+   Create new key → JSON*. Keep the downloaded file outside the project.
+3. **Share, read-only:** with the account that owns the form, share the
+   form's upload folder in Google Drive (`<form title> (File responses)`)
+   and the response Sheet with the service account's email
+   (`cv-collector@<project>.iam.gserviceaccount.com`) as **Viewer**.
+4. **`.env`:**
+   - `GOOGLE_SERVICE_ACCOUNT_KEY`: the key on one line, e.g. in Git Bash
+     `base64 -w0 <key file>.json`. Then delete the downloaded key file.
+   - `CV_RESPONSES_SHEET_ID`: from the Sheet's address `/spreadsheets/d/<ID>/edit`.
+   - `GOOGLE_FORM_POSITION_FIELD`: in the form, *⋮ → Get pre-filled link*,
+     type anything in "Position applied for", *Get link*; the link contains
+     `entry.<number>=…`; use `entry.<number>`. Give that question the help
+     text "Filled in automatically, please don't change".
+5. `docker compose up -d`, then `docker compose logs -f cv-collector`.
+   Post the job again so its link pre-fills the job.
+
+Use only sample or synthetic CVs (N13, CN5).
+
 ## Knowledge base (RAG)
 
 Documents the Hiring Assistant can search: reference library, company
@@ -354,6 +406,10 @@ Security is built into each part instead of added at the end:
   instructions found inside them.
 - **Human approval:** nothing is published before the interviewer
   approves it.
+- **CV files:** only `cv-collector` holds the Google key (a service
+  account that can only read the shared folder and Sheet). Files are
+  checked by content and size before they are saved; logs never contain
+  applicants' names or emails.
 - **Least privilege for integrations:** only `jobboard-mcp` holds the
   Blogger credentials (one OAuth scope: Blogger); the backend cannot use
   them directly. The posted page escapes all JD text, and only Google
