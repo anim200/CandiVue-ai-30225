@@ -202,10 +202,10 @@ function RetrievalTest({ collection }) {
   return (
     <form className={classes.search} onSubmit={search}>
       <div>
-        <Text fz={16} fw={600}>
+        <Text fz={17} fw={600}>
           Try a search
         </Text>
-        <Text fz={13} c="dimmed" mt={2}>
+        <Text fz={14} c="dimmed" mt={2}>
           See which passages the assistant would find for a question.
         </Text>
       </div>
@@ -520,12 +520,12 @@ export default function KnowledgeBasePage() {
           timingFunction: 'ease-out',
         }}
         title={
-          <Text fz={17} fw={600}>
+          <Text fz={18} fw={600}>
             Remove “{removing?.filename}”?
           </Text>
         }
       >
-        <Text fz={14} c="#48535B" lh={1.55}>
+        <Text fz={15} c="#48535B" lh={1.55}>
           Its {removing?.chunk_count} passages are deleted from the search index. Job descriptions
           already written keep their text.
         </Text>

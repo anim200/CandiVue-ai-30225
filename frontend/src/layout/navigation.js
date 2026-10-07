@@ -1,4 +1,5 @@
-// The items in the left menu, in order. Paths are used by the router too.
+// The items in the left menu, in order, with the section (group) each one is
+// shown under. Paths are used by the router too.
 
 import {
   IconBooks,
@@ -14,30 +15,34 @@ export const NAV_ITEMS = [
     label: 'Jobs',
     icon: IconBriefcase,
     description: 'Job profiles, CV screening and candidate ranking will appear here.',
+    group: 'Workspace',
   },
   {
     path: '/interviews',
     label: 'Interviews',
     icon: IconVideo,
     description: 'Upcoming and past interviews will appear here.',
+    group: 'Workspace',
   },
   {
     path: '/reports',
     label: 'Reports',
     icon: IconFileText,
     description: 'Assessment reports waiting for your review will appear here.',
+    group: 'Workspace',
   },
   {
     path: '/assistant',
     label: 'Hiring Assistant',
     icon: IconSparkles,
     description: 'Chat with the Hiring Assistant to create jobs and schedule interviews.',
-    dividerBefore: true,
+    group: 'AI tools',
   },
   {
     path: '/knowledge-base',
     label: 'Knowledge base',
     icon: IconBooks,
     description: 'Documents the Hiring Assistant can search will appear here.',
+    group: 'AI tools',
   },
 ];

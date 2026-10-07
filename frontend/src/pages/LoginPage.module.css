@@ -69,7 +69,7 @@
 
 .headline {
   margin: 0;
-  font-size: 40px;
+  font-size: 41px;
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: -0.02em;
@@ -79,7 +79,7 @@
 
 .intro {
   margin: 0;
-  font-size: 17px;
+  font-size: 18px;
   line-height: 1.6;
   color: #c8e4e7;
   text-wrap: pretty;
@@ -97,7 +97,7 @@
   display: flex;
   gap: 12px;
   align-items: center;
-  font-size: 15px;
+  font-size: 16px;
   animation: fadeUp 0.6s ease-out both;
 }
 
@@ -137,13 +137,13 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 13px;
+  font-size: 14px;
   color: #e6f3f4;
   animation: float 7s ease-in-out infinite;
 }
 
 .timestamp {
-  font: 500 12px var(--mantine-font-family-monospace);
+  font: 500 13px var(--mantine-font-family-monospace);
   color: #bdedf1;
   background: rgba(127, 208, 216, 0.15);
   border-radius: 4px;
@@ -156,7 +156,7 @@
   border-radius: 999px;
   background: rgba(143, 211, 169, 0.18);
   color: #a8e2be;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   display: inline-flex;
   align-items: center;
@@ -164,14 +164,14 @@
 }
 
 .score {
-  font-size: 22px;
+  font-size: 23px;
   font-weight: 700;
   line-height: 1;
   color: #fff;
 }
 
 .scoreLabel {
-  font-size: 11px;
+  font-size: 12px;
   color: #a9c9cc;
 }
 
@@ -192,7 +192,7 @@
 .demoNote {
   position: relative;
   margin-top: 40px;
-  font-size: 12px;
+  font-size: 13px;
   color: #8fb3b7;
 }
 
@@ -223,13 +223,13 @@
 
 .title {
   margin: 0;
-  font-size: 28px;
+  font-size: 29px;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 
 .subtitle {
-  font-size: 15px;
+  font-size: 16px;
   color: #48535b;
 }
 
@@ -239,7 +239,7 @@
   gap: 10px;
   padding: 10px 12px;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.5;
 }
 
@@ -268,7 +268,7 @@
   height: 42px;
   border-radius: 6px;
   border-color: #c9d0d4;
-  font-size: 15px;
+  font-size: 16px;
   transition:
     border-color 0.15s,
     box-shadow 0.15s;
@@ -287,14 +287,14 @@
 }
 
 .fieldError {
-  font-size: 12px;
+  font-size: 13px;
   color: #932e24;
   margin-top: 6px;
   animation: fade 0.2s;
 }
 
 .label {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   margin-bottom: 6px;
 }
@@ -302,7 +302,7 @@
 .submit {
   height: 44px;
   border-radius: 6px;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   box-shadow: 0 1px 2px rgba(16, 58, 64, 0.2);
   transition:
@@ -330,7 +330,7 @@
 }
 
 .signedIn {
-  font-size: 14px;
+  font-size: 15px;
   color: #245f3e;
   text-align: center;
   animation: fadeUp 0.3s ease-out;
@@ -342,7 +342,7 @@
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   color: #48535b;
 }

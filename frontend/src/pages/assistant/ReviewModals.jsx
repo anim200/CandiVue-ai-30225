@@ -54,10 +54,10 @@ export function JdEditModal({ opened, onClose, jd, job, onSave, busy }) {
       transitionProps={TRANSITION}
       title={
         <div>
-          <Text fz={18} fw={600}>
+          <Text fz={19} fw={600}>
             Edit job description
           </Text>
-          <Text fz={13} c="dimmed">
+          <Text fz={14} c="dimmed">
             {job.title} · version {jd.version} → {jd.version + 1}
           </Text>
         </div>
@@ -107,7 +107,7 @@ export function JdEditModal({ opened, onClose, jd, job, onSave, busy }) {
         />
         <div>
           <Group gap={6} mb={6}>
-            <Text fz={14} fw={500}>
+            <Text fz={15} fw={500}>
               Requirements
             </Text>
             <IconLock size={14} color="#66717A" />
@@ -125,7 +125,7 @@ export function JdEditModal({ opened, onClose, jd, job, onSave, busy }) {
           </div>
         </div>
         <Group justify="space-between" mt={4}>
-          <Text fz={13} c="dimmed" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Text fz={14} c="dimmed" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <IconHistory size={15} />
             Version {jd.version} is kept in the history
           </Text>
@@ -169,13 +169,13 @@ export function RejectModal({ opened, onClose, onSend, busy }) {
       radius="md"
       transitionProps={TRANSITION}
       title={
-        <Text fz={17} fw={600}>
+        <Text fz={18} fw={600}>
           Reject this draft
         </Text>
       }
     >
       <Stack gap={12}>
-        <Text fz={14} c="#48535B" lh={1.5}>
+        <Text fz={15} c="#48535B" lh={1.5}>
           Tell the assistant what to change. It writes a new version for you to review.
         </Text>
         <Textarea

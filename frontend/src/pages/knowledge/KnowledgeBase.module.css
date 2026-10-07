@@ -17,13 +17,13 @@
 
 .title {
   margin: 0;
-  font-size: 26px;
+  font-size: 27px;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
 
 .intro {
-  font-size: 14px;
+  font-size: 15px;
   color: #48535b;
   max-width: 640px;
   line-height: 1.55;
@@ -34,7 +34,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 14px;
   color: #48535b;
 }
 
@@ -56,7 +56,7 @@
   padding: 10px 14px;
   border-radius: 8px;
   background: #fbf0d9;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.5;
   color: #5a3d00;
 }
@@ -92,7 +92,7 @@
 }
 
 .collectionsTitle {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: #66717a;
   padding: 6px 8px;
@@ -145,7 +145,7 @@
   display: flex;
   justify-content: space-between;
   gap: 6px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
 }
 
@@ -155,14 +155,14 @@
 }
 
 .count {
-  font-size: 12px;
+  font-size: 13px;
   color: #66717a;
   font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
 
 .use {
-  font-size: 12px;
+  font-size: 13px;
   color: #66717a;
   line-height: 1.4;
 }
@@ -224,7 +224,7 @@
 }
 
 .dropTitle {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
 }
 
@@ -239,7 +239,7 @@
 }
 
 .dropMeta {
-  font-size: 13px;
+  font-size: 14px;
   color: #48535b;
 }
 
@@ -257,7 +257,7 @@
 }
 
 .targetLabel {
-  font-size: 12px;
+  font-size: 13px;
   color: #66717a;
 }
 
@@ -277,7 +277,7 @@
 }
 
 .draggingText {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
   color: #103a40;
 }
@@ -289,6 +289,7 @@
   border: 1px solid #dee3e6;
   border-radius: 8px;
   overflow: hidden;
+  container-type: inline-size; /* the table below follows the card's width */
 }
 
 .tableTop {
@@ -300,12 +301,12 @@
 }
 
 .tableTitle {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
 }
 
 .tableCount {
-  font-size: 13px;
+  font-size: 14px;
   color: #66717a;
 }
 
@@ -322,7 +323,7 @@
   padding-top: 9px;
   padding-bottom: 9px;
   border-bottom: 1px solid #dee3e6;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: #66717a;
 }
@@ -338,7 +339,7 @@
 
 .row {
   min-height: 52px;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .docName {
@@ -356,7 +357,7 @@
   align-items: center;
   justify-content: center;
   flex: none;
-  font: 700 9px var(--mantine-font-family-monospace);
+  font: 700 10px var(--mantine-font-family-monospace);
 }
 
 .nameText {
@@ -373,13 +374,13 @@
 }
 
 .small {
-  font-size: 12px;
+  font-size: 13px;
   color: #66717a;
 }
 
 .collectionCell {
   color: #48535b;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .statusCell {
@@ -450,7 +451,7 @@
   border-radius: 6px;
   background: #fbe9e7;
   color: #5a2620;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   display: flex;
   gap: 10px;
@@ -494,7 +495,7 @@
 }
 
 .searching {
-  font-size: 13px;
+  font-size: 14px;
   color: #66717a;
   display: flex;
   align-items: center;
@@ -529,7 +530,7 @@
 }
 
 .hitSource {
-  font: 500 12px var(--mantine-font-family-monospace);
+  font: 500 13px var(--mantine-font-family-monospace);
   color: #1c5d65;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -537,7 +538,7 @@
 }
 
 .match {
-  font-size: 12px;
+  font-size: 13px;
   color: #66717a;
   display: flex;
   align-items: center;
@@ -559,13 +560,13 @@
 }
 
 .hitText {
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.5;
   white-space: pre-wrap;
 }
 
 .noHits {
-  font-size: 14px;
+  font-size: 15px;
   color: #48535b;
   line-height: 1.5;
   display: flex;
@@ -598,6 +599,21 @@
 }
 
 @media (max-width: 47.99em) {
+  .target {
+    align-items: flex-start;
+  }
+}
+
+/* Medium table: narrower columns. */
+@container (max-width: 700px) {
+  .head,
+  .row {
+    grid-template-columns: minmax(0, 1fr) 112px 120px 64px 32px;
+  }
+}
+
+/* Narrow table (phones, or a narrow column on tablets): name, status, remove. */
+@container (max-width: 560px) {
   .head {
     display: none;
   }
@@ -614,10 +630,6 @@
 
   .message {
     margin-left: 18px;
-  }
-
-  .target {
-    align-items: flex-start;
   }
 }
 

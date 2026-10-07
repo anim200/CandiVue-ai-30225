@@ -239,7 +239,7 @@ export default function LoginPage() {
           {stage === 'signedIn' && (
             <div className={classes.signedIn}>
               Signed in.{' '}
-              <Anchor component={Link} to={goTo} fw={600} fz={14}>
+              <Anchor component={Link} to={goTo} fw={600} fz={15}>
                 Go to Jobs
               </Anchor>
             </div>

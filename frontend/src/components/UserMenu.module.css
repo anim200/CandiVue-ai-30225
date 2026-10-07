@@ -10,10 +10,21 @@
   background-color: #f1f4f5;
 }
 
+/* Very small phones (up to 360px): no room for the chevron. */
+@media (max-width: 22.5em) {
+  .target {
+    padding: 4px;
+  }
+
+  .chevron {
+    display: none;
+  }
+}
+
 .avatar {
   background: #d5e9eb;
   color: #1c5d65;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
 }
 
@@ -35,7 +46,7 @@
   height: 36px;
   padding: 0 10px;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .signOut {

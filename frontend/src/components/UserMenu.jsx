@@ -61,24 +61,24 @@ export default function UserMenu() {
               {initialsOf(user.name)}
             </Avatar>
             <Box visibleFrom="sm" style={{ lineHeight: 1.2 }}>
-              <Text fz={14} fw={600} lh={1.2}>
+              <Text fz={15} fw={600} lh={1.2}>
                 {user.name}
               </Text>
-              <Text fz={12} c="dimmed" lh={1.2}>
+              <Text fz={13} c="dimmed" lh={1.2}>
                 {user.email}
               </Text>
             </Box>
-            <Chevron size={16} color="#66717A" />
+            <Chevron size={16} color="#66717A" className={classes.chevron} />
           </Group>
         </UnstyledButton>
       </Menu.Target>
 
       <Menu.Dropdown>
         <div className={classes.who}>
-          <Text fz={14} fw={600}>
+          <Text fz={15} fw={600}>
             {user.name}
           </Text>
-          <Text fz={12} c="dimmed">
+          <Text fz={13} c="dimmed">
             {user.email}
           </Text>
         </div>

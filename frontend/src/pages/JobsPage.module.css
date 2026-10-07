@@ -16,7 +16,7 @@
 
 .title {
   margin: 0;
-  font-size: 26px;
+  font-size: 27px;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -26,9 +26,11 @@
   border: 1px solid #dee3e6;
   border-radius: 8px;
   overflow: hidden;
+  container-type: inline-size; /* the layout below follows the card's width */
 }
 
-/* Desktop: a 6-column table. Phones: title + badge, other columns hidden. */
+/* Wide card: a 6-column table. Medium: Interviews and Updated hidden.
+   Narrow (phones): title on its own line, status and CVs underneath. */
 .row,
 .head {
   display: grid;
@@ -42,7 +44,7 @@
   padding-top: 10px;
   padding-bottom: 10px;
   border-bottom: 1px solid #dee3e6;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: #66717a;
 }
@@ -50,7 +52,7 @@
 .row {
   height: 52px;
   border-bottom: 1px solid #e9ecee;
-  font-size: 14px;
+  font-size: 15px;
   cursor: pointer;
   transition: background 0.15s;
   width: 100%;
@@ -92,20 +94,58 @@
   color: #8a949a;
 }
 
-@media (max-width: 47.99em) {
+.cvLabel {
+  display: none;
+}
+
+@container (max-width: 760px) {
+  .row,
+  .head {
+    grid-template-columns: minmax(0, 1fr) 110px 170px 24px;
+  }
+
+  .medium {
+    display: none;
+  }
+}
+
+@container (max-width: 520px) {
   .head {
     display: none;
   }
 
   .row {
-    grid-template-columns: minmax(0, 1fr) auto 16px;
+    grid-template-columns: auto minmax(0, 1fr) 16px;
+    grid-template-areas:
+      'title title chevron'
+      'status cvs chevron';
+    gap: 6px 10px;
     height: auto;
-    min-height: 56px;
-    padding-top: 10px;
-    padding-bottom: 10px;
+    min-height: 64px;
+    padding: 12px 16px;
   }
 
-  .wide {
-    display: none;
+  .jobTitle {
+    grid-area: title;
+    white-space: normal; /* the whole title, on two lines if needed */
+  }
+
+  .status {
+    grid-area: status;
+  }
+
+  .cvs {
+    grid-area: cvs;
+    white-space: nowrap;
+    font-size: 14px;
+    color: #48535b;
+  }
+
+  .cvLabel {
+    display: inline;
+  }
+
+  .chevron {
+    grid-area: chevron;
   }
 }

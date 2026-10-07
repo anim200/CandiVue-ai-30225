@@ -1,18 +1,43 @@
 // The frame around every interviewer page: header on top, menu on the left,
 // the current page in the middle (<Outlet />).
-// Responsive: on phones and small tablets (below "sm", 768px) the menu is
-// hidden and opens from the burger button in the header.
+// Responsive: on phones and tablets (below "md", 992px) the menu is hidden
+// and opens from the burger button, so pages get the full width.
+// Menu style (deliberate change from the design, user 07-10-2026): section
+// titles, a teal bar on the active item, a count of jobs that need the
+// interviewer, and a reminder card at the bottom.
 
 import { AppShell, Box, Burger, Group, NavLink } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { Fragment } from 'react';
+import { IconShieldCheck } from '@tabler/icons-react';
+import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useMatches } from 'react-router';
 
+import { apiGet } from '../api/client';
 import BackendStatus from '../components/BackendStatus';
 import Logo from '../components/Logo';
 import UserMenu from '../components/UserMenu';
+import { STAGES } from '../pages/assistant/labels';
 import classes from './AppLayout.module.css';
 import { NAV_ITEMS } from './navigation';
+
+// The menu items grouped by section, in menu order: [["Workspace", [...]], ...]
+const GROUPS = Object.entries(Object.groupBy(NAV_ITEMS, (item) => item.group));
+
+// How many jobs wait for the interviewer (JD to approve, post to confirm,
+// posting failed). Re-checked whenever the page changes.
+function useJobsNeedingAttention(pathname) {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    let current = true;
+    apiGet('/jobs')
+      .then((jobs) => current && setCount(jobs.filter((job) => STAGES[job.stage]?.attention).length))
+      .catch(() => {}); // the badge is a hint only; the page shows its own errors
+    return () => {
+      current = false;
+    };
+  }, [pathname]);
+  return count;
+}
 
 // Page frame for interviewers: header, left menu and the current page.
 export default function AppLayout() {
@@ -20,11 +45,12 @@ export default function AppLayout() {
   // Pages marked fullBleed (the Hiring Assistant) fill the area without padding.
   const fullBleed = useMatches().some((match) => match.handle?.fullBleed);
   const [menuOpen, { toggle: toggleMenu, close: closeMenu }] = useDisclosure(false);
+  const waiting = useJobsNeedingAttention(pathname);
 
   return (
     <AppShell
       header={{ height: 56 }}
-      navbar={{ width: 240, breakpoint: 'sm', collapsed: { mobile: !menuOpen } }}
+      navbar={{ width: 240, breakpoint: 'md', collapsed: { mobile: !menuOpen } }}
     >
       <AppShell.Header px={{ base: 12, sm: 20 }}>
         <Group h="100%" justify="space-between" wrap="nowrap">
@@ -32,7 +58,7 @@ export default function AppLayout() {
             <Burger
               opened={menuOpen}
               onClick={toggleMenu}
-              hiddenFrom="sm"
+              hiddenFrom="md"
               size="sm"
               aria-label={menuOpen ? 'Close menu' : 'Open menu'}
             />
@@ -45,21 +71,45 @@ export default function AppLayout() {
         </Group>
       </AppShell.Header>
 
-      <AppShell.Navbar px={12} py={16} style={{ gap: 2 }}>
-        {NAV_ITEMS.map(({ path, label, icon: Icon, dividerBefore }) => (
-          <Fragment key={path}>
-            {dividerBefore && <div className={classes.divider} />}
-            <NavLink
-              component={Link}
-              to={path}
-              label={label}
-              leftSection={<Icon size={19} stroke={1.6} />}
-              active={pathname.startsWith(path)}
-              classNames={{ root: classes.navLink, section: classes.navIcon }}
-              onClick={closeMenu} // on phones, close the menu after choosing
-            />
-          </Fragment>
-        ))}
+      <AppShell.Navbar className={classes.navbar}>
+        <nav className={classes.menu} aria-label="Main menu">
+          {GROUPS.map(([group, items]) => (
+            <div key={group} className={classes.group}>
+              <div className={classes.sectionTitle}>{group}</div>
+              {items.map(({ path, label, icon: Icon }) => {
+                const count = path === '/assistant' ? waiting : 0;
+                return (
+                  <NavLink
+                    key={path}
+                    component={Link}
+                    to={path}
+                    label={label}
+                    leftSection={<Icon size={19} stroke={1.6} />}
+                    rightSection={
+                      count > 0 && (
+                        <span className={classes.count} title={`${count} job(s) need you`}>
+                          {count}
+                        </span>
+                      )
+                    }
+                    active={pathname.startsWith(path)}
+                    classNames={{ root: classes.navLink, section: classes.navIcon }}
+                    onClick={closeMenu} // on phones, close the menu after choosing
+                  />
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+
+        <div className={classes.footerCard}>
+          <IconShieldCheck size={18} className={classes.footerIcon} />
+          <div>
+            <div className={classes.footerTitle}>You stay in control</div>
+            Nothing is posted or sent until you confirm. Candidates never see scores or
+            reports.
+          </div>
+        </div>
       </AppShell.Navbar>
 
       <AppShell.Main bg="#F5F7F8">

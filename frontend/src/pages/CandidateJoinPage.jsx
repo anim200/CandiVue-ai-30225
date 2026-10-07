@@ -105,13 +105,13 @@ export default function CandidateJoinPage() {
       <header className={classes.header}>
         <Logo />
         <span className={classes.help}>
-          <Anchor href={`mailto:${HELP_EMAIL}`} fz={13} className={classes.helpShort}>
+          <Anchor href={`mailto:${HELP_EMAIL}`} fz={14} className={classes.helpShort}>
             <IconHelpCircle size={16} />
             Help
           </Anchor>
           <span className={classes.helpFull}>
             Need help?{' '}
-            <Anchor href={`mailto:${HELP_EMAIL}`} fz={13}>
+            <Anchor href={`mailto:${HELP_EMAIL}`} fz={14}>
               {HELP_EMAIL}
             </Anchor>
           </span>
@@ -122,7 +122,7 @@ export default function CandidateJoinPage() {
         {result.status === 'checking' ? (
           <StateCard>
             <span className={classes.spinner} />
-            <Text fz={16} fw={600}>
+            <Text fz={17} fw={600}>
               Opening your interview…
             </Text>
           </StateCard>
@@ -137,10 +137,10 @@ export default function CandidateJoinPage() {
             >
               <Icon size={24} />
             </Box>
-            <Text fz={17} fw={600}>
+            <Text fz={18} fw={600}>
               {message.title}
             </Text>
-            <Text fz={14} lh={1.55} c="#48535B">
+            <Text fz={15} lh={1.55} c="#48535B">
               {message.text}
             </Text>
             {message.canRetry && (

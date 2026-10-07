@@ -17,7 +17,7 @@
 
 .errorText {
   flex: 1;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.5;
   color: #5a2620;
 }
@@ -35,7 +35,7 @@
   background: #fff;
   border: 1px solid #e3b7b1;
   color: #932e24;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
@@ -67,12 +67,12 @@
 }
 
 .emptyTitle {
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 600;
 }
 
 .emptyText {
-  font-size: 14px;
+  font-size: 15px;
   color: #48535b;
   max-width: 440px;
   line-height: 1.55;

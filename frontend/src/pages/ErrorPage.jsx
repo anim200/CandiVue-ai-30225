@@ -8,7 +8,7 @@ export default function ErrorPage() {
   return (
     <Center h="100vh" bg="#F5F7F8">
       <Stack align="center" gap="sm" maw={440} ta="center">
-        <Title order={1} fz={26}>
+        <Title order={1} fz={27}>
           Something went wrong
         </Title>
         <Text c="dimmed">
