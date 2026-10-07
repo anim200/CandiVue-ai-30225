@@ -19,6 +19,7 @@ class CandidateStatus(StrEnum):
     """How far a candidate's CV has been processed."""
 
     RECEIVED = "received"  # CV file is in the intake folder
+    REJECTED = "rejected"  # wrong type or too large: not saved (reason kept)
     PARSED = "parsed"
     PARSE_FAILED = "parse_failed"  # this CV failed; the rest of the batch goes on
 

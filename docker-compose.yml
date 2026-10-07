@@ -45,6 +45,10 @@ services:
       DEMO_INTERVIEWER_EMAIL: ${DEMO_INTERVIEWER_EMAIL:-}
       DEMO_INTERVIEWER_NAME: ${DEMO_INTERVIEWER_NAME:-Interviewer A}
       DEMO_INTERVIEWER_PASSWORD: ${DEMO_INTERVIEWER_PASSWORD:-}
+      GOOGLE_FORM_POSITION_FIELD: ${GOOGLE_FORM_POSITION_FIELD:-}
+      MAX_CV_MB: ${MAX_CV_MB:-10}
+    volumes:
+      - cv_intake:/data/cv_intake  # CVs for screening (later steps)
     ports:
       # Bound to localhost only (documented local-development exception, N10).
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
@@ -105,6 +109,32 @@ services:
       timeout: 5s
       retries: 5
 
+  # CV Collector (step 7): every few minutes it copies new CVs from the
+  # Google Form (Drive + response Sheet) into the cv_intake volume and
+  # records the candidates. Same image as the backend, other command. Only
+  # this container gets the Google key (read-only service account).
+  cv-collector:
+    build:
+      context: ./backend
+      target: runtime
+    restart: unless-stopped
+    command: ["python", "-m", "app.collector"]
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # Required by the shared settings, but the collector never signs login
+      # tokens, so it does not get the real secret.
+      JWT_SECRET: not-used-by-the-cv-collector-000000
+      GOOGLE_SERVICE_ACCOUNT_KEY: ${GOOGLE_SERVICE_ACCOUNT_KEY:-}
+      CV_RESPONSES_SHEET_ID: ${CV_RESPONSES_SHEET_ID:-}
+      CV_COLLECT_INTERVAL_SECONDS: ${CV_COLLECT_INTERVAL_SECONDS:-300}
+      MAX_CV_MB: ${MAX_CV_MB:-10}
+    volumes:
+      - cv_intake:/data/cv_intake
+    depends_on:
+      backend:
+        condition: service_healthy  # the backend has applied the migrations
+
   # Tests for the job board MCP server (no real Blogger calls).
   # Run: docker compose run --rm --build jobboard-tests
   jobboard-tests:
@@ -151,3 +181,4 @@ services:
 volumes:
   pgdata:
   ollama_models:
+  cv_intake:  # collected CV files (personal data: never in git, N14)

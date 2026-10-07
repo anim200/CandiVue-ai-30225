@@ -17,3 +17,6 @@ python-docx==1.2.0
 python-multipart==0.0.32
 langchain-ollama==1.1.0
 mcp==2.3.0
+# CV Collector: Google service account + Drive/Sheets REST calls
+google-auth==2.60.0
+requests==2.34.2

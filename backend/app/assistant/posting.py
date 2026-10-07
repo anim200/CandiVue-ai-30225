@@ -9,11 +9,14 @@ Secure by design:
 
 import html
 import logging
-from urllib.parse import urlparse
+import re
+from urllib.parse import parse_qsl, urlencode, urlparse
 
 from sqlalchemy import select
 
 from app.assistant.schemas import JobDescriptionContent, JobProfile
+from app.collector.collect import job_reference
+from app.core.config import get_settings
 from app.db.database import SessionLocal
 from app.db.models import Job, JobDescription
 from app.db.models.job import JobBoardStatus, JobDescriptionStatus
@@ -49,6 +52,19 @@ def _list(title: str, items: list[str]) -> str:
 def _text(title: str, text: str) -> str:
     """An escaped heading with a paragraph (empty when there is no text)."""
     return f"<h3>{html.escape(title)}</h3><p>{html.escape(text)}</p>" if text else ""
+
+
+def application_link(form_url: str, job_id: int, title: str) -> str:
+    """The form link with "Position applied for" already filled in
+    ("JOB-12 · title"), so the CV Collector knows which job a CV is for.
+    Unchanged if GOOGLE_FORM_POSITION_FIELD is not set."""
+    field = get_settings().google_form_position_field or ""
+    parts = urlparse(form_url)
+    if not re.fullmatch(r"entry\.\d+", field) or parts.hostname != "docs.google.com":
+        return form_url  # short forms.gle links cannot be pre-filled
+    query = [(k, v) for k, v in parse_qsl(parts.query) if k not in ("usp", field)]
+    query += [("usp", "pp_url"), (field, job_reference(job_id, title))]
+    return parts._replace(query=urlencode(query)).geturl()
 
 
 def render_post_html(
@@ -119,10 +135,11 @@ def post_job(job_id: int) -> dict:
                 "form_url": None,
             }
         content = JobDescriptionContent.model_validate_json(jd.content)
+        # The link pre-fills the job, so collected CVs find the right job.
+        form_url = application_link(job.google_form_url, job.id, job.title)
         body = render_post_html(
-            content, JobProfile.model_validate(job.profile), job.google_form_url
+            content, JobProfile.model_validate(job.profile), form_url
         )
-        form_url = job.google_form_url
         try:
             post = publish_job_post(content.title, body, ["Jobs"])
         except JobBoardError as exc:

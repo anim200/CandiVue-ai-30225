@@ -36,6 +36,17 @@ class Settings(BaseSettings):
     # credentials live only in that container, never in the backend.
     jobboard_mcp_url: str = "http://jobboard-mcp:8001/mcp"
 
+    # CV Collector (app/collector, cv-collector container). The Google key is
+    # given only to that container (read-only service account, N7).
+    google_service_account_key: SecretStr | None = None  # JSON or base64 JSON
+    cv_responses_sheet_id: str | None = None  # the Google Form's response Sheet
+    cv_collect_interval_seconds: int = Field(default=300, ge=30)
+    cv_intake_dir: str = "/data/cv_intake"  # Docker named volume, never in git
+    max_cv_mb: int = Field(default=10, gt=0)
+    # The form question "Position applied for", e.g. "entry.123456789": the job
+    # post pre-fills it with "JOB-12 · title" so each CV finds its job.
+    google_form_position_field: str | None = None
+
     # Largest document the knowledge base accepts (N8).
     max_upload_mb: int = Field(default=20, gt=0)
 

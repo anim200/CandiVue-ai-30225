@@ -1,4 +1,5 @@
-"""Jobs API: create a job (it starts a Hiring Assistant thread) and list jobs.
+"""Jobs API: create a job (it starts a Hiring Assistant thread), list jobs
+and the CVs the CV Collector received for a job.
 
 Interviewers only (N9). Job profiles are filled in through the Hiring
 Assistant chat (§4B-8), not through a form.
@@ -9,12 +10,13 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import CurrentUser, require_interviewer
 from app.db.database import get_db
-from app.db.models import Job, JobDescription
+from app.db.models import Candidate, Job, JobDescription
+from app.db.models.candidate import CandidateStatus
 from app.db.models.job import JobBoardStatus, JobDescriptionStatus, JobStatus
 
 router = APIRouter(
@@ -35,7 +37,20 @@ class JobOut(BaseModel):
     stage: str  # drafting_profile, jd_to_approve, jd_approved, posted, ...
     google_form_url: str | None = None
     job_board_post_url: str | None = None
+    cvs_received: int = 0  # usable CVs collected (rejected files not counted)
     updated_at: datetime
+
+
+class CvOut(BaseModel):
+    """A CV the collector received for a job (no scores: those come later)."""
+
+    id: int
+    full_name: str | None
+    email: str | None
+    cv_filename: str
+    status: CandidateStatus
+    problem: str | None  # why it was rejected or could not be read
+    received_at: datetime
 
 
 def job_stage(job: Job, latest_jd: JobDescription | None) -> str:
@@ -71,6 +86,12 @@ def to_job_out(db: Session, job: Job) -> JobOut:
         stage=job_stage(job, latest),
         google_form_url=job.google_form_url,
         job_board_post_url=job.job_board_post_url,
+        cvs_received=db.scalar(
+            select(func.count(Candidate.id)).where(
+                Candidate.job_id == job.id,
+                Candidate.status != CandidateStatus.REJECTED,
+            )
+        ),
         updated_at=max(job.updated_at, latest.updated_at) if latest else job.updated_at,
     )
 
@@ -102,3 +123,27 @@ def get_job(job_id: int, db: Annotated[Session, Depends(get_db)]) -> JobOut:
     if job is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, NOT_FOUND)
     return to_job_out(db, job)
+
+
+@router.get("/{job_id}/cvs", response_model=list[CvOut])
+def list_cvs(job_id: int, db: Annotated[Session, Depends(get_db)]) -> list[CvOut]:
+    """The CVs received for a job, newest first, with their status."""
+    if db.get(Job, job_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, NOT_FOUND)
+    candidates = db.scalars(
+        select(Candidate)
+        .where(Candidate.job_id == job_id)
+        .order_by(Candidate.created_at.desc())
+    )
+    return [
+        CvOut(
+            id=c.id,
+            full_name=c.full_name,
+            email=c.email,
+            cv_filename=c.cv_filename,
+            status=c.status,
+            problem=c.parse_error,
+            received_at=c.created_at,
+        )
+        for c in candidates
+    ]

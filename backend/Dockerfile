@@ -19,8 +19,9 @@ COPY alembic.ini .
 COPY migrations ./migrations
 COPY app ./app
 
-# Run as a normal user, not root.
-RUN useradd --create-home --uid 1000 appuser
+# Run as a normal user, not root. The CV intake folder is created here so
+# the named volume mounted on it belongs to that user.
+RUN useradd --create-home --uid 1000 appuser     && mkdir -p /data/cv_intake && chown appuser /data/cv_intake
 USER appuser
 
 EXPOSE 8000

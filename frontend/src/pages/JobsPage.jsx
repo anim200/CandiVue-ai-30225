@@ -1,7 +1,7 @@
 // Jobs list (design: Jobs.dc.html). Jobs are created through the Hiring
 // Assistant: the button makes an empty job and opens its chat (§4B-8).
-// CVs and screening come with the next steps; until then they show 0 and
-// "Not screened".
+// "CVs received" counts the CVs the CV Collector took from the Google Form.
+// Screening comes with the next steps; until then it shows "Not screened".
 
 import { Button } from '@mantine/core';
 import { IconBriefcase, IconChevronRight, IconClock, IconSparkles } from '@tabler/icons-react';
@@ -105,7 +105,7 @@ export default function JobsPage() {
             onClick={() => navigate(`/assistant/${job.id}`)}
           >
             <div className={classes.jobTitle}>{job.title}</div>
-            <div className={`${classes.number} ${classes.wide}`}>0</div>
+            <div className={`${classes.number} ${classes.wide}`}>{job.cvs_received}</div>
             <div>
               <StatusBadge tone="neutral" icon={<IconClock size={13} />}>
                 Not screened
