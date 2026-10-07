@@ -339,8 +339,13 @@ Google Form ─► Drive (CV file) + response Sheet (name, email, job, CV link)
 - **Storage:** the files are in the `cv_intake` named volume (never in the
   project folder or git, N14); only the data about them is in PostgreSQL.
   Look at them in Docker Desktop → Volumes → `candivue_cv_intake`.
-- The Jobs page shows **CVs received**; `GET /api/jobs/{id}/cvs` lists them
-  (interviewers only).
+- The Jobs page shows **CVs received**. Clicking a job opens its page with
+  the **applicants**: name, email, when the CV arrived, file name and status
+  (received / rejected with the reason), **View CV** (PDF opens in the
+  browser, Word downloads; never cached) and **Remove** (deletes the
+  applicant and the CV file, N19). API (interviewers only):
+  `GET /api/jobs/{id}/cvs`, `GET /api/jobs/{id}/cvs/{candidate}/file`,
+  `DELETE /api/jobs/{id}/cvs/{candidate}`.
 - Without the settings below, the collector waits and logs "not set up yet".
 
 **One-time setup** (same Google Cloud project as the job board):

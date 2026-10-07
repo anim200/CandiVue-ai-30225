@@ -26,7 +26,8 @@ export class ApiError extends Error {
 // Send one request to the backend (with the login token) and return the JSON answer, or throw an ApiError with a plain message.
 // body: a plain object (sent as JSON) or FormData (file uploads).
 // timeoutMs: AI requests may take longer than the default.
-async function request(method, path, body, timeoutMs = TIMEOUT_MS) {
+// asFile: return the answer as a file (Blob) instead of JSON.
+async function request(method, path, body, timeoutMs = TIMEOUT_MS, asFile = false) {
   const session = loadSession();
   const isForm = body instanceof FormData;
   const headers = { Accept: 'application/json' };
@@ -57,6 +58,7 @@ async function request(method, path, body, timeoutMs = TIMEOUT_MS) {
     const detail = await readDetail(response);
     throw new ApiError(detail ?? MESSAGES.failed, response.status);
   }
+  if (asFile) return response.blob();
   return response.status === 204 ? null : response.json(); // 204 = done, no content
 }
 
@@ -94,6 +96,11 @@ export function apiPostAi(path, body) {
 // Upload files (POST as multipart form data).
 export function apiUpload(path, formData) {
   return request('POST', path, formData, UPLOAD_TIMEOUT_MS);
+}
+
+// Download a file with the login token (e.g. a CV), as a Blob.
+export function apiGetFile(path) {
+  return request('GET', path, undefined, UPLOAD_TIMEOUT_MS, true);
 }
 
 // Delete something on the backend (DELETE).

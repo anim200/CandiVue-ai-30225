@@ -1,5 +1,5 @@
-"""Jobs API: create a job (it starts a Hiring Assistant thread), list jobs
-and the CVs the CV Collector received for a job.
+"""Jobs API: create a job (it starts a Hiring Assistant thread), list jobs,
+and a job's applicants: the CVs the CV Collector received (view, remove).
 
 Interviewers only (N9). Job profiles are filled in through the Hiring
 Assistant chat (§4B-8), not through a form.
@@ -8,12 +8,14 @@ Assistant chat (§4B-8), not through a form.
 from datetime import datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import CurrentUser, require_interviewer
+from app.collector.intake import find_cv, remove_cv
 from app.db.database import get_db
 from app.db.models import Candidate, Job, JobDescription
 from app.db.models.candidate import CandidateStatus
@@ -24,6 +26,13 @@ router = APIRouter(
 )
 
 NOT_FOUND = "This job no longer exists."
+APPLICANT_NOT_FOUND = "This applicant no longer exists."
+FILE_MISSING = "This CV file is not available."
+# Browsers show PDFs; Word files are downloaded.
+CV_MEDIA_TYPES = {
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
 NEW_JOB_TITLE = "New job"
 
 
@@ -147,3 +156,42 @@ def list_cvs(job_id: int, db: Annotated[Session, Depends(get_db)]) -> list[CvOut
         )
         for c in candidates
     ]
+
+
+def _applicant(db: Session, job_id: int, candidate_id: int) -> Candidate:
+    """The applicant if they belong to this job; 404 otherwise."""
+    candidate = db.get(Candidate, candidate_id)
+    if candidate is None or candidate.job_id != job_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, APPLICANT_NOT_FOUND)
+    return candidate
+
+
+@router.get("/{job_id}/cvs/{candidate_id}/file")
+def get_cv_file(
+    job_id: int, candidate_id: int, db: Annotated[Session, Depends(get_db)]
+) -> FileResponse:
+    """The applicant's CV file from the intake folder (PDF opens in the
+    browser, Word downloads). Not stored by the browser (no-store)."""
+    candidate = _applicant(db, job_id, candidate_id)
+    path = find_cv(job_id, candidate.id)
+    if path is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, FILE_MISSING)
+    return FileResponse(
+        path,
+        media_type=CV_MEDIA_TYPES[path.suffix],
+        filename=candidate.cv_filename or path.name,
+        content_disposition_type="inline" if path.suffix == ".pdf" else "attachment",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.delete("/{job_id}/cvs/{candidate_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_applicant(
+    job_id: int, candidate_id: int, db: Annotated[Session, Depends(get_db)]
+) -> Response:
+    """Remove an applicant: their data and their CV file (N19)."""
+    candidate = _applicant(db, job_id, candidate_id)
+    db.delete(candidate)
+    db.commit()
+    remove_cv(job_id, candidate_id)  # and the CV file
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -9,6 +9,7 @@ import HiringAssistantPage from './pages/assistant/HiringAssistantPage';
 import CandidateJoinPage from './pages/CandidateJoinPage';
 import ComingSoonPage from './pages/ComingSoonPage';
 import ErrorPage from './pages/ErrorPage';
+import JobPage from './pages/job/JobPage';
 import JobsPage from './pages/JobsPage';
 import KnowledgeBasePage from './pages/knowledge/KnowledgeBasePage';
 import LoginPage from './pages/LoginPage';
@@ -43,6 +44,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/jobs" replace /> },
       { path: 'assistant', element: <HiringAssistantPage />, handle: FULL_BLEED },
       { path: 'assistant/:jobId', element: <HiringAssistantPage />, handle: FULL_BLEED },
+      { path: 'jobs/:jobId', element: <JobPage /> },
       // Each module replaces its "coming soon" page with the real screen.
       ...NAV_ITEMS.filter((item) => item.path !== '/assistant').map((item) => ({
         path: item.path,

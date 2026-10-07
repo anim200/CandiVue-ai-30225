@@ -260,3 +260,39 @@ def test_interviewers_see_the_received_cvs(intake_dir, job_id):
     assert sorted(c["status"] for c in cvs) == ["received", "rejected"]
     assert job["cvs_received"] == 1  # the rejected file is not counted
     assert client.get(f"/api/jobs/{job_id}/cvs", headers=candidate).status_code == 403
+
+
+def test_interviewers_can_view_and_remove_an_applicant(intake_dir, job_id):
+    google = FakeGoogle(
+        [answer(job_id, "file-0000012")], {"file-0000012": ("cv.pdf", PDF)}
+    )
+    collect_round(google)
+    (candidate,) = candidates(job_id)
+    client = TestClient(app)
+    interviewer = {
+        "Authorization": f"Bearer {create_access_token(1, Role.INTERVIEWER)}"
+    }
+    url = f"/api/jobs/{job_id}/cvs/{candidate.id}"
+
+    response = client.get(f"{url}/file", headers=interviewer)
+
+    assert response.status_code == 200 and response.content == PDF
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["content-disposition"].startswith("inline")
+    # The applicant must belong to the job in the address.
+    other = f"/api/jobs/{job_id + 1}/cvs/{candidate.id}/file"
+    assert client.get(other, headers=interviewer).status_code == 404
+
+    assert client.delete(url, headers=interviewer).status_code == 204
+    assert candidates(job_id) == []
+    assert intake.find_cv(job_id, candidate.id) is None  # the file is gone too
+
+
+def test_candidates_cannot_view_or_remove_cvs(intake_dir, job_id):
+    client = TestClient(app)
+    candidate = {"Authorization": f"Bearer {create_access_token(1, Role.CANDIDATE)}"}
+    url = f"/api/jobs/{job_id}/cvs/1"
+
+    assert client.get(f"{url}/file", headers=candidate).status_code == 403
+    assert client.delete(url, headers=candidate).status_code == 403

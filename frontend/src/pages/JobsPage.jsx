@@ -1,5 +1,6 @@
 // Jobs list (design: Jobs.dc.html). Jobs are created through the Hiring
 // Assistant: the button makes an empty job and opens its chat (§4B-8).
+// Clicking a job opens its page with the applicants.
 // "CVs received" counts the CVs the CV Collector took from the Google Form.
 // Screening comes with the next steps; until then it shows "Not screened".
 
@@ -93,8 +94,8 @@ export default function JobsPage() {
           <div>Job</div>
           <div>CVs received</div>
           <div>Screening</div>
-          <div>Interviews</div>
-          <div>Updated</div>
+          <div className={classes.medium}>Interviews</div>
+          <div className={classes.medium}>Updated</div>
           <div />
         </div>
         {jobs.map((job) => (
@@ -102,17 +103,20 @@ export default function JobsPage() {
             type="button"
             key={job.id}
             className={classes.row}
-            onClick={() => navigate(`/assistant/${job.id}`)}
+            onClick={() => navigate(`/jobs/${job.id}`)}
           >
             <div className={classes.jobTitle}>{job.title}</div>
-            <div className={`${classes.number} ${classes.wide}`}>{job.cvs_received}</div>
-            <div>
+            <div className={`${classes.number} ${classes.cvs}`}>
+              {job.cvs_received}
+              <span className={classes.cvLabel}>{job.cvs_received === 1 ? ' CV' : ' CVs'}</span>
+            </div>
+            <div className={classes.status}>
               <StatusBadge tone="neutral" icon={<IconClock size={13} />}>
                 Not screened
               </StatusBadge>
             </div>
-            <div className={`${classes.muted} ${classes.wide}`}>—</div>
-            <div className={`${classes.muted} ${classes.wide}`}>{shortDate(job.updated_at)}</div>
+            <div className={`${classes.muted} ${classes.medium}`}>—</div>
+            <div className={`${classes.muted} ${classes.medium}`}>{shortDate(job.updated_at)}</div>
             <IconChevronRight size={16} className={classes.chevron} />
           </button>
         ))}
