@@ -1,9 +1,10 @@
 // One job's page (design: CV Screening Results.dc.html, JobHeader and the
 // "No CVs yet" state). Before screening exists it shows the applicants: the
-// CVs the CV Collector took from the job's Google Form. The ranking and
-// "Screen CVs" come here later. Interviewers only (route guard + backend).
+// CVs the CV Collector took from the job's Google Form, plus any the
+// interviewer added by hand ("Add CV"). The ranking and "Screen CVs" come
+// here later. Interviewers only (route guard + backend).
 
-import { Anchor, Button, Group, Modal, Text } from '@mantine/core';
+import { Anchor, Button, FileButton, Group, Modal, Text } from '@mantine/core';
 import {
   IconAlertTriangle,
   IconChevronRight,
@@ -14,11 +15,13 @@ import {
   IconMessageCircle,
   IconRefresh,
   IconTrash,
+  IconUpload,
+  IconX,
 } from '@tabler/icons-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 
-import { apiDelete, apiGet, apiGetFile } from '../../api/client';
+import { apiDelete, apiGet, apiGetFile, apiUpload } from '../../api/client';
 import { ErrorBanner, Skeleton } from '../../components/Feedback';
 import StatusBadge from '../../components/StatusBadge';
 import { STAGES } from '../assistant/labels';
@@ -63,6 +66,49 @@ async function openCv(jobId, applicant) {
   }
 }
 
+// "Add CV": pick one or a few PDF/Word files (checked again by the backend).
+function AddCvButton({ onFiles, busy, variant = 'default' }) {
+  return (
+    <FileButton
+      onChange={onFiles}
+      accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      multiple
+    >
+      {(props) => (
+        <Button {...props} variant={variant} loading={busy} leftSection={<IconUpload size={16} />}>
+          Add CV
+        </Button>
+      )}
+    </FileButton>
+  );
+}
+
+// What happened to each file of the last "Add CV": added, or why not.
+function UploadResults({ results, onClose }) {
+  const added = results.filter((r) => r.added).length;
+  return (
+    <div className={classes.uploadResults} role="status">
+      <div className={classes.uploadTop}>
+        <span>
+          {added} of {results.length} {results.length === 1 ? 'file' : 'files'} added
+        </span>
+        <button type="button" className={classes.closeButton} onClick={onClose} aria-label="Close">
+          <IconX size={15} />
+        </button>
+      </div>
+      <ul className={classes.uploadList}>
+        {results.map((result, index) => (
+          <li key={index} className={result.added ? classes.uploadOk : classes.uploadBad}>
+            {result.added ? <IconCircleCheck size={15} /> : <IconAlertTriangle size={15} />}
+            <span className={classes.uploadName}>{result.filename}</span>
+            {!result.added && <span>· {result.message}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 // One applicant row: who, when, which file, status and actions.
 function ApplicantRow({ applicant, onView, onRemove, viewing }) {
   const received = applicant.status !== 'rejected';
@@ -71,7 +117,10 @@ function ApplicantRow({ applicant, onView, onRemove, viewing }) {
       <div className={classes.row}>
         <div className={classes.who}>
           <span className={classes.name}>{applicant.full_name || 'Name not given'}</span>
-          <span className={classes.email}>{applicant.email || '—'}</span>
+          <span className={classes.email}>
+            {applicant.source === 'upload' && <span className={classes.source}>Added by hand</span>}
+            {applicant.email || (applicant.source === 'upload' ? '' : '—')}
+          </span>
         </div>
         <div className={classes.when}>{receivedAt(applicant.received_at)}</div>
         <div className={`${classes.file} ${classes.fileColumn}`} title={applicant.cv_filename}>
@@ -126,6 +175,9 @@ export default function JobPage() {
   const [removing, setRemoving] = useState(null); // applicant to confirm
   const [removeBusy, setRemoveBusy] = useState(false);
   const [actionError, setActionError] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadResults, setUploadResults] = useState(null); // last "Add CV" outcome
+  const [uploadProgress, setUploadProgress] = useState(null); // "3 of 19"
 
   // Load the job and its applicants.
   const load = useCallback(async () => {
@@ -154,6 +206,31 @@ export default function JobPage() {
     } finally {
       setViewingId(null);
     }
+  }
+
+  // Send the chosen files one at a time (small requests, progress shown);
+  // each file is added or refused on its own, and one failure never stops
+  // the rest.
+  async function addCvs(files) {
+    if (!files?.length) return;
+    setUploading(true);
+    setActionError(null);
+    setUploadResults(null);
+    const results = [];
+    for (const [index, file] of files.entries()) {
+      setUploadProgress(`${index + 1} of ${files.length}`);
+      const form = new FormData();
+      form.append('files', file);
+      try {
+        results.push(...(await apiUpload(`/jobs/${jobId}/cvs`, form)));
+      } catch (error) {
+        results.push({ filename: file.name, added: false, message: error.message });
+      }
+    }
+    setUploadResults(results);
+    setUploadProgress(null);
+    setUploading(false);
+    await load();
   }
 
   // Remove the confirmed applicant and their CV file.
@@ -213,6 +290,8 @@ export default function JobPage() {
             </div>
           </div>
           <Group gap={8} className={classes.headerActions}>
+            <AddCvButton onFiles={addCvs} busy={uploading} />
+            {uploadProgress && <span className={classes.progress}>Adding {uploadProgress}…</span>}
             {job.job_board_post_url && (
               <Button
                 component="a"
@@ -233,6 +312,7 @@ export default function JobPage() {
       </header>
 
       {actionError && <ErrorBanner title="That didn’t work.">{actionError}</ErrorBanner>}
+      {uploadResults && <UploadResults results={uploadResults} onClose={() => setUploadResults(null)} />}
 
       {applicants.length === 0 ? (
         <div className={classes.empty}>
@@ -254,6 +334,9 @@ export default function JobPage() {
               The job is not posted yet. Post it from the chat so people can apply.
             </Text>
           )}
+          <Text fz={14} c="#66717A">
+            Received a CV another way? Use <b>Add CV</b> to add it by hand.
+          </Text>
         </div>
       ) : (
         <section className={classes.card} aria-label="Applicants">

@@ -346,6 +346,16 @@ Google Form ─► Drive (CV file) + response Sheet (name, email, job, CV link)
   applicant and the CV file, N19). API (interviewers only):
   `GET /api/jobs/{id}/cvs`, `GET /api/jobs/{id}/cvs/{candidate}/file`,
   `DELETE /api/jobs/{id}/cvs/{candidate}`.
+- **Add CV (by hand):** for a CV received another way, or to load a set of
+  sample CVs, use **Add CV** on the job page (one or several PDF/DOCX files;
+  same checks; sent one file per request; shown as "Added by hand"; the name
+  is guessed from the file name until screening reads the CV).
+  API: `POST /api/jobs/{id}/cvs` (multipart `files`, at most 30 per request).
+  nginx accepts requests up to 25 MB (`client_max_body_size`).
+- **Synthetic test CVs:** `test-data/synthetic-cvs/` holds 20 made-up CVs for
+  the "PHP Laravel Developer" test job (strong, partial, excluded and edge
+  cases: scanned, DOCX, two-column, missing sections) and an answer key in
+  `EXPECTED.md`. Re-create them with `python test-data/synthetic-cvs/make_cvs.py`.
 - Without the settings below, the collector waits and logs "not set up yet".
 
 **One-time setup** (same Google Cloud project as the job board):

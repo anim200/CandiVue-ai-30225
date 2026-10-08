@@ -1,25 +1,40 @@
 """Jobs API: create a job (it starts a Hiring Assistant thread), list jobs,
-and a job's applicants: the CVs the CV Collector received (view, remove).
+and a job's applicants: the CVs the CV Collector received from the Google
+Form, or the interviewer uploaded by hand (fallback); view and remove them.
 
 Interviewers only (N9). Job profiles are filled in through the Hiring
 Assistant chat (§4B-8), not through a form.
 """
 
+import logging
+import re
 from datetime import datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import CurrentUser, require_interviewer
-from app.collector.intake import find_cv, remove_cv
+from app.collector.intake import CvRejected, check_cv, find_cv, remove_cv, save_cv
+from app.core.config import get_settings
 from app.db.database import get_db
 from app.db.models import Candidate, Job, JobDescription
 from app.db.models.candidate import CandidateStatus
 from app.db.models.job import JobBoardStatus, JobDescriptionStatus, JobStatus
+from app.knowledge.files import clean_filename
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/jobs", tags=["jobs"], dependencies=[Depends(require_interviewer)]
@@ -59,7 +74,16 @@ class CvOut(BaseModel):
     cv_filename: str
     status: CandidateStatus
     problem: str | None  # why it was rejected or could not be read
+    source: str  # "form" (Google Form, via the collector) or "upload" (by hand)
     received_at: datetime
+
+
+class UploadResult(BaseModel):
+    """What happened to one uploaded file."""
+
+    filename: str
+    added: bool
+    message: str  # "Added" or why the file was refused
 
 
 def job_stage(job: Job, latest_jd: JobDescription | None) -> str:
@@ -152,10 +176,69 @@ def list_cvs(job_id: int, db: Annotated[Session, Depends(get_db)]) -> list[CvOut
             cv_filename=c.cv_filename,
             status=c.status,
             problem=c.parse_error,
+            source="form" if c.drive_file_id else "upload",
             received_at=c.created_at,
         )
         for c in candidates
     ]
+
+
+MAX_FILES_PER_UPLOAD = 30
+NOT_A_NAME = {"cv", "resume", "curriculum", "vitae", "final", "updated", "new"}
+
+
+def name_from_filename(filename: str) -> str | None:
+    """A first guess at the applicant's name from the file name, e.g.
+    "02-alex_rowan-CV.pdf" -> "Alex Rowan" (parsing the CV replaces it later)."""
+    stem = filename.rsplit(".", 1)[0]
+    words = re.sub(r"[^A-Za-z]+", " ", stem).split()  # letters only
+    words = [word for word in words if word.lower() not in NOT_A_NAME]
+    return " ".join(word.capitalize() for word in words)[:200] or None
+
+
+@router.post("/{job_id}/cvs", response_model=list[UploadResult])
+def upload_cvs(
+    job_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    files: Annotated[list[UploadFile], File()],
+) -> list[UploadResult]:
+    """Add CVs by hand (fallback when the Google Form route is not available).
+    Same checks as the collector; each file gets its own result, and one
+    refused file does not stop the others."""
+    if db.get(Job, job_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, NOT_FOUND)
+    if len(files) > MAX_FILES_PER_UPLOAD:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"Upload at most {MAX_FILES_PER_UPLOAD} CVs at a time.",
+        )
+    max_bytes = get_settings().max_cv_mb * 1024 * 1024
+    results = []
+    for upload in files:
+        filename = clean_filename(upload.filename or "")
+        data = upload.file.read(max_bytes + 1)  # one byte more detects "too big"
+        try:
+            file_type = check_cv(data, filename)
+        except CvRejected as exc:
+            results.append(
+                UploadResult(filename=filename, added=False, message=str(exc))
+            )
+            continue
+        candidate = Candidate(
+            job_id=job_id, full_name=name_from_filename(filename), cv_filename=filename
+        )
+        db.add(candidate)
+        db.flush()  # the candidate's id names the file
+        save_cv(job_id, candidate.id, file_type, data)
+        db.commit()
+        results.append(UploadResult(filename=filename, added=True, message="Added"))
+    logger.info(
+        "CVs uploaded for job %d: %d added, %d refused",
+        job_id,
+        sum(r.added for r in results),
+        sum(not r.added for r in results),
+    )
+    return results
 
 
 def _applicant(db: Session, job_id: int, candidate_id: int) -> Candidate:

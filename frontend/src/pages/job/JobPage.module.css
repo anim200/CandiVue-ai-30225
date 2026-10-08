@@ -83,6 +83,91 @@
   flex-wrap: wrap;
 }
 
+/* ---- "Add CV" results ---- */
+
+.uploadResults {
+  background: #fff;
+  border: 1px solid #dee3e6;
+  border-radius: 8px;
+  padding: 12px 16px;
+  animation: fadeUp 0.25s ease-out;
+}
+
+.uploadTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.closeButton {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: #66717a;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.closeButton:hover {
+  background: #f1f4f5;
+}
+
+.uploadList {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.uploadList li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.uploadOk {
+  color: #245f3e;
+}
+
+.uploadBad {
+  color: #7a5000;
+}
+
+.uploadName {
+  font: 500 13px var(--mantine-font-family-monospace);
+  overflow-wrap: anywhere;
+}
+
+.progress {
+  font-size: 14px;
+  color: #48535b;
+  font-variant-numeric: tabular-nums;
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* "Added by hand" next to the email (CVs not from the Google Form). */
+.source {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #edf5f6;
+  color: #1c5d65;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 /* ---- Empty state (design 2c) ---- */
 
 .empty {
@@ -353,6 +438,15 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 

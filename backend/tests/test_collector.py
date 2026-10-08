@@ -296,3 +296,51 @@ def test_candidates_cannot_view_or_remove_cvs(intake_dir, job_id):
 
     assert client.get(f"{url}/file", headers=candidate).status_code == 403
     assert client.delete(url, headers=candidate).status_code == 403
+
+
+def test_interviewers_can_upload_cvs_by_hand(intake_dir, job_id):
+    client = TestClient(app)
+    interviewer = {
+        "Authorization": f"Bearer {create_access_token(1, Role.INTERVIEWER)}"
+    }
+    files = [
+        ("files", ("07-taylor_draft-CV.pdf", PDF, "application/pdf")),
+        ("files", ("cv.docx", docx_bytes(), "application/octet-stream")),
+        ("files", ("notes.txt", b"not a cv", "text/plain")),
+    ]
+
+    response = client.post(f"/api/jobs/{job_id}/cvs", headers=interviewer, files=files)
+
+    assert response.status_code == 200
+    results = response.json()
+    assert [r["added"] for r in results] == [True, True, False]
+    assert "PDF or Word" in results[2]["message"]  # one bad file, the rest added
+    first, second = candidates(job_id)
+    assert first.full_name == "Taylor Draft"  # guessed from the file name
+    assert second.full_name is None  # "cv.docx" has no name in it
+    assert intake.find_cv(job_id, first.id).suffix == ".pdf"
+    assert intake.find_cv(job_id, second.id).suffix == ".docx"
+    cvs = client.get(f"/api/jobs/{job_id}/cvs", headers=interviewer).json()
+    assert {c["source"] for c in cvs} == {"upload"}
+
+
+def test_an_upload_has_a_file_limit(intake_dir, job_id):
+    client = TestClient(app)
+    interviewer = {
+        "Authorization": f"Bearer {create_access_token(1, Role.INTERVIEWER)}"
+    }
+    files = [("files", (f"cv{i}.pdf", PDF, "application/pdf")) for i in range(31)]
+
+    response = client.post(f"/api/jobs/{job_id}/cvs", headers=interviewer, files=files)
+
+    assert response.status_code == 422 and candidates(job_id) == []
+
+
+def test_candidates_cannot_upload_cvs(job_id):
+    client = TestClient(app)
+    candidate = {"Authorization": f"Bearer {create_access_token(1, Role.CANDIDATE)}"}
+    files = [("files", ("cv.pdf", PDF, "application/pdf"))]
+
+    response = client.post(f"/api/jobs/{job_id}/cvs", headers=candidate, files=files)
+
+    assert response.status_code == 403
