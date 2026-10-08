@@ -1,4 +1,4 @@
-"""Make the 20 SYNTHETIC test CVs for the "PHP Laravel Developer" test job.
+"""Make the 28 SYNTHETIC test CVs for the "PHP Laravel Developer" test job.
 
 Every person here is made up (example.com emails, fake +880 1700-0000xx
 phone numbers). Each CV says "SYNTHETIC TEST CV" at the top. Real CVs must
@@ -9,11 +9,13 @@ preferred AWS certification. EXPECTED.md lists what screening should find.
 
 Run on Windows (needs Microsoft Edge to print PDFs, python-docx for Word):
     python test-data/synthetic-cvs/make_cvs.py
+    python test-data/synthetic-cvs/make_cvs.py 21 22   (only these)
 """
 
 import html
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from docx import Document
@@ -395,6 +397,126 @@ CVS = [
         "skills": {"Skills": "PHP, Laravel, Docker"},
         "projects": [],
     },
+    {
+        # No job dates at all: the years are only stated in the summary.
+        "file": "21-jesse-undated", "layout": "classic",
+        "name": "Jesse Undated", "role": "Senior PHP Developer", "phone": "21", "city": "Dhaka",
+        "summary": "Senior PHP developer with 7 years of experience building Laravel applications. Every project I ship runs in Docker.",
+        "jobs": [
+            job("Senior PHP Developer", "Northwind Software, Dhaka", "",
+                "Leads a team building Laravel 10 REST APIs for logistics clients.",
+                "Moved all services to Docker and Docker Compose."),
+            job("PHP Developer", "Contoso Web, Dhaka", "",
+                "Built Laravel admin panels and payment integrations."),
+        ],
+        "education": [("BSc in Computer Science and Engineering", "Sample University", "2012 – 2016")],
+        "certs": [],
+        "skills": {"Skills": "PHP, Laravel, MySQL, Redis, Docker, Git"},
+        "projects": [],
+    },
+    {
+        # "Till Date" and "01.2018" dates, Docker only in a line with "no",
+        # "PHP8", and "Scrum Master" with no education section.
+        "file": "22-parker-tilldate", "layout": "modern",
+        "name": "Parker Sampleton", "role": "PHP Laravel Developer", "phone": "22", "city": "Chattogram",
+        "summary": "Laravel developer focused on reliable, repeatable releases.",
+        "jobs": [
+            job("PHP Laravel Developer", "Fabrikam Systems, Chattogram", "Jan 2020 – Till Date",
+                "Builds Laravel 10 APIs in PHP8 for an e-commerce platform.",
+                "Zero-downtime releases with no manual steps using Docker and GitHub Actions."),
+            job("Junior PHP Developer", "Litware BD, Chattogram", "01.2018 – 12.2019",
+                "Maintained Laravel and plain PHP sites."),
+        ],
+        "education": [],
+        "certs": ["Certified Scrum Master (2023)"],
+        "skills": {"Skills": "PHP8, Laravel, MySQL, GitHub Actions"},
+        "projects": [],
+    },
+    # 23-28: small Word CVs for trying the local-model cases by hand.
+    {
+        # No job dates and no years anywhere: years unknown, not excluded.
+        "file": "23-nia-nodates", "layout": "docx",
+        "name": "Nia Nodates", "role": "PHP Developer", "phone": "23", "city": "Dhaka",
+        "summary": "PHP developer who builds Laravel APIs for online shops.",
+        "jobs": [
+            job("PHP Developer", "Company X, Dhaka", "",
+                "Builds PHP and Laravel APIs that run in Docker."),
+        ],
+        "education": [("BSc in Computer Science", "Sample University", "2014 – 2018")],
+        "certs": [], "skills": {"Skills": "PHP, Laravel, Docker, MySQL"}, "projects": [],
+    },
+    {
+        # No job dates; years in words ("six"): the local model reads 6.
+        "file": "24-omar-sixwords", "layout": "docx",
+        "name": "Omar Sixwords", "role": "Laravel Developer", "phone": "24", "city": "Khulna",
+        "summary": "Over six years of professional PHP and Laravel work, all of it shipped in Docker containers.",
+        "jobs": [
+            job("Laravel Developer", "Adventure Works BD, Khulna", "",
+                "Builds Laravel 11 APIs for a travel booking platform.",
+                "Runs every service with Docker Compose."),
+            job("PHP Developer", "Blue Yonder Web, Khulna", "",
+                "Maintained PHP shops and payment pages."),
+        ],
+        "education": [("BSc in Computer Science and Engineering", "Sample University", "2013 – 2017")],
+        "certs": [], "skills": {"Skills": "PHP, Laravel, Docker, Redis"}, "projects": [],
+    },
+    {
+        # No job dates; 3 years stated: the local model reads 3 → excluded.
+        "file": "25-lina-threeyears", "layout": "docx",
+        "name": "Lina Threeyears", "role": "PHP Developer", "phone": "25", "city": "Rajshahi",
+        "summary": "PHP developer with 3 years of experience in Laravel and Docker.",
+        "jobs": [
+            job("PHP Developer", "Wide World Web, Rajshahi", "",
+                "Builds Laravel admin panels; local setup in Docker."),
+        ],
+        "education": [("BSc in Computer Science", "Sample University", "2017 – 2021")],
+        "certs": [], "skills": {"Skills": "PHP, Laravel, Docker"}, "projects": [],
+    },
+    {
+        # Docker only as a wish: excluded (the second look agrees).
+        "file": "26-hana-wishful", "layout": "docx",
+        "name": "Hana Wishful", "role": "Senior PHP Developer", "phone": "26", "city": "Dhaka",
+        "summary": "Laravel developer. Interested in learning Docker and Kubernetes next year.",
+        "jobs": [
+            job("Senior PHP Developer", "Proseware Ltd, Dhaka", "Feb 2019 – Present",
+                "Builds Laravel 10 APIs and deploys them to a VPS with Forge."),
+            job("PHP Developer", "Lucerne Web, Dhaka", "Jan 2017 – Jan 2019",
+                "Built PHP sites with Laravel and MySQL."),
+        ],
+        "education": [("BSc in Computer Science", "Sample University", "2012 – 2016")],
+        "certs": [], "skills": {"Skills": "PHP, Laravel, MySQL, Forge"}, "projects": [],
+    },
+    {
+        # Docker never named: "container images ... Compose files". Found by
+        # meaning or by the local model's second look: ranked either way.
+        "file": "27-ravi-containers", "layout": "docx",
+        "name": "Ravi Containers", "role": "PHP Laravel Developer", "phone": "27", "city": "Sylhet",
+        "summary": "Laravel developer who cares about reproducible environments.",
+        "jobs": [
+            job("PHP Laravel Developer", "Tailwind Traders BD, Sylhet", "Mar 2020 – Present",
+                "Packages every Laravel service into container images and runs them with Compose files."),
+            job("PHP Developer", "Northwind Web, Sylhet", "Jan 2018 – Feb 2020",
+                "Built PHP and Laravel booking pages."),
+        ],
+        "education": [("BSc in Software Engineering", "Sample University", "2013 – 2017")],
+        "certs": [], "skills": {"Skills": "PHP, Laravel, MySQL, Linux"}, "projects": [],
+    },
+    {
+        # Date formats only the new rules read: "Since March 2019" and
+        # "06.2016 – 02.2019" → about 10 years.
+        "file": "28-mei-since", "layout": "docx",
+        "name": "Mei Since", "role": "Lead PHP Developer", "phone": "28", "city": "Dhaka",
+        "summary": "Lead PHP developer for Laravel platforms running in Docker.",
+        "jobs": [
+            job("Lead PHP Developer", "Fourth Coffee Tech, Dhaka", "Since March 2019",
+                "Leads Laravel 11 development; every service runs in Docker."),
+            job("PHP Developer", "Margie's Travel BD, Dhaka", "06.2016 – 02.2019",
+                "Built Laravel APIs for flight search."),
+        ],
+        "education": [("MSc in Computer Science", "Sample University", "2014 – 2016")],
+        "certs": ["AWS Certified Developer – Associate (2024)"],
+        "skills": {"Skills": "PHP, Laravel, Docker, AWS, Redis"}, "projects": [],
+    },
 ]
 
 BASE_CSS = """
@@ -444,7 +566,8 @@ def sections(cv: dict) -> dict:
     if cv["summary"]:
         parts["summary"] = f"<h2>{esc(names['summary'])}</h2><p>{esc(cv['summary'])}</p>"
     jobs = "".join(
-        f'<div class="job"><div class="head">{esc(j["title"])} · {esc(j["dates"])}</div>'
+        f'<div class="job"><div class="head">{esc(j["title"])}'
+        f'{" · " + esc(j["dates"]) if j["dates"] else ""}</div>'
         f'<div class="sub">{esc(j["company"])}</div>'
         f'<ul>{"".join(f"<li>{esc(b)}</li>" for b in j["bullets"])}</ul></div>'
         for j in cv["jobs"]
@@ -533,7 +656,8 @@ def make_docx(cv: dict) -> None:
     doc.add_paragraph(cv["summary"])
     doc.add_heading("Work Experience", level=1)
     for j in cv["jobs"]:
-        doc.add_paragraph(f"{j['title']} · {j['dates']}", style="Heading 3")
+        dates = f" · {j['dates']}" if j["dates"] else ""
+        doc.add_paragraph(f"{j['title']}{dates}", style="Heading 3")
         doc.add_paragraph(j["company"])
         for b in j["bullets"]:
             doc.add_paragraph(b, style="List Bullet")
@@ -549,11 +673,15 @@ def make_docx(cv: dict) -> None:
 
 
 def main() -> None:
-    """Make all 20 CVs in this folder."""
+    """Make the CVs in this folder: all of them, or only those whose file
+    name starts with one of the arguments (e.g. "21 22")."""
     if EDGE is None:
         raise SystemExit("Microsoft Edge was not found: it is needed to print the PDFs.")
     BUILD.mkdir(exist_ok=True)
+    only = sys.argv[1:]
     for cv in CVS:
+        if only and not cv["file"].startswith(tuple(only)):
+            continue
         if cv["layout"] == "docx":
             make_docx(cv)
         elif cv.get("scanned"):

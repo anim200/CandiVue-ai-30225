@@ -1,6 +1,6 @@
 # Synthetic test CVs: answer key
 
-20 **made-up** CVs (example.com emails, fake phone numbers, "SYNTHETIC TEST CV"
+28 **made-up** CVs (example.com emails, fake phone numbers, "SYNTHETIC TEST CV"
 on each). They are for development and testing only; the final demo uses the
 trainer's sample CVs (requirement.md N13, CN5). Re-create them with
 `python test-data/synthetic-cvs/make_cvs.py` (needs Microsoft Edge and
@@ -33,8 +33,18 @@ Docker. Preferred: AWS certification. Years are counted up to October 2026.
 | 18 | 18-reese-docx.docx | ~5.1 | Middle | **DOCX test:** Word file, with a skills table |
 | 19 | 19-skyler-twocol.pdf | ~7.9 | Top–middle | **Layout test:** two columns, odd headings ("Where I've worked", "Toolbox"), dates like "03/2022 – now" |
 | 20 | 20-drew-minimal.pdf | ~10 | Middle–low | **Missing sections:** no summary, no education, one line of skills, "2016 – present" |
+| 21 | 21-jesse-undated.pdf | 7 (stated) | Top–middle | **No job dates:** years only in the summary ("7 years of experience"), read by the local model with the quote |
+| 22 | 22-parker-tilldate.pdf | ~8.8 | Middle | **Rule gaps:** "Jan 2020 – Till Date" and "01.2018 – 12.2019"; Docker only in "no manual steps using Docker" (still counts); "PHP8"; "Certified Scrum Master" with no education (no degree) |
+| 23 | 23-nia-nodates.docx | unknown | Ranked + ⚠ | **No dates, no years anywhere:** not excluded; experience 0; "please check" calendar icon |
+| 24 | 24-omar-sixwords.docx | 6 (stated) | Ranked | **No dates, years in words** ("Over six years"): read by the local model |
+| 25 | 25-lina-threeyears.docx | 3 (stated) | **Excluded** | **No dates, 3 years stated:** "About 3 years (read by the local model; no job dates found)" |
+| 26 | 26-hana-wishful.docx | ~9.8 | **Excluded** | **Wish only:** "Interested in learning Docker" does not count (the second look agrees) |
+| 27 | 27-ravi-containers.docx | ~8.8 | Ranked | **Docker never named:** "container images ... Compose files", found by meaning or by the local model's second look |
+| 28 | 28-mei-since.docx | ~10.4 | Top group | **New date formats:** "Since March 2019" and "06.2016 – 02.2019"; MSc; AWS cert |
 
 Notes:
+- 23-28 are small Word files for trying the local-model cases by hand
+  (upload them with **Add CV** on the job page).
 - "Excluded" = fails a mandatory requirement, so not ranked (trainer
   clarification, requirement.md F1).
 - The minimum years are treated as mandatory here (the profile says "5+ years").
