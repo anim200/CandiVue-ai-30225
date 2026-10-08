@@ -27,11 +27,25 @@ class RequirementCategory(StrEnum):
 
 
 class Requirement(BaseModel):
-    """One job requirement, e.g. "PostgreSQL" (required skill)."""
+    """One job requirement, e.g. "PostgreSQL" (required skill), and other
+    names that CV screening should accept for it (made once per job, so
+    screening needs no LLM per CV)."""
 
     text: str = Field(min_length=2, max_length=200)
     level: RequirementLevel
     category: RequirementCategory
+    also_counts: list[str] = Field(
+        default_factory=list,
+        max_length=8,
+        description="Other names or tools that clearly show this requirement, "
+        "e.g. for Docker: Docker Compose, Dockerfile, Laravel Sail",
+    )
+    related: list[str] = Field(
+        default_factory=list,
+        max_length=8,
+        description="A close substitute (counts as partly met), "
+        "e.g. for Docker: Podman",
+    )
 
 
 class JobProfile(BaseModel):

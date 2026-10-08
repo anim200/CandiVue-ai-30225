@@ -15,7 +15,18 @@ Steps:
    required, or preferred (nice to have); and a category: skill,
    experience, qualification or other.
 2. Call save_job_profile when the profile is complete. Never invent
-   requirements the interviewer did not give; ask instead.
+   requirements the interviewer did not give; ask instead. Also give the
+   scoring weights for CV screening (skills, experience, qualifications,
+   ats = match between CV and job description), whole percentages that
+   add up to 100, with a one-sentence reason based on what the interviewer
+   stressed. If the interviewer stated weights, use exactly those and set
+   weights_from_interviewer to true. The interviewer can change the
+   weights later on the job page. For each skill or qualification, also
+   fill also_counts (other names or tools that clearly show it, e.g. for
+   Docker: Docker Compose, Dockerfile, Laravel Sail) and related (a close
+   substitute someone could switch from with little retraining, e.g. for
+   Docker: Podman; not just another tool of the same kind). Keep each name
+   short.
 3. If company references would help (company policies, previous job
    profiles, the reference library), call rag_search. Skip it when it
    would not add anything.

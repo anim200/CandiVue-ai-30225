@@ -24,6 +24,7 @@ from app.db.models import Job, JobDescription
 from app.db.models.job import JobBoardStatus, JobDescriptionStatus
 from app.db.models.knowledge import KnowledgeCollection
 from app.knowledge.search import search_knowledge
+from app.screening.weights import SuggestedWeights
 
 logger = logging.getLogger(__name__)
 
@@ -32,18 +33,36 @@ RAG_RESULTS = 4  # passages returned per search
 
 @tool(response_format="content_and_artifact")
 def save_job_profile(
-    profile: JobProfile, job_id: Annotated[int, InjectedState("job_id")]
+    profile: JobProfile,
+    job_id: Annotated[int, InjectedState("job_id")],
+    weights: SuggestedWeights | None = None,
+    weights_from_interviewer: bool = False,
 ) -> tuple[str, dict]:
     """Save the job profile (title, minimum experience and every requirement
-    with its level and category). Call it when the profile is complete."""
+    with its level and category) and the scoring weights for CV screening:
+    skills, experience, qualifications and ats (CV to job description match)
+    as whole percentages adding up to 100, with a one-sentence reason. Set
+    weights_from_interviewer=true only if the interviewer gave the weights.
+    Call it when the profile is complete."""
     saved = profile.model_dump(mode="json")
+    chosen = weights.model_dump(mode="json") if weights else None
+    source = "interviewer" if weights_from_interviewer else "ai"
     with SessionLocal() as db:
         job = db.get(Job, job_id)
         job.title = profile.title
         job.profile = saved
+        if chosen and source == "interviewer":
+            job.weights = chosen  # the interviewer's own numbers: they win
+        elif chosen:
+            job.ai_weights = chosen  # a suggestion; the interviewer may change it
         db.commit()
     logger.info("Job profile saved: job %d", job_id)
-    return "The job profile is saved.", {"kind": "profile", "profile": saved}
+    # Without weights, screening uses the defaults (app/screening/weights.py).
+    return "The job profile is saved.", {
+        "kind": "profile",
+        "profile": saved,
+        "weights": {**chosen, "source": source} if chosen else None,
+    }
 
 
 @tool(response_format="content_and_artifact")

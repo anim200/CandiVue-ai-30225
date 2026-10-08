@@ -33,6 +33,7 @@ from app.db.models import Candidate, Job, JobDescription
 from app.db.models.candidate import CandidateStatus
 from app.db.models.job import JobBoardStatus, JobDescriptionStatus, JobStatus
 from app.knowledge.files import clean_filename
+from app.screening.weights import ScoringWeights, effective_weights
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,9 @@ class JobOut(BaseModel):
     google_form_url: str | None = None
     job_board_post_url: str | None = None
     cvs_received: int = 0  # usable CVs collected (rejected files not counted)
+    # The weights screening will use, with "source": interviewer / ai / default.
+    weights: dict[str, Any]
+    ai_weights: dict[str, Any] | None = None  # the AI suggestion, if any
     updated_at: datetime
 
 
@@ -125,6 +129,8 @@ def to_job_out(db: Session, job: Job) -> JobOut:
                 Candidate.status != CandidateStatus.REJECTED,
             )
         ),
+        weights=effective_weights(job),
+        ai_weights=job.ai_weights,
         updated_at=max(job.updated_at, latest.updated_at) if latest else job.updated_at,
     )
 
@@ -239,6 +245,32 @@ def upload_cvs(
         sum(not r.added for r in results),
     )
     return results
+
+
+@router.put("/{job_id}/weights", response_model=JobOut)
+def set_weights(
+    job_id: int, body: ScoringWeights, db: Annotated[Session, Depends(get_db)]
+) -> JobOut:
+    """Save the interviewer's scoring weights; they win over the AI suggestion."""
+    job = db.get(Job, job_id)
+    if job is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, NOT_FOUND)
+    job.weights = body.model_dump(mode="json")
+    db.commit()
+    logger.info("Scoring weights set by the interviewer: job %d", job_id)
+    return to_job_out(db, job)
+
+
+@router.delete("/{job_id}/weights", response_model=JobOut)
+def reset_weights(job_id: int, db: Annotated[Session, Depends(get_db)]) -> JobOut:
+    """Forget the interviewer's weights: the AI suggestion (or the defaults)
+    applies again."""
+    job = db.get(Job, job_id)
+    if job is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, NOT_FOUND)
+    job.weights = None
+    db.commit()
+    return to_job_out(db, job)
 
 
 def _applicant(db: Session, job_id: int, candidate_id: int) -> Candidate:

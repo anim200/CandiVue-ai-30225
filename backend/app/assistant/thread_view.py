@@ -74,7 +74,13 @@ def thread_items(db: Session, messages: list) -> list[dict]:
             elif kind == "profile" and artifact["profile"] != last_profile:
                 last_profile = artifact["profile"]
                 items.append({"kind": "step", "text": STEP_TEXT["save_job_profile"]})
-                items.append({"kind": "profile", "profile": artifact["profile"]})
+                items.append(
+                    {
+                        "kind": "profile",
+                        "profile": artifact["profile"],
+                        "weights": artifact.get("weights"),
+                    }
+                )
             elif kind == "form":
                 items.append(
                     {"kind": "step", "text": "Saved the application form link"}

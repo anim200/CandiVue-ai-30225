@@ -49,6 +49,11 @@ class Job(TimestampMixin, Base):
     created_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
     )
+    # Scoring weights for screening (F2), e.g. {"skills": 40, "experience": 30,
+    # "qualifications": 10, "ats": 20, "reason": "..."}. The interviewer's
+    # weights win; otherwise the AI suggestion; otherwise fixed defaults.
+    weights: Mapped[dict[str, Any] | None] = mapped_column(JSONB)  # interviewer
+    ai_weights: Mapped[dict[str, Any] | None] = mapped_column(JSONB)  # Hiring Assistant
 
 
 class JobDescriptionStatus(StrEnum):

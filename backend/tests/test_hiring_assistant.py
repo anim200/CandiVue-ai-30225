@@ -595,3 +595,31 @@ def test_the_same_profile_saved_twice_is_shown_once():
     items = thread_items(None, [saved, saved])
 
     assert [i["kind"] for i in items] == ["step", "profile"]
+
+
+def test_profile_weights_are_a_suggestion_unless_the_interviewer_gave_them(
+    client, headers
+):
+    from app.assistant.schemas import JobProfile
+    from app.screening.weights import SuggestedWeights
+
+    job_id = new_job(client, headers)
+    profile = JobProfile.model_validate(PROFILE)  # as LangChain passes them
+    weights = SuggestedWeights(
+        skills=40,
+        experience=30,
+        qualifications=10,
+        ats=20,
+        reason="Skills matter most for this role.",
+    )
+
+    tools.save_job_profile.func(profile, job_id, weights)
+    with SessionLocal() as db:
+        job = db.get(Job, job_id)
+        assert job.ai_weights["skills"] == 40 and job.weights is None
+
+    tools.save_job_profile.func(profile, job_id, weights, weights_from_interviewer=True)
+    with SessionLocal() as db:
+        assert (
+            db.get(Job, job_id).weights["reason"] == "Skills matter most for this role."
+        )
