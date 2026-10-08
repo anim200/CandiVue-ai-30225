@@ -9,10 +9,13 @@ requirement, in this order:
 3. otherwise the line closest in meaning decides (cosine similarity):
    met / partly met / not met. This lets "built REST services in Django"
    count for "Python web development" (F1).
-A line that says the opposite ("has not used Laravel") never counts.
+A line that says the opposite ("has not used Laravel") or only a wish
+("interested in learning Docker") never counts. A version number does not
+hide a name ("PHP8" counts for PHP).
 Evidence is always a real line of the CV, so every result can be checked.
 No LLM is called here: the AI knowledge comes from the job profile, made
-once per job.
+once per job. (A mandatory requirement still not found is checked once more
+by the local model before anyone is excluded: see local_model.py.)
 """
 
 import math
@@ -35,7 +38,25 @@ INSTRUCTION = (
 YEARS_IN_TEXT = re.compile(r"(\d+)\s*\+?\s*years?", re.IGNORECASE)
 EMAIL_OR_PHONE = re.compile(r"@|\+?\d[\d\s()-]{7,}\d")
 # "Has not used Laravel", "No PHP experience": a mention that says the opposite.
-NEGATION = r"\b(?:no|not|never|without|lacks?|lacking|hasn't|haven't|don't|doesn't)\b"
+# "not only" / "not just" are not a denial ("not only PHP but also Laravel").
+NEGATION = (
+    r"\b(?:no|not(?!\s+(?:only|just)\b)|never|without|lacks?|lacking|"
+    r"hasn't|haven't|don't|doesn't)\b"
+)
+# Words that may stand between the denial and the name ("has not USED
+# Laravel", "no EXPERIENCE WITH Docker"). Any other word ends the denial, so
+# "no manual steps using Docker" still counts for Docker.
+DENIAL_FILLER = (
+    r"(?:used|use|using|worked|work|with|in|on|any|much|prior|real|"
+    r"professional|professionally|commercial|hands-on|experience|knowledge|"
+    r"of|familiar|exposure|to|the|a|an|yet)"
+)
+# "Interested in learning Docker": a wish, not experience.
+WISH = (
+    r"\b(?:interested in|keen to|eager to|wants? to|would like to|plans? to|"
+    r"planning to|hopes? to|aspires? to|looking to|currently learning|"
+    r"am learning|to learn)\b"
+)
 
 Passage = tuple[str, str, list[float]]  # (section, line, embedding)
 
@@ -69,10 +90,11 @@ def requirement_vectors(requirements: list[dict]) -> dict[str, list[float]]:
 def match_requirements(
     requirements: list[dict],
     passages: list[Passage],
-    years_experience: float,
+    years_experience: float | None,
     vectors: dict[str, list[float]] | None = None,
 ) -> list[dict]:
     """met / partly / unmet for each requirement, with the evidence line.
+    `years_experience`: None when the CV's years could not be read.
     `vectors`: requirement embeddings from requirement_vectors() (optional)."""
     return [
         match_requirement(
@@ -88,7 +110,7 @@ def match_requirements(
 def match_requirement(
     requirement: dict,
     passages: list[Passage],
-    years_experience: float,
+    years_experience: float | None,
     vector: list[float] | None = None,
 ) -> dict:
     """Decide one requirement (see the module docstring for the order).
@@ -104,9 +126,7 @@ def match_requirement(
         status, decided_by, similarity, found = "partial", "related", 1.0, related
     else:
         status, similarity, found = _closest(text, passages, vector)
-    # "5 years of PHP": the years must be there too (whole career, see README).
-    needed = YEARS_IN_TEXT.search(text)
-    if needed and years_experience < int(needed.group(1)):
+    if too_few_years(text, years_experience):
         status = "unmet" if status != "met" else "partial"
     show = status != "unmet" and found is not None
     return {
@@ -122,16 +142,32 @@ def match_requirement(
     }
 
 
-def _name_pattern(name: str) -> str:
-    """Regex for a name as a whole word (so "Java" does not match "JavaScript")."""
-    return rf"(?<![\w-]){re.escape(name)}(?![\w-])"
-
-
-def _negated(line: str, name: str) -> bool:
-    """True when the line says the candidate does NOT have it."""
+def too_few_years(requirement_text: str, years_experience: float | None) -> bool:
+    """ "5 years of PHP": True when the CV has fewer years (whole career, see
+    README). Unknown years (None) never count against the candidate."""
+    needed = YEARS_IN_TEXT.search(requirement_text)
     return bool(
-        re.search(rf"{NEGATION}[^.;]{{0,30}}{_name_pattern(name)}", line, re.IGNORECASE)
+        needed
+        and years_experience is not None
+        and years_experience < int(needed.group(1))
     )
+
+
+def _name_pattern(name: str) -> str:
+    """Regex for a name as a whole word (so "Java" does not match
+    "JavaScript"); a version number may follow ("PHP8", "Laravel10")."""
+    return rf"(?<![\w-]){re.escape(name)}(?![A-Za-z_-])"
+
+
+def negated(line: str, name: str) -> bool:
+    """True when the line does not claim it: it denies it ("has not used
+    Laravel") or only wishes for it ("interested in learning Docker")."""
+    name_re = _name_pattern(name)
+    denied = re.search(
+        rf"{NEGATION}(?:\s+{DENIAL_FILLER}){{0,3}}\s+{name_re}", line, re.IGNORECASE
+    )
+    wished = re.search(rf"{WISH}[^.;]{{0,40}}{name_re}", line, re.IGNORECASE)
+    return bool(denied or wished)
 
 
 def _mention(names: list[str], passages: list[Passage]) -> tuple[str, str, str] | None:
@@ -143,7 +179,7 @@ def _mention(names: list[str], passages: list[Passage]) -> tuple[str, str, str] 
             continue
         pattern = re.compile(_name_pattern(name), re.IGNORECASE)
         for section, line, _vector in passages:
-            if pattern.search(line) and not _negated(line, name):
+            if pattern.search(line) and not negated(line, name):
                 hits.append((section, line, name))
     hits.sort(key=lambda hit: hit[0] != "experience")  # work history first
     return hits[0] if hits else None
@@ -154,7 +190,7 @@ def _closest(
 ) -> tuple[str, float, tuple[str, str, str] | None]:
     """The line closest in meaning (skipping lines that deny it) and the
     status it gives. `vector`: the requirement's embedding if already made."""
-    usable = [p for p in passages if not _negated(p[1], text)]
+    usable = [p for p in passages if not negated(p[1], text)]
     if not usable:
         return "unmet", 0.0, None
     query = vector or embed_query(INSTRUCTION + text)

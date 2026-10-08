@@ -5,10 +5,17 @@ certifications, skills, projects), jobs with their dates, total years of
 experience (overlapping jobs counted once), the highest degree and the
 certifications. No AI and no network: the same text always gives the same
 result. Semantic matching happens later (matching.py).
+
+When no job dates can be read, "years_source" is "unknown": the screening
+workflow then asks the local model (local_model.py), and if that finds
+nothing either, the years are not used to exclude anyone.
 """
 
 import re
 from datetime import UTC, date, datetime
+
+# Bump when the rules change, so CVs parsed by older rules are parsed again.
+PARSER_VERSION = 2
 
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 PHONE = re.compile(r"\+?\d[\d\s()-]{7,}\d")
@@ -64,12 +71,15 @@ MONTHS = {
     for name in names
 }
 MONTH_NAMES = "|".join(sorted(MONTHS, key=len, reverse=True))
-POINT = rf"(?:(?:{MONTH_NAMES})\.?\s+\d{{4}}|\d{{1,2}}/\d{{4}}|\d{{4}})"
-NOW_WORDS = r"present|now|current|today|ongoing"
+# "Jan 2020", "Jan. 2020", "Jan, 2020", "03/2020", "03.2020" or "2020".
+POINT = rf"(?:(?:{MONTH_NAMES})\.?,?\s+\d{{4}}|\d{{1,2}}[/.]\d{{4}}|\d{{4}})"
+NOW_WORDS = r"till date|till now|to date|present|current|today|ongoing|now|date"
 DATE_RANGE = re.compile(
-    rf"(?P<start>{POINT})\s*(?:–|—|-|to)\s*(?P<end>{POINT}|{NOW_WORDS})",
+    rf"(?P<start>{POINT})\s*(?:–|—|-|to|until|till|through)\s*"
+    rf"(?P<end>{POINT}|{NOW_WORDS})",
     re.IGNORECASE,
 )
+SINCE = re.compile(rf"\bsince\s+(?P<start>{POINT})", re.IGNORECASE)  # "Since 2019"
 
 DEGREES = [  # (level name, score order, pattern) - highest first
     ("doctorate", 4, re.compile(r"\b(ph\.?\s?d|doctor(ate)? of)\b", re.IGNORECASE)),
@@ -77,7 +87,11 @@ DEGREES = [  # (level name, score order, pattern) - highest first
         "master",
         3,
         re.compile(
-            r"\b(m\.?\s?sc|master'?s?|mba|m\.?\s?eng|m\.?\s?tech)\b", re.IGNORECASE
+            # "Master" only as a degree ("Master of", "Master's in"), so
+            # "Scrum Master" is not read as a master's degree.
+            r"\b(m\.?\s?sc|mba|m\.?\s?eng|m\.?\s?tech|"
+            r"masters?['’]?s?(?=\s+(?:of|in|degree)\b))",
+            re.IGNORECASE,
         ),
     ),
     (
@@ -117,6 +131,11 @@ def parse_cv(text: str, today: date | None = None) -> dict:
         "sections": {name: "\n".join(body) for name, body in sections.items()},
         "jobs": jobs,
         "years_experience": total_years(jobs),
+        # "dates": from the job dates; "unknown": no job dates could be read
+        # (the screening workflow may then fill it in, see local_model.py).
+        "years_source": "dates" if jobs else "unknown",
+        "years_evidence": [],
+        "parser_version": PARSER_VERSION,
         "degree": highest_degree("\n".join(sections.get("education") or lines)),
         "certifications": find_certifications(lines, sections),
     }
@@ -157,18 +176,18 @@ def find_name(lines: list[str], email: str | None) -> str | None:
 
 
 def find_jobs(lines: list[str], today: date) -> list[dict]:
-    """Each line with a date range is a job: its title and its months."""
+    """Each line with a date range ("Jan 2020 – Till Date") or "Since 2019"
+    is a job: its title and its months."""
     jobs = []
     for line in lines:
-        match = DATE_RANGE.search(line)
+        match = DATE_RANGE.search(line) or SINCE.search(line)
         if not match:
             continue
         start = _point(match["start"], is_end=False)
-        end = (
-            today_point(today)
-            if re.fullmatch(NOW_WORDS, match["end"], re.IGNORECASE)
-            else _point(match["end"], is_end=True)
+        ends_now = "end" not in match.groupdict() or re.fullmatch(
+            NOW_WORDS, match["end"], re.IGNORECASE
         )
+        end = today_point(today) if ends_now else _point(match["end"], is_end=True)
         if not start or not end or end < start:
             continue
         title = re.sub(r"[\s·|,–—-]+$", "", line[: match.start()]).strip()
@@ -242,11 +261,11 @@ def today_point(today: date) -> tuple[int, int]:
 
 
 def _point(text: str, is_end: bool) -> tuple[int, int] | None:
-    """(year, month) from "Jan 2020", "03/2020" or "2020" (a bare year means
-    January for a start and December for an end)."""
-    text = text.strip().lower().rstrip(".")
-    if "/" in text:
-        month, year = text.split("/")
+    """(year, month) from "Jan 2020", "Jan, 2020", "03/2020", "03.2020" or
+    "2020" (a bare year means January for a start and December for an end)."""
+    text = text.strip().lower().rstrip(".").replace(",", " ")
+    if re.fullmatch(r"\d{1,2}[/.]\d{4}", text):
+        month, year = re.split(r"[/.]", text)
         return int(year), int(month) if 1 <= int(month) <= 12 else 1
     parts = text.replace(".", " ").split()
     if len(parts) == 2:

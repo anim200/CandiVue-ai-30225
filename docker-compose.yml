@@ -37,6 +37,7 @@ services:
       LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0}
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-ollama}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-qwen3-embedding:0.6b}
+      SCREENING_MODEL: ${SCREENING_MODEL:-qwen3:4b-instruct}
       OLLAMA_BASE_URL: http://ollama:11434
       JOBBOARD_MCP_URL: http://jobboard-mcp:8001/mcp
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-20}
@@ -56,7 +57,7 @@ services:
       db:
         condition: service_healthy
       ollama-pull:
-        condition: service_completed_successfully  # embedding model is ready
+        condition: service_completed_successfully  # local models are ready
       jobboard-mcp:
         condition: service_healthy
     healthcheck:
@@ -65,8 +66,9 @@ services:
       timeout: 5s
       retries: 5
 
-  # Local embedding model for the knowledge base (RAG). Document text never
-  # leaves this machine. No "ports": only the backend can reach it.
+  # Local models: embeddings for the knowledge base (RAG) and CV screening,
+  # and the screening model (local_model.py). Text never leaves this
+  # machine. No "ports": only the backend can reach it.
   ollama:
     image: ollama/ollama:0.35.1
     restart: unless-stopped
@@ -78,13 +80,16 @@ services:
       timeout: 5s
       retries: 10
 
-  # Downloads the embedding model once (about 640 MB on the first start;
-  # afterwards it is already in the volume and this finishes at once).
+  # Downloads the local models once: the embedding model (about 640 MB) and
+  # the screening model (about 2.5 GB). Afterwards they are already in the
+  # volume and this finishes at once.
   ollama-pull:
     image: ollama/ollama:0.35.1
     environment:
       OLLAMA_HOST: http://ollama:11434
-    command: ["pull", "${EMBEDDING_MODEL:-qwen3-embedding:0.6b}"]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - ollama pull "${EMBEDDING_MODEL:-qwen3-embedding:0.6b}" && ollama pull "${SCREENING_MODEL:-qwen3:4b-instruct}"
     restart: "no"
     depends_on:
       ollama:

@@ -66,6 +66,7 @@ class ScreenedCandidate(BaseModel):
     matches: list[dict[str, Any]]  # per requirement: status and evidence
     summary: str | None
     scanned: bool  # read with OCR
+    years_unknown: bool  # years of experience could not be read: check the CV
 
 
 class ScreeningOut(BaseModel):
@@ -165,6 +166,7 @@ def _result(score: CandidateScore, candidate: Candidate) -> ScreenedCandidate:
         matches=score.requirement_matches or [],
         summary=score.summary,
         scanned=bool((candidate.parsed_cv or {}).get("used_ocr")),
+        years_unknown=(candidate.parsed_cv or {}).get("years_source") == "unknown",
     )
 
 

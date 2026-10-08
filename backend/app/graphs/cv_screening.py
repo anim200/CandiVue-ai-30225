@@ -13,7 +13,10 @@ by the "Screen CVs" button (not by the chatbot), so scores stay repeatable.
                              score_qualifications ║ ats_match → combine_scores
     → collect_results → rank_candidates → save_results → END
 
-- Every node is local work (no Gemini): see app/screening.
+- Every node is local work (no Gemini): see app/screening. The local model
+  (local_model.py) is asked only in two cases: parse_cv, when the rules
+  found no job dates; check_hard_requirements, before excluding a
+  candidate for a mandatory requirement the rules did not find.
 - One bad CV goes to log_and_skip; the rest of the batch goes on (F1).
 - State is checkpointed in PostgreSQL: after a restart the run continues
   where it stopped (N26). Parsed CVs and their embeddings are stored, so a
@@ -35,6 +38,7 @@ from sqlalchemy import delete, select, update
 from app.ai.embeddings import embed_documents, embed_query
 from app.ai.errors import AIServiceError
 from app.collector.intake import find_cv
+from app.core.config import get_settings
 from app.db.database import SessionLocal
 from app.db.models import (
     Candidate,
@@ -48,13 +52,15 @@ from app.db.models.candidate import CandidateStatus
 from app.db.models.job import JobDescriptionStatus
 from app.graphs.checkpointer import open_checkpointer
 from app.runs.runner import graph_config, register_run_kind
-from app.screening import scoring
+from app.screening import local_model, scoring
 from app.screening.matching import (
     cv_passages,
     embed_passages,
     match_requirements,
     requirement_vectors,
+    too_few_years,
 )
+from app.screening.parsing import PARSER_VERSION
 from app.screening.parsing import parse_cv as parse_cv_text
 from app.screening.text import (
     UnreadableCv,
@@ -99,6 +105,7 @@ class CvState(TypedDict, total=False):
     context: dict
     text: str
     used_ocr: bool
+    previous: dict  # parsed by older rules: parsed again, embeddings reused
     parsed: dict
     matches: list[dict]
     gate_reasons: list[str]
@@ -226,11 +233,19 @@ def save_results(state: ScreeningState) -> dict:
 
 
 def extract_text(state: CvState) -> dict:
-    """Read the CV's own text, or reuse the text parsed in an earlier run."""
+    """Read the CV's own text, or reuse the text parsed in an earlier run
+    (parsed again when the parsing rules changed since)."""
     with SessionLocal() as db:
         candidate = db.get(Candidate, state["candidate_id"])
-        if candidate.parsed_cv and candidate.status == CandidateStatus.PARSED:
-            return {"parsed": candidate.parsed_cv, "text": candidate.parsed_cv["text"]}
+        parsed = candidate.parsed_cv
+        if parsed and candidate.status == CandidateStatus.PARSED:
+            if parsed.get("parser_version") == PARSER_VERSION:
+                return {"parsed": parsed, "text": parsed["text"]}
+            return {
+                "text": parsed["text"],
+                "used_ocr": parsed.get("used_ocr", False),
+                "previous": parsed,
+            }
         job_id = candidate.job_id
     path = find_cv(job_id, state["candidate_id"])
     if path is None:
@@ -247,7 +262,9 @@ def after_extract(state: CvState) -> str:
         return "log_and_skip"
     if state.get("parsed"):
         return "check_hard_requirements"  # parsed before: reuse it
-    return "parse_cv" if has_text(state["text"]) else "ocr_extract"
+    if state.get("previous") or has_text(state["text"]):
+        return "parse_cv"
+    return "ocr_extract"
 
 
 def ocr_extract(state: CvState) -> dict:
@@ -289,28 +306,43 @@ def after_parse(state: CvState) -> str:
 
 def _parse_and_store(state: CvState) -> dict:
     """The work of parse_cv (see there)."""
-    parsed = parse_cv_text(state["text"], datetime.now(UTC).date())
+    today = datetime.now(UTC).date()
+    previous = state.get("previous") or {}
+    parsed = parse_cv_text(state["text"], today)
     parsed["text"] = state["text"]
     parsed["used_ocr"] = state.get("used_ocr", False)
+    # The local model's earlier answers about requirements stay valid.
+    parsed["model_checks"] = previous.get("model_checks", {})
+    if parsed["years_source"] == "unknown":
+        # No job dates the rules could read: ask the local model.
+        answer = local_model.read_years(state["text"], today)
+        if answer:
+            parsed["years_experience"], parsed["years_evidence"] = answer
+            parsed["years_source"] = "model"
     # The whole CV's embedding for the ATS score, stored for later runs.
-    parsed["ats_vector"] = embed_documents([state["text"][:MAX_CV_CHARS_FOR_ATS]])[0]
+    parsed["ats_vector"] = (
+        previous.get("ats_vector")
+        or embed_documents([state["text"][:MAX_CV_CHARS_FOR_ATS]])[0]
+    )
     lines = cv_passages(parsed)
-    vectors = embed_passages(lines)
+    same_lines = _stored_lines(state["candidate_id"]) == lines
     with SessionLocal() as db:
         candidate = db.get(Candidate, state["candidate_id"])
-        db.execute(delete(CvPassage).where(CvPassage.candidate_id == candidate.id))
-        db.add_all(
-            CvPassage(
-                candidate_id=candidate.id,
-                position=index,
-                section=section,
-                text=line,
-                embedding=vector,
+        if not same_lines:  # same lines as before: keep their embeddings
+            vectors = embed_passages(lines)
+            db.execute(delete(CvPassage).where(CvPassage.candidate_id == candidate.id))
+            db.add_all(
+                CvPassage(
+                    candidate_id=candidate.id,
+                    position=index,
+                    section=section,
+                    text=line,
+                    embedding=vector,
+                )
+                for index, ((section, line), vector) in enumerate(
+                    zip(lines, vectors, strict=True)
+                )
             )
-            for index, ((section, line), vector) in enumerate(
-                zip(lines, vectors, strict=True)
-            )
-        )
         if parsed["name"] and (not candidate.full_name or not candidate.drive_file_id):
             candidate.full_name = parsed["name"][:200]  # the CV beats a file-name guess
         candidate.email = candidate.email or parsed["email"]
@@ -323,19 +355,27 @@ def _parse_and_store(state: CvState) -> dict:
 
 
 def check_hard_requirements(state: CvState) -> dict:
-    """Match the mandatory requirements and check the minimum years."""
+    """Match the mandatory requirements and check the minimum years. Before
+    excluding a candidate for a requirement the rules did not find, the local
+    model checks the CV once more (only if the years are not too few anyway)."""
     context, parsed = state["context"], state["parsed"]
+    years = known_years(parsed)
     mandatory = [r for r in context["requirements"] if r["level"] == "mandatory"]
+    passages = _passages(state["candidate_id"])
     matches = match_requirements(
-        mandatory,
-        _passages(state["candidate_id"]),
-        parsed["years_experience"],
-        context["requirement_vectors"],
+        mandatory, passages, years, context["requirement_vectors"]
     )
+    failing = [m for m in matches if scoring.fails_mandatory(m)]
+    if failing and not scoring.too_few_years(years, context["min_years"]):
+        parsed = _second_opinion(state["candidate_id"], parsed, mandatory, failing)
+        for match in failing:
+            quote = parsed["model_checks"][_check_key(match["requirement"], mandatory)]
+            if quote:
+                _confirmed_by_model(match, quote, passages, years)
     reasons = scoring.check_gate(
-        matches, parsed["years_experience"], context["min_years"]
+        matches, years, context["min_years"], parsed.get("years_source", "dates")
     )
-    return {"matches": matches, "gate_reasons": reasons}
+    return {"matches": matches, "gate_reasons": reasons, "parsed": parsed}
 
 
 def after_gate(state: CvState) -> str:
@@ -349,7 +389,7 @@ def match_requirements_node(state: CvState) -> dict:
     more = match_requirements(
         others,
         _passages(state["candidate_id"]),
-        state["parsed"]["years_experience"],
+        known_years(state["parsed"]),
         state["context"]["requirement_vectors"],
     )
     return {"matches": state["matches"] + more}
@@ -365,7 +405,11 @@ def score_experience(state: CvState) -> dict:
     """Relevant experience dimension."""
     parsed = state["parsed"]
     score, reason = scoring.score_experience(
-        parsed["years_experience"], state["context"]["min_years"], parsed["jobs"]
+        known_years(parsed),
+        state["context"]["min_years"],
+        parsed["jobs"],
+        parsed.get("years_source", "dates"),
+        parsed.get("years_evidence"),
     )
     return {"scores": {"experience": score}, "reasons": {"experience": reason}}
 
@@ -483,6 +527,76 @@ def key_terms(jd_text: str, requirements: list[dict]) -> list[str]:
     ]
     unique = list(dict.fromkeys(term.lower() for term in terms))
     return unique[:KEY_TERM_COUNT]
+
+
+def known_years(parsed: dict) -> float | None:
+    """The CV's years of experience, or None when they could not be read."""
+    if parsed.get("years_source") == "unknown":
+        return None
+    return parsed["years_experience"]
+
+
+def _check_key(requirement_text: str, requirements: list[dict]) -> str:
+    """Cache key of a local-model check: the model, the requirement and its
+    "also counts" names (a changed profile or model asks again)."""
+    requirement = next(r for r in requirements if r["text"] == requirement_text)
+    names = "|".join(requirement.get("also_counts", []))
+    return f"{get_settings().screening_model}|{requirement_text}|{names}"
+
+
+def _second_opinion(
+    candidate_id: int, parsed: dict, mandatory: list[dict], failing: list[dict]
+) -> dict:
+    """Ask the local model about the failing requirements it was not asked
+    about before; its answers are stored with the parsed CV for later runs."""
+    checks = dict(parsed.get("model_checks", {}))
+    texts = {m["requirement"] for m in failing}
+    todo = [
+        r
+        for r in mandatory
+        if r["text"] in texts and _check_key(r["text"], mandatory) not in checks
+    ]
+    if not todo:
+        return parsed
+    answers = local_model.confirm_requirements(parsed["text"], todo)
+    for requirement in todo:
+        checks[_check_key(requirement["text"], mandatory)] = answers[
+            requirement["text"]
+        ]
+    parsed = {**parsed, "model_checks": checks}
+    with SessionLocal() as db:
+        db.get(Candidate, candidate_id).parsed_cv = parsed
+        db.commit()
+    return parsed
+
+
+def _confirmed_by_model(
+    match: dict, quote: str, passages: list, years: float | None
+) -> None:
+    """The local model found a real CV line for the requirement: met, with
+    that line as the evidence ("5 years of PHP" still needs the years)."""
+    line = local_model.normalised(quote)
+    section = next(
+        (
+            s
+            for s, text, _v in passages
+            if line in local_model.normalised(text)
+            or local_model.normalised(text) in line
+        ),
+        None,
+    )
+    match.update(
+        status="partial" if too_few_years(match["requirement"], years) else "met",
+        decided_by="local_model",
+        matched_name=None,
+        evidence=quote,
+        section=section,
+    )
+
+
+def _stored_lines(candidate_id: int) -> list[tuple[str, str]]:
+    """The CV lines stored for this candidate (to reuse their embeddings)."""
+    return [(section, text) for section, text, _v in _passages(candidate_id)]
 
 
 def _passages(candidate_id: int) -> list[tuple[str, str, list[float]]]:

@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     embedding_model: str = "qwen3-embedding:0.6b"
     ollama_base_url: str = "http://ollama:11434"  # the ollama service in Compose
 
+    # Local model for CV screening (app/screening/local_model.py): reads the
+    # years when a CV has no readable job dates, and checks a missing
+    # mandatory requirement once more before a candidate is excluded.
+    screening_model: str = "qwen3:4b-instruct"
+    screening_model_timeout_seconds: float = Field(default=300, gt=0)
+
     # Job board MCP server (jobboard-mcp container, Blogger). The Blogger
     # credentials live only in that container, never in the backend.
     jobboard_mcp_url: str = "http://jobboard-mcp:8001/mcp"

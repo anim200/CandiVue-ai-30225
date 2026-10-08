@@ -7,7 +7,8 @@ Gate (trainer clarification: failing a mandatory requirement = excluded):
 - a mandatory requirement passes when it is met, or partly met through a
   named close substitute ("related", e.g. Podman for Docker);
 - "partly met" only by meaning is too weak for a must-have: excluded;
-- fewer years than the profile's minimum: excluded.
+- fewer years than the profile's minimum: excluded. Years that could not be
+  read never exclude anyone: the candidate is ranked with a warning.
 
 Dimensions, each 0-100:
 - skills: skill requirements, weighted mandatory 3 / required 2 / preferred 1;
@@ -29,26 +30,51 @@ EXTRA_YEARS_FOR_FULL_MARKS = 3
 ATS_SIMILARITY_RANGE = (0.35, 0.75)
 
 
-def check_gate(matches: list[dict], years: float, min_years: int | None) -> list[str]:
-    """Reasons the candidate fails the hard requirements (empty = passes)."""
+def check_gate(
+    matches: list[dict],
+    years: float | None,
+    min_years: int | None,
+    years_source: str = "dates",
+) -> list[str]:
+    """Reasons the candidate fails the hard requirements (empty = passes).
+    `years` is None when the CV's years could not be read."""
     reasons = []
     for match in matches:
-        if match["level"] != "mandatory":
+        if not fails_mandatory(match):
             continue
         if match["status"] == "unmet":
             reasons.append(
                 f"Mandatory requirement not shown in the CV: {match['requirement']}."
             )
-        elif match["status"] == "partial" and match["decided_by"] == "meaning":
+        else:
             reasons.append(
                 f"Only loosely related evidence for a mandatory requirement: "
                 f"{match['requirement']}."
             )
-    if min_years and years < min_years:
+    if too_few_years(years, min_years):
+        how = (
+            " (read by the local model; no job dates found)"
+            if years_source == "model"
+            else ""
+        )
         reasons.append(
-            f"About {years:g} years of experience; the job needs at least {min_years}."
+            f"About {years:g} years of experience{how}; "
+            f"the job needs at least {min_years}."
         )
     return reasons
+
+
+def fails_mandatory(match: dict) -> bool:
+    """A mandatory requirement not met, or only partly met by meaning."""
+    return match["level"] == "mandatory" and (
+        match["status"] == "unmet"
+        or (match["status"] == "partial" and match["decided_by"] == "meaning")
+    )
+
+
+def too_few_years(years: float | None, min_years: int | None) -> bool:
+    """Fewer years than the minimum (unknown years never count as too few)."""
+    return bool(min_years) and years is not None and years < min_years
 
 
 def score_skills(matches: list[dict]) -> tuple[int, str]:
@@ -72,13 +98,29 @@ def score_skills(matches: list[dict]) -> tuple[int, str]:
 
 
 def score_experience(
-    years: float, min_years: int | None, jobs: list[dict]
+    years: float | None,
+    min_years: int | None,
+    jobs: list[dict],
+    years_source: str = "dates",
+    evidence: list[str] | None = None,
 ) -> tuple[int, str]:
-    """Years of experience against the minimum."""
+    """Years of experience against the minimum. years_source: "dates" (job
+    dates), "model" (read from the CV by the local model) or "unknown"."""
+    needed = f"; the job needs {min_years}+" if min_years else ""
+    if years is None:
+        return 0, (
+            "Years of experience could not be read from the CV (no job dates or "
+            f"stated years found): please check the CV{needed}."
+        )
     target = (min_years or 0) + EXTRA_YEARS_FOR_FULL_MARKS
     score = round(100 * min(1.0, years / target)) if target else 100
+    if years_source == "model":
+        quote = f": “{evidence[0]}”" if evidence else ""
+        return score, (
+            f"About {years:g} years, read from the CV by the local model{quote} "
+            f"(no job dates found){needed}."
+        )
     roles = len(jobs)
-    needed = f"; the job needs {min_years}+" if min_years else ""
     return (
         score,
         f"About {years:g} years across {roles} role{'s' if roles != 1 else ''}{needed}.",
