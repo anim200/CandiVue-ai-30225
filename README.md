@@ -246,6 +246,12 @@ START -> load_context -> assistant --(tool call)--> tools --> assistant ...
   - `rag_search`: searches the knowledge base, only when useful.
   - `write_job_description`: drafts the JD from the profile and any
     passages found; records which documents it used.
+  - `save_job_profile` also saves the **scoring weights** the assistant
+    suggests (with a reason), and for each requirement short lists of
+    names that **also count** (e.g. Docker: Docker Compose, Laravel Sail)
+    and **related** close substitutes (e.g. Podman). Screening uses them
+    (see "CV screening"). Weights the interviewer states in the chat are
+    saved as the interviewer's.
   - `save_application_form`: saves the Google Form link applicants use
     to send their CV (only Google Forms links are accepted).
   - `request_job_posting`: when the interviewer later asks to post a job
@@ -381,6 +387,79 @@ Google Form ─► Drive (CV file) + response Sheet (name, email, job, CV link)
    Post the job again so its link pre-fills the job.
 
 Use only sample or synthetic CVs (N13, CN5).
+
+## CV screening (LangGraph 2)
+
+A fixed workflow (Figure 4), started with **Screen CVs** on the job page,
+not by the chatbot, so scores stay repeatable. It screens all of the job's
+CVs in one batch, one parallel branch per CV, in the background with
+progress ("12 of 20 CVs"). It is checkpointed, so after a restart it
+continues where it stopped (N26). **No Gemini is used**: everything runs
+locally, so there is no quota and CV text stays on this machine.
+
+```
+load_cv_batch → Send (one branch per CV):
+  extract_text ─ no text → ocr_extract (Tesseract) ─┐
+       │ text ───────────────────────────────────────┴→ parse_cv
+       └ error → log_and_skip                           │ error → log_and_skip
+  check_hard_requirements ─ fail → record_exclusion
+       └ pass → match_requirements → score_skills ║ score_experience ║
+                score_qualifications ║ ats_match → combine_scores
+→ collect_results → rank_candidates → save_results
+```
+
+- **Reading:** the file's text (PDF or Word); a PDF without text is read
+  by OCR (local Tesseract). A CV that still cannot be read is listed as
+  "could not be read"; the batch goes on.
+- **Parsing (rules):** contact details, sections, jobs with dates, years
+  of experience (overlapping jobs counted once), highest degree,
+  certificates. Ligatures ("ﬁ") are normalised; two-column CVs are handled.
+- **Matching:** each requirement is **met** when the CV names it or one of
+  its "also counts" names; **partly met** through a "related" name; else
+  the CV line closest in meaning (local embeddings, cosine similarity)
+  decides: met ≥ 0.62, partly ≥ 0.58 (calibrated on the synthetic CVs).
+  A line that says the opposite ("has not used Laravel") never counts.
+  Every result keeps the CV line as evidence.
+- **Hard-requirement gate:** a candidate is **excluded** (not ranked, with
+  the reason) when a mandatory requirement is not met, is only "partly met
+  by meaning", or the years are below the minimum.
+- **Scores (0-100, rules, each with a written reason):** technical skills
+  (requirements weighted mandatory 3 / required 2 / preferred 1), relevant
+  experience (minimum + 3 years = full marks), qualifications (degree 60%,
+  qualification requirements 40%), ATS CV-JD match (key job terms found
+  60%, closeness of the whole CV to the JD 40%).
+- **Weights (human control):** the interviewer's weights on the job page
+  win; otherwise the Hiring Assistant's suggestion; otherwise defaults
+  (skills 35, experience 30, qualifications 15, ATS 20). Each run records
+  the weights it used; the page says when weights or CVs changed since.
+- **Results** (interviewers only, N9): ranking (overall score first), a
+  candidate panel with the score breakdown and each requirement's evidence,
+  excluded candidates with reasons, unreadable CVs.
+- API: `POST /api/jobs/{id}/screenings`, `GET /api/jobs/{id}/screenings/latest`,
+  `PUT /api/jobs/{id}/weights`, `DELETE /api/jobs/{id}/weights`.
+
+**Measured time (N1), 20 synthetic CVs, this laptop (CPU only):** about
+**3 minutes** for the first run (reading, OCR and embedding every CV line)
+and about **8 seconds** for a repeat run (parsed CVs and embeddings are
+reused, e.g. after changing the weights).
+
+**Checked against** `test-data/synthetic-cvs/EXPECTED.md`: the 5 expected
+candidates are excluded with the right reasons, the strong CVs rank on top,
+"Laravel Sail" counts for Docker and "Podman" gives partly met.
+
+**Known limitations (fairness and accuracy, N20):**
+- Only job-related data is scored; no age, gender, nationality or other
+  protected attribute is read or stored. Names and emails are shown but
+  not scored.
+- Years of experience count the whole career, not years per skill.
+- "Present" means the screening date, so the same CV gains experience over
+  time.
+- The "also counts" / "related" lists come from the AI when the profile is
+  saved; check them, since a missing name can make a skill look unmet.
+- Similarity thresholds were calibrated on synthetic CVs; unusual CV
+  layouts can lose lines. Scanned CVs are marked so they can be checked.
+- Scores support the interviewer's decision; nothing is rejected or hired
+  automatically.
 
 ## Knowledge base (RAG)
 
