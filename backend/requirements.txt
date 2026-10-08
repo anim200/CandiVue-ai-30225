@@ -20,3 +20,7 @@ mcp==2.3.0
 # CV Collector: Google service account + Drive/Sheets REST calls
 google-auth==2.60.0
 requests==2.34.2
+# CV screening: PDF pages to images and OCR for scanned CVs (local Tesseract)
+pypdfium2==5.14.0
+pytesseract==0.3.13
+pillow==12.3.0
