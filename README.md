@@ -395,7 +395,10 @@ not by the chatbot, so scores stay repeatable. It screens all of the job's
 CVs in one batch, one parallel branch per CV, in the background with
 progress ("12 of 20 CVs"). It is checkpointed, so after a restart it
 continues where it stopped (N26). **No Gemini is used**: everything runs
-locally, so there is no quota and CV text stays on this machine.
+locally, so there is no quota and CV text stays on this machine. Mostly
+rules and local embeddings; a small **local model** (Ollama,
+`SCREENING_MODEL`, default `qwen3:4b-instruct`, about 2.5 GB) is asked only
+in the two cases the rules cannot settle (see below).
 
 ```
 load_cv_batch → Send (one branch per CV):
@@ -414,15 +417,37 @@ load_cv_batch → Send (one branch per CV):
 - **Parsing (rules):** contact details, sections, jobs with dates, years
   of experience (overlapping jobs counted once), highest degree,
   certificates. Ligatures ("ﬁ") are normalised; two-column CVs are handled.
+  Dates such as "Jan 2020 – Present", "Jan 2020 – Till Date", "Feb 2019 to
+  date", "03/2022 – now", "01.2018 – 12.2019", "Jan, 2015 – Mar, 2016",
+  "2017 through 2018", "March 2019 until today" and "since 2014".
+  "Master" counts as a degree only as "Master of / Master's in" (not
+  "Scrum Master").
+- **Years without dates (local model):** when the rules find no job dates,
+  the local model reads the years the CV shows ("7 years of experience",
+  "over five years"). It must quote the CV lines it used; a rule checks the
+  quotes are really in the CV and the number comes from them. If nothing is
+  found, the years are **unknown**: the candidate is **not excluded** for
+  years, the experience score is 0 and the screen shows a "please check"
+  warning.
 - **Matching:** each requirement is **met** when the CV names it or one of
   its "also counts" names; **partly met** through a "related" name; else
   the CV line closest in meaning (local embeddings, cosine similarity)
   decides: met ≥ 0.62, partly ≥ 0.58 (calibrated on the synthetic CVs).
-  A line that says the opposite ("has not used Laravel") never counts.
-  Every result keeps the CV line as evidence.
+  A line that says the opposite ("has not used Laravel", "no experience
+  with Docker") or only a wish ("interested in learning Docker") never
+  counts; "no manual steps using Docker" still counts. A version number
+  does not hide a name ("PHP8" counts for PHP). Every result keeps the CV
+  line as evidence.
+- **Second look before excluding (local model):** when a mandatory
+  requirement is still not found (and the years are not too few anyway),
+  the local model reads the CV once more. It counts only with a quoted line
+  that is really in the CV and does not deny the skill; the panel then says
+  the local model found it. This protects against excluding a good
+  candidate because the rules missed a wording.
 - **Hard-requirement gate:** a candidate is **excluded** (not ranked, with
   the reason) when a mandatory requirement is not met, is only "partly met
-  by meaning", or the years are below the minimum.
+  by meaning", or the years are below the minimum (unknown years never
+  exclude).
 - **Scores (0-100, rules, each with a written reason):** technical skills
   (requirements weighted mandatory 3 / required 2 / preferred 1), relevant
   experience (minimum + 3 years = full marks), qualifications (degree 60%,
@@ -438,14 +463,19 @@ load_cv_batch → Send (one branch per CV):
 - API: `POST /api/jobs/{id}/screenings`, `GET /api/jobs/{id}/screenings/latest`,
   `PUT /api/jobs/{id}/weights`, `DELETE /api/jobs/{id}/weights`.
 
-**Measured time (N1), 20 synthetic CVs, this laptop (CPU only):** about
-**3 minutes** for the first run (reading, OCR and embedding every CV line)
-and about **8 seconds** for a repeat run (parsed CVs and embeddings are
-reused, e.g. after changing the weights).
+**Measured time (N1), 22 synthetic CVs, this laptop (CPU only):** about
+**5 minutes** for the first run (reading, OCR, embedding every CV line, and
+4 local-model questions: one CV without dates, three second looks; the
+first question also loads the model, about 40 s) and about **7 seconds**
+for a repeat run (parsed CVs, embeddings and the local model's answers are
+reused, e.g. after changing the weights). One local-model question takes
+about 6-16 s.
 
 **Checked against** `test-data/synthetic-cvs/EXPECTED.md`: the 5 expected
 candidates are excluded with the right reasons, the strong CVs rank on top,
-"Laravel Sail" counts for Docker and "Podman" gives partly met.
+"Laravel Sail" counts for Docker and "Podman" gives partly met, the CV
+without dates gets its stated 7 years, and the "Till Date" CV is read
+correctly. A fresh run and a repeat run give the same ranking.
 
 **Known limitations (fairness and accuracy, N20):**
 - Only job-related data is scored; no age, gender, nationality or other
@@ -458,6 +488,11 @@ candidates are excluded with the right reasons, the strong CVs rank on top,
   saved; check them, since a missing name can make a skill look unmet.
 - Similarity thresholds were calibrated on synthetic CVs; unusual CV
   layouts can lose lines. Scanned CVs are marked so they can be checked.
+- The local model is small: its answers are only used with a quote that
+  is checked against the CV, but it can still miss a wording (then the
+  result is the same as the rules alone). Years it computes from unusual
+  dates are checked for plausibility, not exactly.
+- English CVs only (OCR and rules are set up for English).
 - Scores support the interviewer's decision; nothing is rejected or hired
   automatically.
 
