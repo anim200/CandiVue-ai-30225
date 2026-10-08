@@ -1,10 +1,10 @@
-// One job's page (design: CV Screening Results.dc.html, JobHeader and the
-// "No CVs yet" state). Before screening exists it shows the applicants: the
-// CVs the CV Collector took from the job's Google Form, plus any the
-// interviewer added by hand ("Add CV"). The ranking and "Screen CVs" come
-// here later. Interviewers only (route guard + backend).
+// One job's page (design: CV Screening Results.dc.html). Header with
+// "Screen CVs", the scoring weights, the screening run (progress, ranking,
+// excluded and unreadable CVs, candidate drawer) and the applicants: the
+// CVs the CV Collector took from the job's Google Form, plus any added by
+// hand ("Add CV"). Interviewers only (route guard + backend).
 
-import { Anchor, Button, FileButton, Group, Modal, Text } from '@mantine/core';
+import { Anchor, Button, FileButton, Group, Loader, Modal, Text } from '@mantine/core';
 import {
   IconAlertTriangle,
   IconChevronRight,
@@ -13,6 +13,7 @@ import {
   IconFileText,
   IconInbox,
   IconMessageCircle,
+  IconPlayerPlay,
   IconRefresh,
   IconTrash,
   IconUpload,
@@ -21,11 +22,16 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 
-import { apiDelete, apiGet, apiGetFile, apiUpload } from '../../api/client';
+import { apiDelete, apiGet, apiGetFile, apiPost, apiUpload } from '../../api/client';
 import { ErrorBanner, Skeleton } from '../../components/Feedback';
 import StatusBadge from '../../components/StatusBadge';
 import { STAGES } from '../assistant/labels';
 import classes from './JobPage.module.css';
+import ScreeningResults, { ScreeningProgress } from './ScreeningResults';
+import WeightsCard from './WeightsCard';
+
+const POLL_MS = 2000; // progress refresh while screening runs
+const ACTIVE = ['pending', 'running'];
 
 // "7 Oct, 15:09" for the time a CV arrived.
 function receivedAt(value) {
@@ -178,6 +184,8 @@ export default function JobPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadResults, setUploadResults] = useState(null); // last "Add CV" outcome
   const [uploadProgress, setUploadProgress] = useState(null); // "3 of 19"
+  const [screening, setScreening] = useState(null); // latest run and results
+  const [starting, setStarting] = useState(false);
 
   // Load the job and its applicants.
   const load = useCallback(async () => {
@@ -194,6 +202,48 @@ export default function JobPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Load the latest screening run (progress or results).
+  const loadScreening = useCallback(async () => {
+    try {
+      setScreening(await apiGet(`/jobs/${jobId}/screenings/latest`));
+    } catch (error) {
+      setActionError(error.message);
+    }
+  }, [jobId]);
+
+  useEffect(() => {
+    loadScreening();
+  }, [loadScreening]);
+
+  // While a run works, refresh its progress; when it ends, reload the page data.
+  const running = ACTIVE.includes(screening?.run?.status);
+  useEffect(() => {
+    if (!running) return undefined;
+    const timer = setInterval(async () => {
+      const latest = await apiGet(`/jobs/${jobId}/screenings/latest`).catch(() => null);
+      if (!latest) return;
+      setScreening(latest);
+      if (!ACTIVE.includes(latest.run?.status)) load(); // names/emails read from CVs
+    }, POLL_MS);
+    return () => clearInterval(timer);
+  }, [running, jobId, load]);
+
+  // Start screening all of the job's CVs (one batch, in the background).
+  async function startScreening() {
+    setStarting(true);
+    setActionError(null);
+    try {
+      setScreening(await apiPost(`/jobs/${jobId}/screenings`));
+    } catch (error) {
+      setActionError(error.message);
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  // "View CV" from the screening drawer (same as in the applicants list).
+  const viewResultCv = (result) => view({ id: result.candidate_id, cv_filename: result.cv_filename });
 
   // Show an applicant's CV.
   async function view(applicant) {
@@ -281,6 +331,12 @@ export default function JobPage() {
             <h1 className={classes.title}>{job.title}</h1>
             <div className={classes.meta}>
               <span>{cvCount(job.cvs_received)}</span>
+              {screening?.run?.finished_at && (
+                <>
+                  <span className={classes.dot}>·</span>
+                  <span>Last screened {receivedAt(screening.run.finished_at)}</span>
+                </>
+              )}
               {stage && (
                 <>
                   <span className={classes.dot}>·</span>
@@ -290,6 +346,18 @@ export default function JobPage() {
             </div>
           </div>
           <Group gap={8} className={classes.headerActions}>
+            {applicants.length > 0 && (
+              <Button
+                onClick={startScreening}
+                loading={starting}
+                disabled={!job.profile || running}
+                leftSection={running ? <Loader size={14} color="white" /> : <IconPlayerPlay size={16} />}
+                className={running ? classes.screeningButton : undefined}
+                title={job.profile ? undefined : 'Save the job profile in the chat first'}
+              >
+                {running ? 'Screening…' : 'Screen CVs'}
+              </Button>
+            )}
             <AddCvButton onFiles={addCvs} busy={uploading} />
             {uploadProgress && <span className={classes.progress}>Adding {uploadProgress}…</span>}
             {job.job_board_post_url && (
@@ -304,7 +372,7 @@ export default function JobPage() {
                 View job post
               </Button>
             )}
-            <Button component={Link} to={`/assistant/${job.id}`} leftSection={<IconMessageCircle size={16} />}>
+            <Button component={Link} to={`/assistant/${job.id}`} variant="default" leftSection={<IconMessageCircle size={16} />}>
               Open chat
             </Button>
           </Group>
@@ -313,6 +381,31 @@ export default function JobPage() {
 
       {actionError && <ErrorBanner title="That didn’t work.">{actionError}</ErrorBanner>}
       {uploadResults && <UploadResults results={uploadResults} onClose={() => setUploadResults(null)} />}
+
+      {job.profile && <WeightsCard job={job} onSaved={setJob} disabled={running} />}
+
+      {screening?.run && !running && (screening.weights_changed || screening.new_cvs > 0) && (
+        <div className={classes.staleNote} role="status">
+          <IconAlertTriangle size={17} />
+          <span>
+            {screening.weights_changed && 'The weights changed since the last screening. '}
+            {screening.new_cvs > 0 && `${screening.new_cvs} new ${screening.new_cvs === 1 ? 'CV' : 'CVs'} arrived since then. `}
+            Screen again to update the ranking.
+          </span>
+          <Button size="xs" variant="default" onClick={startScreening} loading={starting}>
+            Screen again
+          </Button>
+        </div>
+      )}
+      {running && <ScreeningProgress run={screening.run} />}
+      {screening?.run?.status === 'failed' && (
+        <ErrorBanner title="Screening stopped." onRetry={startScreening}>
+          {screening.run.error} No CVs were lost. Try again.
+        </ErrorBanner>
+      )}
+      {screening?.run?.status === 'completed' && (
+        <ScreeningResults data={screening} onViewCv={viewResultCv} viewingId={viewingId} />
+      )}
 
       {applicants.length === 0 ? (
         <div className={classes.empty}>

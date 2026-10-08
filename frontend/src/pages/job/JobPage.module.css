@@ -83,6 +83,99 @@
   flex-wrap: wrap;
 }
 
+/* "Screening…" keeps the brand colour while disabled (design 2a). */
+.screeningButton:disabled {
+  background: #23717a;
+  color: #fff;
+  opacity: 0.7;
+}
+
+/* ---- Scoring weights (not in the design: user request) ---- */
+
+.weightsCard {
+  background: #fff;
+  border: 1px solid #dee3e6;
+  border-radius: 8px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: fadeUp 0.3s ease-out;
+}
+
+.weightsTop {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.weightsIcon {
+  color: #23717a;
+  flex: none;
+  margin-top: 2px;
+}
+
+.sparkle {
+  color: #23717a;
+  margin-right: 4px;
+  vertical-align: -2px;
+}
+
+.weightsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.weightsBottom {
+  flex-wrap: wrap;
+}
+
+.totalOk,
+.totalBad {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.2s;
+}
+
+.totalOk {
+  color: #245f3e;
+}
+
+.totalBad {
+  color: #932e24;
+}
+
+.weightsError {
+  font-size: 14px;
+  color: #932e24;
+}
+
+.staleNote {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #fbf0d9;
+  color: #5a3d00;
+  font-size: 15px;
+  animation: fadeUp 0.25s ease-out;
+}
+
+.staleNote span {
+  flex: 1;
+  min-width: 200px;
+}
+
+@media (max-width: 47.99em) {
+  .weightsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* ---- "Add CV" results ---- */
 
 .uploadResults {

@@ -62,7 +62,17 @@ export function ReviewNote({ text }) {
 }
 
 // The job profile: requirements grouped as Mandatory / Required / Preferred.
-export function ProfileCard({ profile }) {
+// "Skills 40 · Experience 30 · ..." for the weights line on the profile card.
+const WEIGHT_NAMES = [
+  ['skills', 'Skills'],
+  ['experience', 'Experience'],
+  ['qualifications', 'Qualifications'],
+  ['ats', 'ATS match'],
+];
+
+// The saved job profile: experience, requirements by level, and the
+// scoring weights (suggested by the assistant or given by the interviewer).
+export function ProfileCard({ profile, weights }) {
   return (
     <div className={classes.profileCard}>
       {profile.min_years_experience != null && (
@@ -81,6 +91,19 @@ export function ProfileCard({ profile }) {
           </div>
         );
       })}
+      {weights && (
+        <>
+          <span className={classes.profileLabel}>Scoring weights</span>
+          <span>
+            {WEIGHT_NAMES.map(([key, name]) => `${name} ${weights[key]}%`).join(' · ')}
+            <span className={classes.weightsNote}>
+              {weights.source === 'interviewer'
+                ? ' (set by you)'
+                : ' (suggested; you can change them on the job page)'}
+            </span>
+          </span>
+        </>
+      )}
     </div>
   );
 }

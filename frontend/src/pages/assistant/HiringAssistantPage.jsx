@@ -80,7 +80,7 @@ function ChatRows({ items, profile, pending, reviewBusy, onApprove, onEdit, onRe
     if (item.kind === 'profile')
       rows.push(
         <AssistantRow key={index}>
-          <ProfileCard profile={item.profile} />
+          <ProfileCard profile={item.profile} weights={item.weights} />
         </AssistantRow>,
       );
     if (item.kind === 'jd')

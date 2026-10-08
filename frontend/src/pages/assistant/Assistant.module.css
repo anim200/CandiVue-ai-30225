@@ -300,6 +300,11 @@
   line-height: 1.45;
 }
 
+.weightsNote {
+  color: #66717a;
+  font-size: 14px;
+}
+
 .profileLabel {
   color: #66717a;
   font-size: 14px;
