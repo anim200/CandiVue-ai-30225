@@ -5,6 +5,7 @@
 import { Button, Collapse, Drawer } from '@mantine/core';
 import {
   IconAlertTriangle,
+  IconCalendarQuestion,
   IconCheck,
   IconChevronDown,
   IconChevronRight,
@@ -72,6 +73,8 @@ function RequirementRow({ match }) {
   if (match.decided_by === 'related') how = `“${match.matched_name}” is a close substitute, so partly met.`;
   if (match.decided_by === 'meaning' && match.evidence)
     how = `Closest line by meaning (similarity ${match.similarity}).`;
+  if (match.decided_by === 'local_model')
+    how = 'Not found by the rules; the local AI model found this line when checking again before excluding.';
   return (
     <div className={classes.requirement}>
       <div className={classes.requirementTop}>
@@ -131,6 +134,12 @@ function CandidateDrawer({ result, rankedCount, onClose, onViewCv, viewing }) {
             </div>
           </div>
           <div className={classes.drawerScroll}>
+            {result.years_unknown && (
+              <div className={classes.checkNote}>
+                <IconCalendarQuestion size={18} /> Years of experience could not be read from this CV (no job
+                dates or stated years), so they were not used to exclude. Please check the CV.
+              </div>
+            )}
             {result.outcome === 'ranked' ? (
               <div className={classes.breakdown}>
                 <div className={classes.breakdownTop}>
@@ -202,6 +211,7 @@ export default function ScreeningResults({ data, onViewCv, viewingId }) {
             {ranked.length} {ranked.length === 1 ? 'candidate' : 'candidates'} met every mandatory requirement.
             Weights: {weightsLine(run.weights)}.
             {ranked.some((r) => r.scanned) && ' The scan icon marks CVs read from an image with text recognition.'}
+            {ranked.some((r) => r.years_unknown) && ' The calendar icon marks CVs whose years of experience could not be read: please check them.'}
           </div>
         </div>
         {ranked.length === 0 ? (
@@ -231,6 +241,11 @@ export default function ScreeningResults({ data, onViewCv, viewingId }) {
                   {result.scanned && (
                     <span className={classes.scanChip} title="Scanned CV: read from an image with text recognition. Worth a quick check against the original.">
                       <IconScan size={12} />
+                    </span>
+                  )}
+                  {result.years_unknown && (
+                    <span className={classes.checkChip} title="Years of experience could not be read from this CV. Please check it.">
+                      <IconCalendarQuestion size={12} />
                     </span>
                   )}
                 </div>

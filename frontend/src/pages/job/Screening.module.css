@@ -184,6 +184,18 @@
   flex: none;
 }
 
+/* Years of experience could not be read: the interviewer should check. */
+.checkChip {
+  display: inline-flex;
+  align-items: center;
+  color: #7a5000;
+  background: #fbf0d9;
+  border: 1px solid #f0dcae;
+  border-radius: 4px;
+  padding: 1px 5px;
+  flex: none;
+}
+
 .overall {
   display: flex;
   align-items: center;
@@ -457,6 +469,23 @@
   color: #5a2620;
   font-size: 15px;
   line-height: 1.5;
+}
+
+.checkNote {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #fbf0d9;
+  color: #5c3d00;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.checkNote svg {
+  flex: none;
+  color: #a86b00;
+  margin-top: 2px;
 }
 
 .excludedNote svg {
