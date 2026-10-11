@@ -7,7 +7,10 @@ import { Anchor, Button, Checkbox, TextInput } from '@mantine/core';
 import {
   IconAlertTriangle,
   IconCheck,
+  IconChevronDown,
+  IconChevronRight,
   IconEye,
+  IconMail,
   IconInfoCircle,
   IconListCheck,
   IconPencil,
@@ -76,6 +79,31 @@ export function ShortlistCard({ card }) {
         </ul>
       )}
       <Notes notes={card.notes} warnings={card.warnings} />
+    </div>
+  );
+}
+
+// The email the first candidate gets (collapsible; design: email preview).
+function EmailPreview({ email, action }) {
+  const [open, setOpen] = useState(false);
+  const Chevron = open ? IconChevronDown : IconChevronRight;
+  return (
+    <div className={classes.cardNotes}>
+      <button type="button" className={classes.previewToggle} onClick={() => setOpen(!open)} aria-expanded={open}>
+        <Chevron size={15} />
+        <IconMail size={15} />
+        Email preview · {email.template}
+      </button>
+      {open && (
+        <div className={classes.preview}>
+          <b>Subject: {email.subject}</b>
+          {'\n\n'}
+          {email.text}
+        </div>
+      )}
+      <span className={classes.hint}>
+        {action === 'reschedule' ? 'Moved candidates get this email with the new time and a new link.' : 'Each candidate gets it with their own name, time and private link.'}
+      </span>
     </div>
   );
 }
@@ -153,6 +181,12 @@ export function InvitationConfirmCard({ plan, busy, onDecide }) {
         ))}
       </ul>
       <Notes warnings={plan.warnings} />
+      {plan.email && <EmailPreview email={plan.email} action={plan.action} />}
+      {plan.action === 'cancel' && (
+        <div className={classes.cardNotes}>
+          <span className={classes.hint}>Candidates are not emailed about a cancellation.</span>
+        </div>
+      )}
       <div className={classes.jdActions}>
         <span className={`${classes.hint} ${classes.actionsHint}`}>Nothing is booked until you confirm.</span>
         <Button variant="subtle" color="gray" onClick={() => onDecide({ action: 'cancel' })} disabled={busy}>
@@ -182,6 +216,7 @@ const DONE_TITLES = { invite: 'scheduled', reschedule: 'moved', cancel: 'cancell
 // What happened after confirming: done, or skipped with the reason.
 export function InvitationResultsCard({ result }) {
   const done = result.results.filter((r) => r.done).length;
+  const unsent = result.results.some((r) => r.email && r.email !== 'sent');
   return (
     <div className={classes.jdCard}>
       <div className={classes.jdHead}>
@@ -196,15 +231,20 @@ export function InvitationResultsCard({ result }) {
             <span className={classes.personName}>{r.name}</span>
             <span className={classes.personTime}>{r.starts_at && whenText(r.starts_at)}</span>
             {!r.done && <span className={`${classes.personMeta} ${classes.problemText}`}>{r.reason}</span>}
+            {r.email && (
+              <span className={`${classes.personMeta} ${r.email === 'sent' ? '' : classes.warningText}`}>
+                {r.email === 'sent' ? 'Email sent' : `Email not sent: ${r.email}`}
+              </span>
+            )}
           </li>
         ))}
       </ul>
-      {result.action === 'invite' && done > 0 && (
+      {unsent && (
         <div className={classes.cardNotes}>
           <span className={classes.noteLine}>
             <IconInfoCircle size={15} />
             <span>
-              Each candidate needs their private link: copy it on the{' '}
+              Send the missing emails again, or copy the link, on the{' '}
               <Anchor component={Link} to="/interviews" fz={14} fw={600}>
                 Interviews page
               </Anchor>

@@ -1,10 +1,12 @@
 // Interviews (design: Interviews.dc.html): upcoming and past interviews.
 // Interviews are planned in the Hiring Assistant and appear here once the
-// interviewer confirms them. "Copy link" makes the candidate's private link
-// (only its hash is stored, so a new link replaces the old one); "Cancel"
-// stops the interview and its link. Interviewers only.
+// interviewer confirms them (the invitation email is sent then). "Send
+// invitation" emails it again; "Copy link" makes the candidate's private
+// link (only its hash is stored, so a new link replaces the old one, also
+// an emailed one); "Cancel" stops the interview and its link.
+// Interviewers only.
 
-import { Button, Group, SegmentedControl } from '@mantine/core';
+import { ActionIcon, Button, Group, SegmentedControl, Tooltip } from '@mantine/core';
 import { useDocumentTitle } from '@mantine/hooks';
 import {
   IconBan,
@@ -15,6 +17,7 @@ import {
   IconMailCheck,
   IconMailX,
   IconPlayerRecord,
+  IconSend,
   IconVideo,
   IconX,
 } from '@tabler/icons-react';
@@ -55,7 +58,7 @@ export default function InterviewsPage() {
   const [when, setWhen] = useState('upcoming');
   const [interviews, setInterviews] = useState(null); // null = loading
   const [failed, setFailed] = useState(false);
-  const [linkBusy, setLinkBusy] = useState(null); // interview id
+  const [busy, setBusy] = useState(null); // "send-<id>" or "link-<id>"
   const [cancelling, setCancelling] = useState(null); // interview to confirm
   const [cancelBusy, setCancelBusy] = useState(false);
   useDocumentTitle('Interviews · CandiVue AI');
@@ -75,17 +78,32 @@ export default function InterviewsPage() {
     load();
   }, [load]);
 
+  // Email the invitation (again) with a new private link.
+  async function send(interview) {
+    setBusy(`send-${interview.id}`);
+    try {
+      const result = await apiPost(`/interviews/${interview.id}/send`);
+      if (result.sent) notifyDone(`Invitation sent to ${interview.candidate_name}`);
+      else notifyError('The invitation wasn’t sent.', result);
+      await load();
+    } catch (error) {
+      notifyError('The invitation wasn’t sent.', error);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   // Make a new private link and copy it (the previous one stops working).
   async function copyLink(interview) {
-    setLinkBusy(interview.id);
+    setBusy(`link-${interview.id}`);
     try {
       const { link_token: token } = await apiPost(`/interviews/${interview.id}/link`);
       await navigator.clipboard.writeText(`${window.location.origin}/join/${token}`);
-      notifyDone(`Link for ${interview.candidate_name} copied. Any earlier link no longer works.`);
+      notifyDone(`Link for ${interview.candidate_name} copied. Earlier links, also an emailed one, no longer work.`);
     } catch (error) {
       notifyError('The link wasn’t made.', error);
     } finally {
-      setLinkBusy(null);
+      setBusy(null);
     }
   }
 
@@ -158,21 +176,33 @@ export default function InterviewsPage() {
                   <Button
                     size="xs"
                     variant="light"
-                    leftSection={<IconLink size={14} />}
-                    loading={linkBusy === interview.id}
-                    onClick={() => copyLink(interview)}
+                    leftSection={<IconSend size={14} />}
+                    loading={busy === `send-${interview.id}`}
+                    onClick={() => send(interview)}
                   >
-                    Copy link
+                    {interview.invitation_status === 'pending' ? 'Send invitation' : 'Resend'}
                   </Button>
-                  <Button
-                    size="xs"
-                    variant="subtle"
-                    color="gray"
-                    leftSection={<IconX size={14} />}
-                    onClick={() => setCancelling(interview)}
-                  >
-                    Cancel
-                  </Button>
+                  <Tooltip label="Copy the private link">
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      loading={busy === `link-${interview.id}`}
+                      onClick={() => copyLink(interview)}
+                      aria-label={`Copy the private link for ${interview.candidate_name}`}
+                    >
+                      <IconLink size={17} />
+                    </ActionIcon>
+                  </Tooltip>
+                  <Tooltip label="Cancel the interview">
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      onClick={() => setCancelling(interview)}
+                      aria-label={`Cancel the interview with ${interview.candidate_name}`}
+                    >
+                      <IconX size={17} />
+                    </ActionIcon>
+                  </Tooltip>
                 </>
               )}
             </Group>
@@ -205,7 +235,7 @@ export default function InterviewsPage() {
         busy={cancelBusy}
       >
         The interview with {cancelling?.candidate_name} on {cancelling && whenText(cancelling.scheduled_at)} is
-        cancelled and their link stops working. No email is sent.
+        cancelled and their link stops working. The candidate is not emailed about it.
       </ConfirmModal>
     </div>
   );

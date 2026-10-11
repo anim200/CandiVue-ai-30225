@@ -528,6 +528,33 @@
   color: #932e24;
 }
 
+.previewToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: #1c5d65;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+/* The email exactly as sent: plain text, line breaks kept. */
+.preview {
+  white-space: pre-wrap;
+  background: #f5f7f8;
+  border: 1px solid #e9ecee;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #1a2227;
+  animation: fade 0.2s ease-out;
+}
+
 /* "Nothing is booked until you confirm" sits left of the buttons and wraps
    before the buttons do. */
 .actionsHint {
