@@ -30,7 +30,8 @@ class FakeSmtp:
         """Close the (fake) connection."""
 
     def login(self, user, password):
-        """Accept any login."""
+        """Accept any login; remember the password that was used."""
+        FakeSmtp.password = password
 
     def send_message(self, message):
         """Record the message, or fail like a real server would."""
@@ -56,7 +57,7 @@ def smtp(monkeypatch):
     for name, value in {
         "SMTP_HOST": "smtp.example.com",
         "SMTP_USER": "hiring@example.com",
-        "SMTP_PASSWORD": "app-password",
+        "SMTP_PASSWORD": "abcd efgh ijkl mnop",  # as Google shows it
     }.items():
         monkeypatch.setenv(name, value)
     monkeypatch.delenv("EMAIL_TEST_RECIPIENT", raising=False)
@@ -76,6 +77,7 @@ def test_an_email_is_sent_as_plain_text(smtp):
     assert message["To"] == "candidate.a@example.com"
     assert message["Subject"] == "Interview invitation"
     assert message.get_content_type() == "text/plain"
+    assert smtp.password == "abcdefghijklmnop"  # the spaces are not sent
 
 
 def test_the_test_recipient_gets_every_email(smtp, monkeypatch):

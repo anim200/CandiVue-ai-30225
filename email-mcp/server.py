@@ -74,7 +74,10 @@ def send_email(
         port = int(os.environ.get("SMTP_PORT", "465"))
         context = ssl.create_default_context()
         with smtplib.SMTP_SSL(os.environ["SMTP_HOST"], port, context=context, timeout=30) as smtp:
-            smtp.login(os.environ["SMTP_USER"], os.environ["SMTP_PASSWORD"])
+            # Google shows app passwords in groups of four ("abcd efgh ...");
+            # the spaces are not part of the password.
+            password = os.environ["SMTP_PASSWORD"].replace(" ", "")
+            smtp.login(os.environ["SMTP_USER"], password)
             smtp.send_message(message)
     except smtplib.SMTPAuthenticationError:
         logger.warning("Email sign-in failed")
