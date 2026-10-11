@@ -1,7 +1,7 @@
 """Interviews API: the Interviews page lists the scheduled and past
 interviews, (re)sends the invitation email and cancels an interview; the
 interviewer joins the video call (a ticket for its LiveKit room) and ends
-it.
+it. Sending and cancelling also update the interviewer's Google Calendar.
 
 Interviewers only (N9). Interviews are created from the Hiring Assistant
 after the interviewer confirms them (§4B-7b). The email is the only way a
@@ -24,7 +24,7 @@ from app.core import clock
 from app.db.database import get_db
 from app.db.models import Candidate, InterviewSession, Job, User
 from app.db.models.interview import InvitationStatus, SessionStatus
-from app.interviews import emails, planning, room
+from app.interviews import calendar_sync, emails, planning, room
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,7 @@ class InterviewOut(BaseModel):
     duration_minutes: int
     status: SessionStatus
     invitation_status: InvitationStatus
+    invitation_error: str | None  # why the last email failed
 
 
 class SendOut(BaseModel):
@@ -60,6 +61,15 @@ class SendOut(BaseModel):
 
     sent: bool
     message: str  # "Invitation sent" or why it failed
+    calendar: str | None  # "added" / "moved", or why the calendar failed
+
+
+class CancelOut(BaseModel):
+    """The result of a cancellation: the candidate's email and the calendar
+    ("sent" / "removed", why it failed, or None: nothing to do)."""
+
+    email: str | None
+    calendar: str | None
 
 
 class TicketOut(BaseModel):
@@ -134,23 +144,33 @@ def end_interview(
 def send_invitation(
     interview_id: int, db: Annotated[Session, Depends(get_db)]
 ) -> SendOut:
-    """Email the invitation (again) with a new private link."""
+    """Email the invitation (again) with a new private link, and put the
+    interview in the calendar if it is not there yet."""
     session = _active(db, interview_id)
     token, session.join_token_hash = planning.new_link_token()
     text, _ = emails.template(db)
     problem = emails.deliver(db, session, token, text)
+    calendar = calendar_sync.sync(db, session)
     db.commit()
-    return SendOut(sent=problem is None, message=problem or "Invitation sent")
+    return SendOut(
+        sent=problem is None, message=problem or "Invitation sent", calendar=calendar
+    )
 
 
-@router.post("/{interview_id}/cancel", status_code=status.HTTP_204_NO_CONTENT)
-def cancel(interview_id: int, db: Annotated[Session, Depends(get_db)]) -> None:
-    """Cancel a scheduled interview (its link stops working and an open
-    call is closed)."""
-    _active(db, interview_id).status = SessionStatus.CANCELLED
+@router.post("/{interview_id}/cancel", response_model=CancelOut)
+def cancel(interview_id: int, db: Annotated[Session, Depends(get_db)]) -> CancelOut:
+    """Cancel a scheduled interview: its link stops working, an open call is
+    closed, the candidate is emailed (if invited) and the calendar event is
+    removed."""
+    session = _active(db, interview_id)
+    session.status = SessionStatus.CANCELLED
     db.commit()
     room.end_room(interview_id)
     logger.info("Interview cancelled: session %d", interview_id)
+    email = planning.cancel_notice(db, session)
+    calendar = calendar_sync.sync(db, session)
+    db.commit()
+    return CancelOut(email=email, calendar=calendar)
 
 
 def _out(db: Session, session: InterviewSession) -> InterviewOut:
@@ -165,6 +185,7 @@ def _out(db: Session, session: InterviewSession) -> InterviewOut:
         duration_minutes=session.duration_minutes,
         status=session.status,
         invitation_status=session.invitation_status,
+        invitation_error=session.invitation_error,
     )
 
 

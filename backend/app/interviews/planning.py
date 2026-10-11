@@ -7,7 +7,10 @@ Plan: one item per candidate with its problem (blocks it) or warnings (shown
 on the confirmation card), and a preview of the invitation email. The same
 checks run again when the interviewer confirms, because time has passed
 (apply() skips what is no longer allowed). Invited and moved candidates are
-then emailed their private link (app/interviews/emails.py).
+then emailed their private link (app/interviews/emails.py), cancelled ones
+a cancellation, and the interviewer's Google Calendar is updated
+(app/interviews/calendar_sync.py). Times are checked against the
+interviewer's other interviews and the busy times in that calendar.
 Times are stored in UTC and read/typed in local time (app/core/clock.py).
 """
 
@@ -21,8 +24,8 @@ from sqlalchemy.orm import Session
 from app.auth.security import hash_link_token
 from app.core import clock
 from app.db.models import Candidate, InterviewSession, Job
-from app.db.models.interview import SessionStatus
-from app.interviews import emails, ranking
+from app.db.models.interview import InvitationStatus, SessionStatus
+from app.interviews import calendar_sync, emails, ranking, room
 
 WORK_START, WORK_END = time(9), time(17)  # outside these hours: a warning only
 MIN_NOTICE = timedelta(hours=1)  # an interview starts at least 1 hour from now
@@ -42,6 +45,7 @@ class Plan:
     problems: list[str] = field(default_factory=list)  # block the whole plan
     warnings: list[str] = field(default_factory=list)
     email: dict | None = None  # preview: subject, text and template name
+    calendar_checked: bool = False  # the times are free in the Google Calendar
 
     @property
     def ok(self) -> bool:
@@ -57,6 +61,7 @@ class Plan:
             "problems": self.problems,
             "warnings": self.warnings,
             "email": self.email,
+            "calendar_checked": self.calendar_checked,
         }
 
     def as_text(self) -> str:
@@ -83,10 +88,16 @@ def free_slots(
     count: int = 5,
     duration: int = 45,
     weekdays_only: bool = True,
-) -> list[datetime]:
+) -> tuple[list[datetime], str | None]:
     """Up to `count` free start times (UTC) between the two days, within the
-    hours, that do not overlap the interviewer's other interviews."""
-    busy = _busy(db, interviewer_id)
+    hours, that do not overlap the interviewer's other interviews or busy
+    calendar times; and a warning if the calendar could not be checked."""
+    window = (
+        datetime.combine(days[0], time(0), clock.local_zone()),
+        datetime.combine(days[1] + timedelta(days=1), time(0), clock.local_zone()),
+    )
+    calendar_busy, warning = calendar_sync.busy_times(db, *window)
+    busy = _busy(db, interviewer_id) + calendar_busy
     length = timedelta(minutes=duration)
     found = []
     day = days[0]
@@ -100,7 +111,7 @@ def free_slots(
             if start >= clock.now() + MIN_NOTICE and not _overlap(start, length, busy):
                 found.append(start)
             start += length + BREAK
-    return found
+    return found, warning
 
 
 def make_plan(
@@ -134,6 +145,13 @@ def make_plan(
     moving = [_active_session(db, job_id, int(r["candidate_id"])) for r in unique]
     busy = _busy(db, interviewer_id, skip={s.id for s in moving if s})
     length = timedelta(minutes=duration)
+    if action != "cancel" and unique:
+        calendar_busy, warning = calendar_sync.busy_times(
+            db, clock.now(), clock.now() + MAX_AHEAD + length
+        )
+        busy += calendar_busy
+        plan.calendar_checked = warning is None
+        plan.warnings += [warning] if warning else []
     for request, session in zip(unique, moving, strict=True):
         candidate = db.get(Candidate, int(request["candidate_id"]))
         item = _item(candidate, session, rows)
@@ -171,8 +189,9 @@ def make_plan(
 def apply(db: Session, plan: Plan, job_id: int, interviewer_id: int) -> list[dict]:
     """Save a confirmed plan: what passed its checks is done, the rest is
     skipped with the reason. Invited and moved candidates are emailed a new
-    private link. Returns one result per candidate."""
-    results, to_email = [], []
+    private link, cancelled ones a cancellation; then the calendar is
+    updated. Returns one result per candidate."""
+    results, to_email, cancelled = [], [], []
     for item in plan.items:
         reason = item["problem"] or (plan.problems[0] if plan.problems else None)
         result = {
@@ -180,12 +199,13 @@ def apply(db: Session, plan: Plan, job_id: int, interviewer_id: int) -> list[dic
             "starts_at": item["starts_at"],
             "done": not reason,
         }
-        results.append({**result, "reason": reason, "email": None})
+        results.append({**result, "reason": reason, "email": None, "calendar": None})
         if reason:
             continue
         session = _active_session(db, job_id, item["candidate_id"])
         if plan.action == "cancel":
             session.status = SessionStatus.CANCELLED
+            cancelled.append((results[-1], session))
             continue
         token, token_hash = new_link_token()
         if plan.action == "invite":
@@ -204,8 +224,21 @@ def apply(db: Session, plan: Plan, job_id: int, interviewer_id: int) -> list[dic
         text, _ = emails.template(db)
         for result, session, token in to_email:
             result["email"] = emails.deliver(db, session, token, text) or "sent"
-        db.commit()
+    for result, session in cancelled:
+        room.end_room(session.id)  # an open call closes
+        result["email"] = cancel_notice(db, session)
+    for result, session, *_ in to_email + cancelled:  # (token not needed)
+        result["calendar"] = calendar_sync.sync(db, session)
+    db.commit()
     return results
+
+
+def cancel_notice(db: Session, session: InterviewSession) -> str | None:
+    """Email a cancellation to a candidate who had been sent the invitation
+    ("sent", or why it failed); None if they were never invited by email."""
+    if session.invitation_status != InvitationStatus.SENT:
+        return None
+    return emails.deliver_cancellation(db, session) or "sent"
 
 
 def new_link_token() -> tuple[str, str]:

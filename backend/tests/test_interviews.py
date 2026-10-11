@@ -59,11 +59,13 @@ def mailbox(monkeypatch):
     (set .fail to make sending fail; .templates to fake the knowledge base)."""
     box = type("Mailbox", (), {"sent": [], "fail": None, "templates": []})()
 
-    def send(to, subject, text, html=None):
+    def send(to, subject, text, html=None, invite=None):
         """Record the email, or fail like the email server would."""
         if box.fail:
             raise EmailError(box.fail)
-        box.sent.append({"to": to, "subject": subject, "text": text, "html": html})
+        box.sent.append(
+            {"to": to, "subject": subject, "text": text, "html": html, "invite": invite}
+        )
         return {"sent_to": to, "message_id": "<1@test>"}
 
     monkeypatch.setattr(emails, "send_email", send)
@@ -343,7 +345,7 @@ def test_confirmed_plan_creates_interviews_and_checks_again(screened):
     assert "Already invited" in again.items[0]["problem"]
 
 
-def test_reschedule_and_cancel(screened):
+def test_reschedule_and_cancel(screened, calendar, mailbox):
     shortlist_people(screened["job_id"], screened["Alex"])
     alex = screened["Alex"]
     with SessionLocal() as db:
@@ -354,7 +356,14 @@ def test_reschedule_and_cancel(screened):
             "invite",
             [{"candidate_id": alex, "starts_at": local_iso(2, 10)}],
         )
-        planning.apply(db, first, screened["job_id"], screened["user_id"])
+        (added,) = planning.apply(db, first, screened["job_id"], screened["user_id"])
+        assert added["calendar"] == "added"
+        (event_id,) = calendar.events
+        start, end = calendar.events[event_id]
+        # The interview's own event is in the calendar's busy times too.
+        calendar.busy = [
+            {"event_id": event_id, "start": start.isoformat(), "end": end.isoformat()}
+        ]
 
         # Moving an interview may overlap its own old time.
         moved = planning.make_plan(
@@ -365,7 +374,9 @@ def test_reschedule_and_cancel(screened):
             [{"candidate_id": alex, "starts_at": local_iso(2, 10, 15)}],
         )
         assert moved.ok
-        planning.apply(db, moved, screened["job_id"], screened["user_id"])
+        (result,) = planning.apply(db, moved, screened["job_id"], screened["user_id"])
+        assert result["calendar"] == "moved"
+        assert calendar.events[event_id][0] == start + timedelta(minutes=15)
         cancel = planning.make_plan(
             db,
             screened["job_id"],
@@ -373,7 +384,7 @@ def test_reschedule_and_cancel(screened):
             "cancel",
             [{"candidate_id": alex}],
         )
-        planning.apply(db, cancel, screened["job_id"], screened["user_id"])
+        (result,) = planning.apply(db, cancel, screened["job_id"], screened["user_id"])
         session = db.scalar(
             select(InterviewSession).where(InterviewSession.candidate_id == alex)
         )
@@ -381,6 +392,11 @@ def test_reschedule_and_cancel(screened):
     local = session.scheduled_at.astimezone(clock.local_zone())
     assert local.strftime("%H:%M") == "10:15"
     assert session.status == SessionStatus.CANCELLED
+    assert result == {**result, "email": "sent", "calendar": "removed"}
+    assert calendar.events == {} and session.calendar_event_id is None
+    invites = [email["invite"]["method"] for email in mailbox.sent]
+    assert invites == ["REQUEST", "REQUEST", "CANCEL"]  # one event, kept up to date
+    assert "has been cancelled" in mailbox.sent[-1]["text"]
     nothing = plan(screened, "cancel", [{"candidate_id": alex}])
     assert "no scheduled interview" in nothing.items[0]["problem"]
 
@@ -400,7 +416,7 @@ def test_free_slots_skip_weekends_and_booked_times(screened):
             )
         )
         db.commit()
-        slots = planning.free_slots(
+        slots, warning = planning.free_slots(
             db,
             screened["user_id"],
             (monday - timedelta(days=2), monday),  # Saturday to Monday
@@ -410,6 +426,52 @@ def test_free_slots_skip_weekends_and_booked_times(screened):
 
     local = [s.astimezone(clock.local_zone()).strftime("%a %H:%M") for s in slots]
     assert local == ["Mon 10:00", "Mon 11:00"]  # 09:00 is booked; 45 min + break
+    assert warning is None
+
+
+def test_busy_calendar_times_block_a_time(screened, calendar):
+    shortlist_people(screened["job_id"], screened["Alex"])
+    meeting = clock.parse_local(local_iso(2, 10))
+    calendar.busy = [
+        {
+            "event_id": "meeting1",
+            "start": meeting.isoformat(),
+            "end": (meeting + timedelta(hours=1)).isoformat(),
+        }
+    ]
+
+    clash = plan(
+        screened,
+        items=[{"candidate_id": screened["Alex"], "starts_at": local_iso(2, 10, 30)}],
+    )
+    with SessionLocal() as db:
+        day = meeting.astimezone(clock.local_zone()).date()
+        slots, _ = planning.free_slots(
+            db,
+            screened["user_id"],
+            (day, day),
+            (time(10), time(12)),
+            weekdays_only=False,
+        )
+
+    assert "busy time in your calendar" in clash.items[0]["problem"]
+    local = [s.astimezone(clock.local_zone()).strftime("%H:%M") for s in slots]
+    assert local == ["11:00"]  # 10:00 is the meeting
+
+
+def test_an_unreachable_calendar_never_blocks_interviews(screened, calendar):
+    shortlist_people(screened["job_id"], screened["Alex"])
+    calendar.fail = "The calendar could not be reached."
+    items = [{"candidate_id": screened["Alex"], "starts_at": local_iso(2, 10)}]
+
+    with SessionLocal() as db:
+        checked = planning.make_plan(
+            db, screened["job_id"], screened["user_id"], "invite", items
+        )
+        (result,) = planning.apply(db, checked, screened["job_id"], screened["user_id"])
+
+    assert checked.ok and "could not be checked" in checked.warnings[0]
+    assert result["done"] and result["calendar"] == "The calendar could not be reached."
 
 
 # ---------- the whole flow through the chat and the API ----------
@@ -487,7 +549,8 @@ def test_shortlist_then_invite_through_the_chat(screened, client, scripted, mail
     candidate = {"Authorization": f"Bearer {joined.json()['access_token']}"}
     assert client.get("/api/interviews", headers=candidate).status_code == 403
     cancel = client.post(f"/api/interviews/{interview['id']}/cancel", headers=headers)
-    assert cancel.status_code == 204
+    assert cancel.json() == {"email": "sent", "calendar": "removed"}
+    assert mailbox.sent[-1]["invite"]["method"] == "CANCEL"
     assert client.post("/api/auth/candidate", json=token).status_code == 410
 
     ranked = client.get(f"/api/jobs/{job_id}/screenings/latest", headers=headers).json()
@@ -668,15 +731,23 @@ def test_a_failed_email_keeps_the_interview(screened, mailbox):
             )
         ).all()
     assert statuses == [InvitationStatus.FAILED, InvitationStatus.FAILED]
+    with SessionLocal() as db:
+        errors = db.scalars(
+            select(InterviewSession.invitation_error).where(
+                InterviewSession.job_id == screened["job_id"]
+            )
+        ).all()
+    assert sorted(errors) == ["No email address.", "The email address was refused."]
 
 
-def test_send_again_from_the_interviews_page(screened, client, mailbox):
+def test_send_again_from_the_interviews_page(screened, client, mailbox, calendar):
     headers = {
         "Authorization": f"Bearer {create_access_token(screened['user_id'], Role.INTERVIEWER)}"
     }
     mailbox.fail = "The email service could not be reached."
+    calendar.fail = "The calendar could not be reached."
     invite(screened, screened["Alex"])
-    mailbox.fail = None
+    mailbox.fail = calendar.fail = None
     upcoming = client.get("/api/interviews", headers=headers).json()
     (interview,) = [i for i in upcoming if i["job_id"] == screened["job_id"]]
 
@@ -684,7 +755,7 @@ def test_send_again_from_the_interviews_page(screened, client, mailbox):
         f"/api/interviews/{interview['id']}/send", headers=headers
     ).json()
 
-    assert answer == {"sent": True, "message": "Invitation sent"}
+    assert answer == {"sent": True, "message": "Invitation sent", "calendar": "added"}
     link = mailbox.sent[-1]["text"].split("/join/")[1].split()[0]
     assert (
         client.post("/api/auth/candidate", json={"link_token": link}).status_code == 200

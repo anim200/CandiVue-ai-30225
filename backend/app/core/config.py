@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     # Where candidates open their private interview link (this app's address).
     app_public_url: str = "http://localhost:5173"
 
+    # Calendar MCP server (calendar-mcp container): the interviewer's Google
+    # Calendar. The Google sign-in lives only in that container.
+    calendar_mcp_url: str = "http://calendar-mcp:8003/mcp"
+
     # Video calls (F3): the LiveKit server in Docker. The key and secret sign
     # each room "ticket" (only this backend can make them) and LiveKit's
     # webhooks. Empty secret: calls show "not set up".

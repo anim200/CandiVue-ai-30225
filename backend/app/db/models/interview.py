@@ -52,6 +52,7 @@ class InterviewSession(TimestampMixin, Base):
     invitation_status: Mapped[InvitationStatus] = mapped_column(
         status_column(InvitationStatus), default=InvitationStatus.PENDING
     )
+    invitation_error: Mapped[str | None] = mapped_column(String(300))  # why it failed
     calendar_event_id: Mapped[str | None] = mapped_column(String(200))
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

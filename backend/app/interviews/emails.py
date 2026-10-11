@@ -11,14 +11,16 @@ standard text is used, so invitations never get stuck.
 Each email has a plain-text part and an HTML part built from a fixed,
 simple layout: paragraphs, a details table for "- **Label:** value" lines,
 and a "Join your interview" button for the private link. All template text
-is HTML-escaped; the private link is the only link.
+is HTML-escaped; the private link is the only link. A calendar invite goes
+with it, so the interview appears in the candidate's calendar; a moved
+interview updates it and a cancellation (a short fixed text) removes it.
 """
 
 import html
 import logging
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -46,6 +48,15 @@ Thank you for applying for the {job_title} role. We would like to invite you to 
 - **Your personal link:** {interview_link}
 
 If this time does not suit you, reply to this email and we will find another one.
+
+Kind regards,
+The hiring team
+"""
+CANCELLED = """Hello {candidate_name},
+
+We are sorry to tell you that your interview for the {job_title} role on {date} at {time} ({time_zone}) has been cancelled. Your interview link no longer works.
+
+We will contact you if a new time is arranged.
 
 Kind regards,
 The hiring team
@@ -92,16 +103,7 @@ def compose(
     link: str,
 ) -> Invitation:
     """Fill the template for one candidate."""
-    local = starts_at.astimezone(clock.local_zone())
-    values = {
-        "candidate_name": candidate.full_name or "there",
-        "job_title": job.title,
-        "date": local.strftime("%A %d %B %Y"),
-        "time": local.strftime("%H:%M"),
-        "time_zone": clock.local_zone().key,
-        "duration": str(duration),
-        "interview_link": link,
-    }
+    values = _values(candidate, job, starts_at, duration, link)
     lines = text.splitlines()
     first = next(i for i, line in enumerate(lines) if line.startswith("Subject:"))
     section = []
@@ -129,20 +131,80 @@ def deliver(
     job = db.get(Job, session.job_id)
     if not candidate.email:
         session.invitation_status = InvitationStatus.FAILED
-        return "No email address."
+        session.invitation_error = "No email address."
+        return session.invitation_error
     link = f"{get_settings().app_public_url.rstrip('/')}/join/{token}"
     email = compose(
         text, candidate, job, session.scheduled_at, session.duration_minutes, link
     )
+    invite = _invite(session, job, "REQUEST", link)
     try:
-        send_email(candidate.email, email.subject, email.text, email.html)
+        send_email(candidate.email, email.subject, email.text, email.html, invite)
     except EmailError as exc:
         session.invitation_status = InvitationStatus.FAILED
+        session.invitation_error = str(exc)[:300]
         logger.warning("Invitation email failed: session %d", session.id)
-        return str(exc)
+        return session.invitation_error
     session.invitation_status = InvitationStatus.SENT
+    session.invitation_error = None
     logger.info("Invitation email sent: session %d", session.id)
     return None
+
+
+def deliver_cancellation(db: Session, session: InterviewSession) -> str | None:
+    """Tell the candidate their interview was cancelled; the calendar invite
+    removes it from their calendar. Returns why it failed, or None if sent."""
+    candidate = db.get(Candidate, session.candidate_id)
+    job = db.get(Job, session.job_id)
+    if not candidate.email:
+        return "No email address."
+    values = _values(candidate, job, session.scheduled_at, session.duration_minutes, "")
+    subject = f"Interview cancelled: {job.title}"
+    blocks = _blocks(CANCELLED.format(**values))
+    invite = _invite(session, job, "CANCEL", "")
+    try:
+        send_email(
+            candidate.email,
+            subject,
+            _as_text(blocks),
+            _as_html(subject, blocks, ""),
+            invite,
+        )
+    except EmailError as exc:
+        logger.warning("Cancellation email failed: session %d", session.id)
+        return str(exc)
+    logger.info("Cancellation email sent: session %d", session.id)
+    return None
+
+
+def _values(candidate, job, starts_at: datetime, duration: int, link: str) -> dict:
+    """The placeholder values for one candidate's email."""
+    local = starts_at.astimezone(clock.local_zone())
+    return {
+        "candidate_name": candidate.full_name or "there",
+        "job_title": job.title,
+        "date": local.strftime("%A %d %B %Y"),
+        "time": local.strftime("%H:%M"),
+        "time_zone": clock.local_zone().key,
+        "duration": str(duration),
+        "interview_link": link,
+    }
+
+
+def _invite(session: InterviewSession, job: Job, method: str, link: str) -> dict:
+    """The calendar invite sent with an email. The same interview always has
+    the same uid, so a new time or a cancellation updates the same event."""
+    end = session.scheduled_at + timedelta(minutes=session.duration_minutes)
+    join = f" Join with your personal link: {link}" if link else ""
+    return {
+        "method": method,
+        "uid": f"candivue-interview-{session.id}@candivue.local",
+        "start": session.scheduled_at.isoformat(),
+        "end": end.isoformat(),
+        "summary": f"Interview: {job.title}",
+        "location": link,
+        "description": f"Video interview for the {job.title} role.{join}",
+    }
 
 
 def _whole_document(db: Session, document_id: int) -> str:
@@ -203,22 +265,30 @@ def _as_text(blocks: list) -> str:
 
 def _as_html(subject: str, blocks: list, link: str) -> str:
     """The HTML part: a simple, mobile-friendly card (tables and inline
-    styles, which email programs understand). Everything is escaped."""
+    styles, which email programs understand). Everything is escaped. No
+    link (a cancellation): no button and no "personal link" footer."""
     safe_link = html.escape(link, quote=True)
+    footer = (
+        '<tr><td style="padding:16px 28px;border-top:1px solid #e9ecee;font-size:12px;'
+        'color:#66717a">This link is personal: please do not share it.</td></tr>'
+        if link
+        else ""
+    )
     body = []
     for kind, items in blocks:
         if kind == "paragraph":
             lines = "<br>".join(html.escape(line.replace("**", "")) for line in items)
-            lines = lines.replace(
-                html.escape(link),
-                f'<a href="{safe_link}" style="color:{BRAND}">{safe_link}</a>',
-            )
+            if link:
+                lines = lines.replace(
+                    html.escape(link),
+                    f'<a href="{safe_link}" style="color:{BRAND}">{safe_link}</a>',
+                )
             body.append(f'<p style="margin:0 0 16px">{lines}</p>')
             continue
         rows, has_link = [], False
         for item in items:
             label, value = _label(item)
-            if link in value:
+            if link and link in value:
                 has_link = True  # shown as the button below the table
                 continue
             label_cell = (
@@ -254,8 +324,6 @@ def _as_html(subject: str, blocks: list, link: str) -> str:
         'width:100%;border-collapse:collapse;background:#ffffff;border:1px solid #dee3e6">'
         f'<tr><td style="background:{BRAND};color:#ffffff;padding:18px 28px;'
         f'font-size:18px;font-weight:600">{html.escape(subject)}</td></tr>'
-        f'<tr><td style="padding:28px">{"".join(body)}</td></tr>'
-        '<tr><td style="padding:16px 28px;border-top:1px solid #e9ecee;font-size:12px;'
-        'color:#66717a">This link is personal: please do not share it.</td></tr>'
+        f'<tr><td style="padding:28px">{"".join(body)}</td></tr>{footer}'
         "</table></body></html>"
     )

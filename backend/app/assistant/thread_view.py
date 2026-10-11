@@ -100,6 +100,8 @@ def thread_items(db: Session, messages: list) -> list[dict]:
                 items.append(artifact)
             elif kind == "slots":
                 text = f"Found {len(artifact['times'])} free interview times"
+                if artifact.get("warnings"):
+                    text += " (your calendar could not be checked)"
                 items.append({"kind": "step", "text": text})
             elif kind == "interview_plan":
                 text = "Prepared the interviews for your confirmation"

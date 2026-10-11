@@ -1,6 +1,7 @@
-"""Calls a tool on one of CandiVue's MCP servers (job board, email), trying
-up to 3 times with a short, growing pause. If it still fails, ToolFailed
-carries a message that is safe to show."""
+"""Calls a tool on one of CandiVue's MCP servers (job board, email,
+calendar), trying up to 3 times with a short, growing pause. If it still
+fails, ToolFailed carries a message that is safe to show. A server that is
+"not set up" (missing settings) is not asked again: that cannot change."""
 
 import asyncio
 import logging
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 ATTEMPTS = 3  # design: "I tried 3 times"
 WAIT_SECONDS = 1.0  # pause before the 2nd try, doubled before the 3rd; tests set 0
+NOT_SET_UP = "not set up"  # in the servers' message for missing settings
 
 
 class ToolFailed(Exception):
@@ -42,6 +44,8 @@ def call_tool(url: str, tool: str, arguments: dict) -> dict:
             return asyncio.run(_call_once(url, tool, arguments))
         except ToolFailed as exc:
             last_error = str(exc)
+            if NOT_SET_UP in last_error:
+                break
         except Exception as exc:  # noqa: BLE001 - network/MCP errors: retry, then a safe message
             logger.warning("MCP call %s failed: %s", tool, type(exc).__name__)
         if attempt < ATTEMPTS:

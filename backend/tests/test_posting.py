@@ -96,6 +96,21 @@ def test_publish_retries_then_succeeds(monkeypatch):
     assert len(calls) == 3
 
 
+def test_a_server_that_is_not_set_up_is_asked_once(monkeypatch):
+    calls = []
+
+    async def not_set_up(url, tool, arguments):
+        """The job board has no settings yet."""
+        calls.append(tool)
+        raise ToolFailed("The job board is not set up yet: add the BLOGGER_* settings.")
+
+    monkeypatch.setattr(mcp_client, "_call_once", not_set_up)
+
+    with pytest.raises(JobBoardError, match="not set up"):
+        publish_job_post("T", "<p>body text here</p>", [])
+    assert len(calls) == 1
+
+
 def test_publish_gives_up_after_three_tries_with_a_safe_message(monkeypatch):
     async def refused(url, tool, arguments):
         """The job board refuses every time."""

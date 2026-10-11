@@ -112,11 +112,12 @@ def find_free_slots(
 ) -> tuple[str, dict]:
     """Find free interview start times (local time) between two days, e.g.
     "next week, mornings" = Monday to Friday, earliest 09:00, latest 12:00.
-    Times that clash with the interviewer's other interviews are left out."""
+    Times that clash with the interviewer's other interviews or busy times
+    in their calendar are left out."""
     if last_day < first_day or (last_day - first_day).days > 90:
         raise ValueError("Give a range of at most 90 days, first_day before last_day.")
     with SessionLocal() as db:
-        slots = planning.free_slots(
+        slots, warning = planning.free_slots(
             db,
             interviewer_id,
             (first_day, last_day),
@@ -132,7 +133,13 @@ def find_free_slots(
     content = (
         "Free times: " + ", ".join(local) if slots else "No free times in that range."
     )
-    return content, {"kind": "slots", "times": times}
+    if warning:
+        content += f"\nWarning: {warning}"
+    return content, {
+        "kind": "slots",
+        "times": times,
+        "warnings": [warning] if warning else [],
+    }
 
 
 @tool(response_format="content_and_artifact")

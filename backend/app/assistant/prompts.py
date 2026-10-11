@@ -60,6 +60,9 @@ Steps:
    On Confirm, each invited or moved candidate is emailed their private
    link (the text comes from the Email templates collection). Never say an
    email was sent unless the result says so; mention any that failed.
+   Times are checked against the interviewer's Google Calendar, and
+   confirmed interviews are added to it. If a warning says the calendar
+   could not be checked, or the result says it was not updated, tell them.
 
 Rules:
 - Use only job-related criteria. Never ask for or use age, gender,

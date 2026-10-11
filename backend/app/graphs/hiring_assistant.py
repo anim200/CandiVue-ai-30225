@@ -292,9 +292,15 @@ def confirm_invitations(state: AssistantState) -> dict:
         for r in results
         if r["email"] not in (None, "sent")
     )
+    no_calendar = "; ".join(
+        f"{r['name']}: {r['calendar']}"
+        for r in results
+        if r["calendar"] not in (None, "added", "moved", "removed")
+    )
     note = f"I confirmed ({plan['action']}): {done} done."
     note += f" Skipped: {skipped}." if skipped else ""
     note += f" Emails not sent: {unsent}." if unsent else ""
+    note += f" Calendar not updated: {no_calendar}." if no_calendar else ""
     logger.info("Interviews %s: job %d, %d done", plan["action"], state["job_id"], done)
     marks = {"invitations": {"action": plan["action"], "results": results}}
     return {"messages": [HumanMessage(note, additional_kwargs=marks)]}

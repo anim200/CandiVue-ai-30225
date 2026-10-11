@@ -80,9 +80,12 @@ class JobOut(BaseModel):
     weights: dict[str, Any]
     ai_weights: dict[str, Any] | None = None  # the AI suggestion, if any
     applications_close_at: datetime | None = None  # CVs after it are not taken
-    # The latest screening run: its status and how many passed the gate.
+    # The latest screening run: its status, when it finished and how many
+    # passed the gate (ranked) or not (excluded).
     screening_status: RunStatus | None = None
+    screened_at: datetime | None = None
     ranked_count: int = 0
+    excluded_count: int = 0
     shortlisted_count: int = 0
     interview_count: int = 0  # scheduled (or live) interviews
     updated_at: datetime
@@ -126,11 +129,12 @@ def job_stage(job: Job, latest_jd: JobDescription | None) -> str:
     return "jd_rejected"
 
 
-def ranked_count(db: Session, run_id: int) -> int:
-    """How many candidates passed the gate in a screening run."""
+def gate_count(db: Session, run_id: int, passed: bool) -> int:
+    """How many candidates passed (or did not pass) the gate in a run."""
     return db.scalar(
         select(func.count(CandidateScore.id)).where(
-            CandidateScore.screening_run_id == run_id, CandidateScore.passed_gate
+            CandidateScore.screening_run_id == run_id,
+            CandidateScore.passed_gate.is_(passed),
         )
     )
 
@@ -167,7 +171,9 @@ def to_job_out(db: Session, job: Job) -> JobOut:
         ai_weights=job.ai_weights,
         applications_close_at=job.applications_close_at,
         screening_status=run.status if run else None,
-        ranked_count=ranked_count(db, run.id) if run else 0,
+        screened_at=run.finished_at if run else None,
+        ranked_count=gate_count(db, run.id, True) if run else 0,
+        excluded_count=gate_count(db, run.id, False) if run else 0,
         shortlisted_count=db.scalar(
             select(func.count(Candidate.id)).where(
                 Candidate.job_id == job.id, Candidate.shortlisted_at.is_not(None)
