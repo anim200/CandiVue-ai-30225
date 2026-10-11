@@ -6,7 +6,12 @@ import zipfile
 import pytest
 from docx import Document
 
-from app.knowledge.chunking import CHUNK_OVERLAP, CHUNK_SIZE, split_into_chunks
+from app.knowledge.chunking import (
+    CHUNK_OVERLAP,
+    CHUNK_SIZE,
+    join_chunks,
+    split_into_chunks,
+)
 from app.knowledge.files import (
     NO_TEXT,
     UNSUPPORTED,
@@ -129,3 +134,12 @@ def test_long_text_is_split_with_overlap():
     assert all(len(chunk) <= CHUNK_SIZE + CHUNK_OVERLAP + 2 for chunk in chunks)
     # The start of each passage repeats the end of the previous one.
     assert chunks[0][-CHUNK_OVERLAP:] in chunks[1]
+
+
+def test_passages_join_back_into_the_document():
+    sentences = " ".join(["Some words here."] * 20)
+    text = "\n\n".join(f"Paragraph {i}. {sentences}" for i in range(12))
+
+    chunks = split_into_chunks(text)
+
+    assert len(chunks) > 3 and join_chunks(chunks) == text

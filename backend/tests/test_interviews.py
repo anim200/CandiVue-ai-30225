@@ -59,15 +59,16 @@ def mailbox(monkeypatch):
     (set .fail to make sending fail; .templates to fake the knowledge base)."""
     box = type("Mailbox", (), {"sent": [], "fail": None, "templates": []})()
 
-    def send(to, subject, text):
+    def send(to, subject, text, html=None):
         """Record the email, or fail like the email server would."""
         if box.fail:
             raise EmailError(box.fail)
-        box.sent.append({"to": to, "subject": subject, "text": text})
+        box.sent.append({"to": to, "subject": subject, "text": text, "html": html})
         return {"sent_to": to, "message_id": "<1@test>"}
 
     monkeypatch.setattr(emails, "send_email", send)
     monkeypatch.setattr(emails, "search_knowledge", lambda *args: box.templates)
+    monkeypatch.setattr(emails, "_whole_document", lambda db, document_id: TEMPLATE)
     return box
 
 
@@ -571,8 +572,16 @@ Subject: Interview invitation: {job_title}
 
 Hello {candidate_name},
 
-- **Date and time:** {date}, {time}
+Thank you for applying for the {job_title} role. We enjoyed reading your
+application and would like to invite you to a video interview.
+
+- **Date and time:** {date}, {time} (Bangladesh time)
+- **Format:** a video call with one interviewer, in your browser. You don't
+  need an account.
 - **Your personal link:** {interview_link}
+
+Kind regards,
+The hiring team
 
 ---
 
@@ -616,8 +625,19 @@ def test_invited_candidates_get_the_knowledge_base_template(screened, mailbox):
     (mail,) = mailbox.sent
     assert mail["to"] == "alex@example.com"
     assert mail["subject"] == "Interview invitation: PHP Developer"
-    assert "Hello Alex Strong," in mail["text"] and "**" not in mail["text"]
-    assert "/join/" in mail["text"] and "Reminder" not in mail["text"]
+    text = mail["text"]
+    assert "Hello Alex Strong," in text and "**" not in text and "Reminder" not in text
+    # Wrapped lines become whole sentences; the sign-off keeps its lines.
+    assert "We enjoyed reading your application and would like" in text
+    assert (
+        "Format: a video call with one interviewer, in your browser. You don't need"
+        in text
+    )
+    assert "Kind regards,\nThe hiring team" in text
+    assert "(Asia/Dhaka)" not in text and "(Bangladesh time)" in text  # one zone only
+    html = mail["html"]
+    assert ">Join your interview</a>" in html and "/join/" in html
+    assert "<td" in html and "Date and time" in html and "**" not in html
     with SessionLocal() as db:
         session = db.scalar(
             select(InterviewSession).where(
@@ -670,3 +690,20 @@ def test_send_again_from_the_interviews_page(screened, client, mailbox):
     assert (
         client.post("/api/auth/candidate", json={"link_token": link}).status_code == 200
     )
+
+
+def test_html_is_escaped_and_the_link_always_included(screened):
+    with SessionLocal() as db:
+        candidate = db.get(Candidate, screened["Alex"])
+        candidate.full_name = "Alex <b>Strong</b>"
+        job = db.get(Job, screened["job_id"])
+        no_link = (
+            "Subject: Hi {candidate_name}\n\nHello {candidate_name}, see you soon."
+        )
+        email = emails.compose(
+            no_link, candidate, job, clock.now(), 45, "https://app.example.com/join/t"
+        )
+
+    assert "<b>Strong</b>" not in email.html and "&lt;b&gt;Strong" in email.html
+    assert "Your personal link: https://app.example.com/join/t" in email.text
+    assert 'href="https://app.example.com/join/t"' in email.html

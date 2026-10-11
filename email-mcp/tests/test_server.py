@@ -80,6 +80,17 @@ def test_an_email_is_sent_as_plain_text(smtp):
     assert smtp.password == "abcdefghijklmnop"  # the spaces are not sent
 
 
+def test_an_html_version_is_added_when_given(smtp):
+    html = "<p>Hello Candidate A</p>"
+
+    call_tool({"to": "a@example.com", "subject": "Interview", "text": TEXT, "html": html})
+
+    (message,) = smtp.sent
+    assert message.get_content_type() == "multipart/alternative"
+    parts = [part.get_content_type() for part in message.iter_parts()]
+    assert parts == ["text/plain", "text/html"]  # the text one is the fallback
+
+
 def test_the_test_recipient_gets_every_email(smtp, monkeypatch):
     monkeypatch.setenv("EMAIL_TEST_RECIPIENT", "tester@example.com")
 

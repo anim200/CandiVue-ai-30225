@@ -6,6 +6,7 @@ overlap a little, so a sentence cut at the border is still found.
 """
 
 import re
+from itertools import pairwise
 
 CHUNK_SIZE = 1000  # characters per passage (about 150-200 words)
 CHUNK_OVERLAP = 150  # characters repeated from the end of the previous passage
@@ -34,3 +35,14 @@ def split_into_chunks(text: str) -> list[str]:
     if current:
         chunks.append(current)
     return chunks
+
+
+def join_chunks(chunks: list[str]) -> str:
+    """Rebuild a document's text from its passages (the opposite of
+    split_into_chunks): each later passage starts with the last
+    CHUNK_OVERLAP characters of the one before and a blank line."""
+    text = chunks[0] if chunks else ""
+    for previous, chunk in pairwise(chunks):
+        overlap = previous[-CHUNK_OVERLAP:] + "\n\n"
+        text += "\n\n" + chunk.removeprefix(overlap)
+    return text

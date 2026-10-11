@@ -4,8 +4,9 @@ The Hiring Assistant (LangGraph 1) calls this server's single tool,
 send_email, through MCP after the interviewer confirmed the interviews.
 Only this container holds the email login, so the backend never sees it
 (least privilege). It has no port on the host: only other containers in
-Docker's network can reach it. Emails are plain text, so they cannot carry
-code.
+Docker's network can reach it. Each email has a plain-text part and,
+optionally, an HTML part (built and escaped by the backend from a fixed
+layout).
 
 Settings (environment / .env):
   SMTP_HOST, SMTP_PORT (SSL, e.g. smtp.gmail.com and 465), SMTP_USER,
@@ -55,8 +56,10 @@ def send_email(
     to: Annotated[str, Field(pattern=ADDRESS, max_length=255)],
     subject: Annotated[str, Field(min_length=2, max_length=200)],
     text: Annotated[str, Field(min_length=10, max_length=20_000)],
+    html: Annotated[str, Field(max_length=100_000)] | None = None,
 ) -> SentEmail:
-    """Send one plain-text email to one address."""
+    """Send one email to one address: plain text, plus an HTML version if
+    given (email programs show the HTML one, or the text if they cannot)."""
     if not all(os.environ.get(name) for name in SETTINGS):
         raise ToolError(NOT_SET_UP)
     test_recipient = os.environ.get("EMAIL_TEST_RECIPIENT")
@@ -68,6 +71,8 @@ def send_email(
     message["Subject"] = f"[Test for {to}] {subject}" if test_recipient else subject
     message["Message-ID"] = make_msgid(domain="candivue.local")
     message.set_content(text)
+    if html:
+        message.add_alternative(html, subtype="html")
     # ToolError = an expected failure whose message the caller may see; any
     # other error is hidden by MCP (no internal details leak).
     try:

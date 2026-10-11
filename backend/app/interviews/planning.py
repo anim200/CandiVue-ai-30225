@@ -156,7 +156,7 @@ def make_plan(
     if ready:  # the email the first one gets (the others: own name and time)
         text, name = emails.template(db)
         candidate = db.get(Candidate, ready[0]["candidate_id"])
-        subject, body = emails.compose(
+        email = emails.compose(
             text,
             candidate,
             job,
@@ -164,7 +164,7 @@ def make_plan(
             duration,
             emails.PREVIEW_LINK,
         )
-        plan.email = {"subject": subject, "text": body, "template": name}
+        plan.email = {"subject": email.subject, "text": email.text, "template": name}
     return plan
 
 
