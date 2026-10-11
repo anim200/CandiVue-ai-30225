@@ -27,7 +27,7 @@ import {
   UserBubble,
   WorkingLine,
 } from './ChatItems';
-import { InvitationConfirmCard, InvitationResultsCard, ShortlistCard } from './InterviewCards';
+import { InvitationConfirmCard, InvitationResultsCard, ScreeningNotice, ShortlistCard } from './InterviewCards';
 import JdCard from './JdCard';
 import JobProgressBar from './JobProgressBar';
 import ModelPicker from './ModelPicker';
@@ -64,10 +64,19 @@ function feedbackBefore(items, jd) {
 }
 
 // Turn the thread items into chat rows; consecutive tool steps share one row.
-function ChatRows({ items, profile, pending, reviewBusy, onApprove, onEdit, onReject, onPost, postBusy }) {
+// The screening notice goes after the last job board card (CVs come after
+// posting), or at the end when the job was never posted.
+function ChatRows({ items, job, pending, reviewBusy, onApprove, onEdit, onReject, onPost, postBusy }) {
   const rows = [];
+  const profile = job?.profile;
   const approvedJd = items.find((item) => item.kind === 'jd' && item.jd.status === 'approved')?.jd;
   const lastPosting = items.findLastIndex((item) => item.kind === 'posting');
+  const screened = job?.screening_status === 'completed' && job.screened_at;
+  const notice = (
+    <AssistantRow key="screening">
+      <ScreeningNotice job={job} />
+    </AssistantRow>
+  );
   let steps = [];
   const flushSteps = () => {
     if (steps.length) rows.push(<AssistantRow key={`s${rows.length}`}><StepLines steps={steps} /></AssistantRow>);
@@ -133,8 +142,10 @@ function ChatRows({ items, profile, pending, reviewBusy, onApprove, onEdit, onRe
           />
         </AssistantRow>,
       );
+    if (index === lastPosting && screened) rows.push(notice);
   });
   flushSteps();
+  if (lastPosting === -1 && screened) rows.push(notice);
   return rows;
 }
 
@@ -397,7 +408,7 @@ export default function HiringAssistantPage() {
               {thread && (
                 <ChatRows
                   items={thread.items}
-                  profile={job?.profile}
+                  job={job}
                   pending={pending}
                   reviewBusy={reviewBusy}
                   onApprove={() => review({ action: 'approve' })}

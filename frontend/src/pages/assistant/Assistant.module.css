@@ -287,6 +287,29 @@
   animation: fade 0.2s ease-out;
 }
 
+/* Screening finished on the job page (design: ScreeningNotice). */
+.screeningNotice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #f5f7f8;
+  font-size: 13px;
+  color: #48535b;
+}
+
+.screeningText {
+  flex: 1;
+  min-width: 200px;
+}
+
+.screeningText b {
+  font-weight: 600;
+  color: #1a2227;
+}
+
 /* ---- Cards ---- */
 
 .profileCard {

@@ -1,11 +1,13 @@
-// Chat cards after screening (design: InvitationConfirmCard): the saved
-// shortlist, the interviews waiting for confirmation (Cancel / Change /
-// Confirm), and what was done after confirming. Nothing is booked before
-// the interviewer confirms; the backend checks everything again then.
+// Chat cards after screening (design: ScreeningNotice, InvitationConfirmCard):
+// the screening result, the saved shortlist, the interviews waiting for
+// confirmation (Cancel / Change / Confirm), and what was done after
+// confirming. Nothing is booked before the interviewer confirms; the backend
+// checks everything again then.
 
 import { Anchor, Button, Checkbox, TextInput } from '@mantine/core';
 import {
   IconAlertTriangle,
+  IconCalendarCheck,
   IconCheck,
   IconChevronDown,
   IconChevronRight,
@@ -13,6 +15,7 @@ import {
   IconMail,
   IconInfoCircle,
   IconListCheck,
+  IconListNumbers,
   IconPencil,
   IconX,
 } from '@tabler/icons-react';
@@ -22,9 +25,27 @@ import { Link } from 'react-router';
 import StatusBadge from '../../components/StatusBadge';
 import { toLocalInput, whenText } from '../../utils/dates';
 import classes from './Assistant.module.css';
-import { DIMENSION_NAMES } from './labels';
+import { CALENDAR_DONE, DIMENSION_NAMES, calendarProblem } from './labels';
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+// Screening runs on the job page, not in the chat: this says it finished and
+// links to the results (design: ScreeningNotice).
+export function ScreeningNotice({ job }) {
+  const date = new Date(job.screened_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return (
+    <div className={classes.screeningNotice}>
+      <IconListNumbers size={17} color="#23717A" />
+      <span className={classes.screeningText}>
+        <b>CV screening finished</b> on the job page, {date}: {job.ranked_count} ranked, {job.excluded_count}{' '}
+        excluded.
+      </span>
+      <Anchor component={Link} to={`/jobs/${job.id}`} fz={13} fw={600}>
+        View results
+      </Anchor>
+    </div>
+  );
+}
 
 // Notes (e.g. a tie, a name not found) and warnings (e.g. new CVs) under a card.
 function Notes({ notes = [], warnings = [] }) {
@@ -180,11 +201,21 @@ export function InvitationConfirmCard({ plan, busy, onDecide }) {
           </li>
         ))}
       </ul>
+      {plan.calendar_checked && (
+        <div className={classes.cardNotes}>
+          <span className={classes.noteLine}>
+            <IconCalendarCheck size={15} color="#2D7A4E" />
+            {editing ? 'Changed times are checked against your calendar when you confirm.' : 'Free in your calendar.'}
+          </span>
+        </div>
+      )}
       <Notes warnings={plan.warnings} />
       {plan.email && <EmailPreview email={plan.email} action={plan.action} />}
       {plan.action === 'cancel' && (
         <div className={classes.cardNotes}>
-          <span className={classes.hint}>Candidates are not emailed about a cancellation.</span>
+          <span className={classes.hint}>
+            Invited candidates are emailed that it is cancelled, and it is removed from your calendar.
+          </span>
         </div>
       )}
       <div className={classes.jdActions}>
@@ -216,7 +247,10 @@ const DONE_TITLES = { invite: 'scheduled', reschedule: 'moved', cancel: 'cancell
 // What happened after confirming: done, or skipped with the reason.
 export function InvitationResultsCard({ result }) {
   const done = result.results.filter((r) => r.done).length;
-  const unsent = result.results.some((r) => r.email && r.email !== 'sent');
+  // Resend (Interviews page) tries a failed email and calendar update again.
+  const retry =
+    result.action !== 'cancel' &&
+    result.results.some((r) => (r.email && r.email !== 'sent') || calendarProblem(r.calendar));
   return (
     <div className={classes.jdCard}>
       <div className={classes.jdHead}>
@@ -236,19 +270,24 @@ export function InvitationResultsCard({ result }) {
                 {r.email === 'sent' ? 'Email sent' : `Email not sent: ${r.email}`}
               </span>
             )}
+            {r.calendar && (
+              <span className={`${classes.personMeta} ${CALENDAR_DONE[r.calendar] ? '' : classes.warningText}`}>
+                {CALENDAR_DONE[r.calendar] ?? calendarProblem(r.calendar)}
+              </span>
+            )}
           </li>
         ))}
       </ul>
-      {unsent && (
+      {retry && (
         <div className={classes.cardNotes}>
           <span className={classes.noteLine}>
             <IconInfoCircle size={15} />
             <span>
-              Send the missing emails again, or copy the link, on the{' '}
+              To try again, use Resend on the{' '}
               <Anchor component={Link} to="/interviews" fz={14} fw={600}>
                 Interviews page
               </Anchor>
-              .
+              : it sends the email and updates your calendar.
             </span>
           </span>
         </div>

@@ -76,6 +76,14 @@
   white-space: nowrap;
 }
 
+/* Why the invitation email failed, under its badge. */
+.reason {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #932e24;
+}
+
 .when {
   font-variant-numeric: tabular-nums;
   color: #48535b;

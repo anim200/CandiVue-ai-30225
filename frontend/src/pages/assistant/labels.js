@@ -42,3 +42,16 @@ export function sourceLabel(source) {
   const name = source.filename.replace(/\.[^.]+$/, '');
   return `${COLLECTION_SHORT[source.collection] ?? 'Document'} · ${name}`;
 }
+
+// What happened in the interviewer's Google Calendar ("added", "moved",
+// "removed"); anything else is the reason it failed.
+export const CALENDAR_DONE = {
+  added: 'Added to your calendar',
+  moved: 'Moved in your calendar',
+  removed: 'Removed from your calendar',
+};
+
+// "Calendar not updated: <reason>" when it failed, null when all went well.
+export function calendarProblem(calendar) {
+  return calendar && !CALENDAR_DONE[calendar] ? `Calendar not updated: ${calendar}` : null;
+}

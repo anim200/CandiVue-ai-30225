@@ -30,6 +30,7 @@ import { EmptyState, ErrorBanner, Skeleton } from '../components/Feedback';
 import { notifyDone, notifyError } from '../components/notify';
 import StatusBadge from '../components/StatusBadge';
 import { whenText } from '../utils/dates';
+import { calendarProblem } from './assistant/labels';
 import classes from './InterviewsPage.module.css';
 
 const SESSION = {
@@ -86,6 +87,7 @@ export default function InterviewsPage() {
       const result = await apiPost(`/interviews/${interview.id}/send`);
       if (result.sent) notifyDone(`Invitation sent to ${interview.candidate_name}`);
       else notifyError('The invitation wasn’t sent.', result);
+      if (calendarProblem(result.calendar)) notifyError('Your calendar wasn’t updated.', { message: result.calendar });
       await load();
     } catch (error) {
       notifyError('The invitation wasn’t sent.', error);
@@ -98,8 +100,14 @@ export default function InterviewsPage() {
   async function cancel() {
     setCancelBusy(true);
     try {
-      await apiPost(`/interviews/${cancelling.id}/cancel`);
+      const result = await apiPost(`/interviews/${cancelling.id}/cancel`);
       notifyDone(`Interview with ${cancelling.candidate_name} cancelled`);
+      if (result.email && result.email !== 'sent') {
+        notifyError('The candidate wasn’t emailed about it.', { message: result.email });
+      }
+      if (calendarProblem(result.calendar)) {
+        notifyError('Your calendar wasn’t updated.', { message: result.calendar });
+      }
       await load();
     } catch (error) {
       notifyError('The interview wasn’t cancelled.', error);
@@ -156,6 +164,9 @@ export default function InterviewsPage() {
             </div>
             <div className={classes.invitation}>
               <Badge of={INVITATION} value={interview.invitation_status} />
+              {interview.invitation_status === 'failed' && interview.invitation_error && (
+                <div className={classes.reason}>{interview.invitation_error}</div>
+              )}
             </div>
             <Group gap={6} wrap="nowrap" className={classes.actions}>
               {when === 'upcoming' && (
@@ -226,7 +237,8 @@ export default function InterviewsPage() {
         busy={cancelBusy}
       >
         The interview with {cancelling?.candidate_name} on {cancelling && whenText(cancelling.scheduled_at)} is
-        cancelled and their link stops working. The candidate is not emailed about it.
+        cancelled and their link stops working. If they were sent the invitation, they are emailed that it is
+        cancelled. It is also removed from your calendar.
       </ConfirmModal>
     </div>
   );
