@@ -9,6 +9,7 @@ import HiringAssistantPage from './pages/assistant/HiringAssistantPage';
 import CandidateJoinPage from './pages/CandidateJoinPage';
 import ComingSoonPage from './pages/ComingSoonPage';
 import ErrorPage from './pages/ErrorPage';
+import InterviewRoomPage from './pages/interview/InterviewRoomPage';
 import InterviewsPage from './pages/InterviewsPage';
 import JobPage from './pages/job/JobPage';
 import JobsPage from './pages/JobsPage';
@@ -23,7 +24,7 @@ const BUILT_PAGES = {
   '/knowledge-base': <KnowledgeBasePage />,
 };
 
-// The Hiring Assistant fills the whole area (no page padding).
+// The Hiring Assistant and the interview room fill the whole area (no page padding).
 const FULL_BLEED = { fullBleed: true };
 
 // errorElement: shown instead of a crashed page; never shows technical
@@ -47,6 +48,7 @@ export const router = createBrowserRouter([
       { path: 'assistant', element: <HiringAssistantPage />, handle: FULL_BLEED },
       { path: 'assistant/:jobId', element: <HiringAssistantPage />, handle: FULL_BLEED },
       { path: 'jobs/:jobId', element: <JobPage /> },
+      { path: 'interviews/:interviewId/room', element: <InterviewRoomPage />, handle: FULL_BLEED },
       // Each module replaces its "coming soon" page with the real screen.
       ...NAV_ITEMS.filter((item) => item.path !== '/assistant').map((item) => ({
         path: item.path,

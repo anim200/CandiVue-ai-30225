@@ -1,14 +1,13 @@
 // Where the private link in the invitation email leads: /join/<link token>.
 // Swaps the link for a candidate session in this tab (design: Candidate
-// Join.dc.html, states 3a, 3e, 3i and 3j). The next real screens (welcome,
-// consent, device check, the call) are built with F3/F7; until then a
-// working link shows a short confirmation in the same style.
+// Join.dc.html, states 3a, 3e, 3i and 3j); a working link opens the
+// interview steps (welcome, device check, the call: CandidateInterview).
 // No account, no scores: candidates only ever see their own interview (N9).
 
 import { Anchor, Box, Button, Stack, Text } from '@mantine/core';
 import { useDocumentTitle } from '@mantine/hooks';
 import { IconAlertCircle, IconCircleCheck, IconCloudOff, IconHelpCircle } from '@tabler/icons-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 
 import { apiPost } from '../api/client';
@@ -16,6 +15,7 @@ import { clearSession, saveSession } from '../auth/session';
 import Logo from '../components/Logo';
 import { HELP_EMAIL } from '../config';
 import classes from './CandidateJoinPage.module.css';
+import CandidateInterview from './interview/CandidateInterview';
 
 // Icon circle colours from the design frames.
 const RED = { bg: '#FBE9E7', color: '#B03A2E' };
@@ -23,14 +23,6 @@ const GREEN = { bg: '#E7F3EC', color: '#2D7A4E' };
 
 // What to show for each result of the link check (wording from the design).
 function messageFor(result) {
-  if (result.status === 'joined') {
-    return {
-      icon: IconCircleCheck,
-      tint: GREEN,
-      title: 'Your interview link works',
-      text: 'On the day of your interview, this page will help you check your camera and microphone and join the call. You don’t need an account.',
-    };
-  }
   if (result.httpStatus === 404) {
     return {
       icon: IconAlertCircle,
@@ -79,6 +71,9 @@ export default function CandidateJoinPage() {
   const { linkToken } = useParams();
   const [result, setResult] = useState({ status: 'checking' }); // checking | joined | failed
   const [attempt, setAttempt] = useState(0); // "Try again" checks the link once more
+  // The interview ended: show the "has ended" message (one stable function,
+  // so the interview steps do not restart on every render).
+  const showEnded = useCallback(() => setResult({ status: 'failed', httpStatus: 410 }), []);
   useDocumentTitle('Your interview · CandiVue AI');
 
   useEffect(() => {
@@ -121,7 +116,9 @@ export default function CandidateJoinPage() {
       </header>
 
       <Box px={{ base: 16, sm: 24 }} py={40} style={{ display: 'flex', justifyContent: 'center' }}>
-        {result.status === 'checking' ? (
+        {result.status === 'joined' ? (
+          <CandidateInterview onEnded={showEnded} />
+        ) : result.status === 'checking' ? (
           <StateCard>
             <span className={classes.spinner} />
             <Text fz={17} fw={600}>

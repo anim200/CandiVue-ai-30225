@@ -1,0 +1,64 @@
+/* The interviewer's live interview (design: Live Interview, option 1a). */
+
+.page {
+  padding: 16px 20px;
+  height: 100%;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  align-items: start;
+}
+
+.main,
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid #dee3e6;
+  border-radius: 8px;
+}
+
+.panelHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #e9ecee;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.panelNote {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 500;
+  color: #66717a;
+}
+
+.panelBody {
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #66717a;
+}
+
+/* Below a laptop width the right column moves under the call. */
+@media (max-width: 74.99em) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 47.99em) {
+  .page {
+    padding: 12px;
+  }
+}

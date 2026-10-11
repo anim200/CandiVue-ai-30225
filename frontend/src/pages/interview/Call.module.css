@@ -1,0 +1,185 @@
+/* The video call (design: Live Interview SessionBar, VideoTile, CallControls,
+   and the candidate's in-call view). Dark video area, light controls. */
+
+.call {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 10px 14px;
+  flex-wrap: wrap;
+  font-size: 15px;
+}
+
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #fbe9e7;
+  color: #932e24;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.live::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #b03a2e;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.title {
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.timer {
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 14px;
+  color: #48535b;
+}
+
+.notice {
+  font-size: 13px;
+  color: #66717a;
+}
+
+.connection {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+
+.ok {
+  background: #e7f3ec;
+  color: #245f3e;
+}
+
+.busy {
+  background: #fbf0d9;
+  color: #7a5000;
+}
+
+.bad {
+  background: #fbe9e7;
+  color: #932e24;
+}
+
+/* The other person large, your own video small in the corner. */
+.stage {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  max-height: 62vh;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #1e272c;
+}
+
+.tile {
+  position: absolute;
+  inset: 0;
+  background: #1e272c;
+}
+
+.small {
+  inset: auto 12px 12px auto;
+  width: 22%;
+  min-width: 120px;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  z-index: 1;
+}
+
+.video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.placeholder {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+  color: #c9d0d4;
+  font-size: 15px;
+  background: repeating-linear-gradient(135deg, #1e272c 0 10px, #222c31 10px 20px);
+}
+
+.small .placeholder {
+  font-size: 12px;
+}
+
+.label {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(16, 22, 25, 0.7);
+  color: #fff;
+  font-size: 13px;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+  background: rgba(16, 22, 25, 0.72);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Phones are held upright: a taller video area, so the other person stays
+   large next to your own small video. */
+@media (max-width: 37.5em) {
+  .stage {
+    aspect-ratio: 3 / 4;
+    max-height: 70vh;
+  }
+
+  .small {
+    width: 32%;
+    min-width: 96px;
+    aspect-ratio: 3 / 4;
+  }
+}

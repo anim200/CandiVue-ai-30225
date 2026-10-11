@@ -1,6 +1,7 @@
 // Interviews (design: Interviews.dc.html): upcoming and past interviews.
 // Interviews are planned in the Hiring Assistant and appear here once the
-// interviewer confirms them (the invitation email is sent then). "Send
+// interviewer confirms them (the invitation email is sent then). "Join now"
+// opens the video call (any time until the interview is ended). "Send
 // invitation" emails it again; "Copy link" makes the candidate's private
 // link (only its hash is stored, so a new link replaces the old one, also
 // an emailed one); "Cancel" stops the interview and its link.
@@ -16,13 +17,14 @@ import {
   IconLink,
   IconMailCheck,
   IconMailX,
+  IconPlayerPlay,
   IconPlayerRecord,
   IconSend,
   IconVideo,
   IconX,
 } from '@tabler/icons-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 
 import { apiGet, apiPost } from '../api/client';
 import ConfirmModal from '../components/ConfirmModal';
@@ -61,6 +63,7 @@ export default function InterviewsPage() {
   const [busy, setBusy] = useState(null); // "send-<id>" or "link-<id>"
   const [cancelling, setCancelling] = useState(null); // interview to confirm
   const [cancelBusy, setCancelBusy] = useState(false);
+  const navigate = useNavigate();
   useDocumentTitle('Interviews · CandiVue AI');
 
   // Load the chosen list.
@@ -175,13 +178,22 @@ export default function InterviewsPage() {
                 <>
                   <Button
                     size="xs"
-                    variant="light"
-                    leftSection={<IconSend size={14} />}
-                    loading={busy === `send-${interview.id}`}
-                    onClick={() => send(interview)}
+                    leftSection={<IconPlayerPlay size={14} />}
+                    onClick={() => navigate(`/interviews/${interview.id}/room`)}
                   >
-                    {interview.invitation_status === 'pending' ? 'Send invitation' : 'Resend'}
+                    {interview.status === 'live' ? 'Rejoin' : 'Join now'}
                   </Button>
+                  <Tooltip label={interview.invitation_status === 'pending' ? 'Send the invitation' : 'Send the invitation again'}>
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      loading={busy === `send-${interview.id}`}
+                      onClick={() => send(interview)}
+                      aria-label={`Send the invitation to ${interview.candidate_name}`}
+                    >
+                      <IconSend size={17} />
+                    </ActionIcon>
+                  </Tooltip>
                   <Tooltip label="Copy the private link">
                     <ActionIcon
                       variant="subtle"
