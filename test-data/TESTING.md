@@ -99,3 +99,21 @@ The test job is **PHP Laravel Developer**, the job `EXPECTED.md` was written for
    `Cancel the interview with <name>.`, `Invite <name> at 07:00` (a
    warning: outside working hours), two people at the same time (refused:
    overlap).
+
+## 6. The video interview (two tabs on one laptop)
+
+1. **Interviews → Join now** on an upcoming interview (any time before it
+   is ended). Allow the camera and microphone. The page shows LIVE, your
+   video small in the corner and "<candidate> hasn't joined yet".
+2. Click the send icon (or **Copy link**) and open the candidate's link in a
+   **private window of the same browser**. Welcome → **Check camera and
+   mic** → **Join interview**.
+3. Both windows now show each other. Try **Mute** and **Camera off** on one
+   side: the other side sees the microphone icon and "camera off".
+4. Reload the candidate's window: it goes straight back into the call.
+5. **End session** (interviewer) → confirm. The interviewer is back on the
+   Interviews list (the interview is under **Past**, Ended); the candidate
+   sees "The interview has ended" and the link no longer works.
+
+Use a headset, or mute the side that is not speaking, to avoid echo.
+

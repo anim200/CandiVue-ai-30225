@@ -163,6 +163,7 @@ width.
 | `jobboard-tests` | built from `jobboard-mcp/Dockerfile` (target `test`) | Only runs on demand (see below). |
 | `email-mcp` | built from `email-mcp/Dockerfile` (target `runtime`) | Our small MCP server that emails interview invitations (Gmail SMTP). The only service that holds the email login. Not exposed to the host. |
 | `email-tests` | built from `email-mcp/Dockerfile` (target `test`) | Only runs on demand (see below). |
+| `livekit` | `livekit/livekit-server:v1.13.9` | Open-source video server for the interviews. Signalling through nginx (`/rtc`); video and audio on ports 7881/tcp and 7882/udp, bound to `127.0.0.1`. Nothing is recorded. |
 | `cv-collector` | built from `backend/Dockerfile` (target `runtime`), command `python -m app.collector` | Copies new CVs from the Google Form into the `cv_intake` volume every few minutes. The only service that holds the Google key (read-only). No ports. |
 | `frontend` | built from `frontend/Dockerfile` | React app served by nginx 1.31 (HTTP, and HTTPS when `certs/` has a certificate); forwards `/api` to the backend. |
 
@@ -325,6 +326,46 @@ failed"; run step 5 again and replace the token (do it before a demo).
 
 The token only allows managing your Blogger blogs. To revoke it, remove
 CandiVue at <https://myaccount.google.com/permissions>.
+
+## Video calls (interviews)
+
+Interviews are 1-on-1 video calls in the browser, using **LiveKit**, an
+open-source video server that runs here in Docker (no cloud, no account).
+
+```
+Interviewer (signed in): Interviews → "Join now" ─┐
+Candidate: private link → welcome → camera check ──┤ ticket from the backend
+                                                   ▼ (this room only)
+             browser ⇄ LiveKit (Docker) ⇄ browser   video + audio, encrypted
+                         │ signed webhooks
+                         ▼
+             backend: Live + start time, who joined; End session → Ended
+```
+
+- The backend gives each person a **ticket** (a signed LiveKit token) for
+  their interview's room only: the interviewer after signing in, the
+  candidate after opening their private link. Camera and microphone only.
+- **Join any time** until the interviewer clicks **End session** (or the
+  interview is cancelled). Ending closes the call for everyone and the
+  candidate's link stops working.
+- **Reconnect:** LiveKit reconnects a dropped connection by itself (the
+  bar shows "Reconnecting…"); a reloaded candidate tab goes straight back
+  into the call.
+- The candidate sees only the call: no transcript, scores or assistant.
+- Video and audio are not recorded or stored (N16).
+
+Setup: `LIVEKIT_API_SECRET` in `.env` (32+ random characters, see
+`.env.example`); it signs the tickets and LiveKit's webhooks.
+
+**Try it on one computer:** sign in, open **Interviews → Join now**; open the
+candidate's link (**Copy link**) in a second window of the **same browser**
+(a private window works), so both tabs can use the camera. Use a headset,
+or mute the tab that is not speaking, to avoid echo.
+
+**From a phone or a second computer on the same network:** set
+`LIVEKIT_NODE_IP` and `LIVEKIT_BIND_ADDRESS` in `.env` to this computer's
+network address (e.g. `192.168.1.20`) and use HTTPS for the app (see
+*Transport security*: phones only allow the camera on HTTPS).
 
 ## Email (interview invitations)
 
@@ -620,7 +661,7 @@ How each connection is protected (N10):
 | Browser → backend directly (`/docs`, port 8000) | Plain HTTP, bound to `127.0.0.1` only (local-development exception, for the API documentation). |
 | nginx → backend, backend → database | Inside Docker's private network only; never leaves the machine. The database has no published port. |
 | Backend → AI provider (Google Gemini) and other external services | HTTPS (TLS), handled by the providers' client libraries. |
-| Interview audio and video (WebRTC, built with F3) | Always encrypted by the browsers (DTLS-SRTP). |
+| Interview audio and video (WebRTC through LiveKit) | Always encrypted (DTLS-SRTP) between each browser and the LiveKit container. Its ports are bound to `127.0.0.1` unless `LIVEKIT_BIND_ADDRESS` is set for another device. |
 
 **Local-development exceptions.** Plain HTTP is used only on `127.0.0.1`,
 so nothing is reachable from other machines. Never open the HTTP ports to a
