@@ -6,8 +6,9 @@ import pytest
 
 from app.assistant.posting import clean_form_url, render_post_html
 from app.assistant.schemas import JobDescriptionContent, JobProfile
-from app.integrations import job_board
+from app.integrations import mcp_client
 from app.integrations.job_board import JobBoardError, publish_job_post
+from app.integrations.mcp_client import ToolFailed
 
 PROFILE = JobProfile.model_validate(
     {
@@ -81,27 +82,27 @@ def test_post_shows_the_closing_date_in_local_time():
 def test_publish_retries_then_succeeds(monkeypatch):
     calls = []
 
-    async def flaky(tool, arguments):
+    async def flaky(url, tool, arguments):
         """Fail twice like a network hiccup, then succeed."""
         calls.append(tool)
         if len(calls) < 3:
             raise ConnectionError("network down")
         return {"post_id": "1", "url": "https://example.blogspot.com/p/1.html"}
 
-    monkeypatch.setattr(job_board, "_call_once", flaky)
-    monkeypatch.setattr(job_board, "WAIT_SECONDS", 0)
+    monkeypatch.setattr(mcp_client, "_call_once", flaky)
+    monkeypatch.setattr(mcp_client, "WAIT_SECONDS", 0)
 
     assert publish_job_post("T", "<p>body text here</p>", [])["post_id"] == "1"
     assert len(calls) == 3
 
 
 def test_publish_gives_up_after_three_tries_with_a_safe_message(monkeypatch):
-    async def refused(tool, arguments):
+    async def refused(url, tool, arguments):
         """The job board refuses every time."""
-        raise JobBoardError("The job board refused the post (HTTP 403).")
+        raise ToolFailed("The job board refused the post (HTTP 403).")
 
-    monkeypatch.setattr(job_board, "_call_once", refused)
-    monkeypatch.setattr(job_board, "WAIT_SECONDS", 0)
+    monkeypatch.setattr(mcp_client, "_call_once", refused)
+    monkeypatch.setattr(mcp_client, "WAIT_SECONDS", 0)
 
     with pytest.raises(JobBoardError, match="HTTP 403"):
         publish_job_post("T", "<p>body text here</p>", [])

@@ -1,9 +1,11 @@
 """Interviews API: the Interviews page lists the scheduled and past
-interviews, makes a candidate's private link and cancels an interview.
+interviews, (re)sends the invitation email, makes a candidate's private
+link and cancels an interview.
 
 Interviewers only (N9). Interviews are created from the Hiring Assistant
 after the interviewer confirms them (§4B-7b). Only a hash of each link is
-stored, so "Copy link" makes a new link; the previous one stops working.
+stored, so sending the email or "Copy link" makes a new link; the previous
+one (also an emailed one) stops working.
 """
 
 import logging
@@ -19,7 +21,7 @@ from app.auth.dependencies import require_interviewer
 from app.db.database import get_db
 from app.db.models import Candidate, InterviewSession, Job
 from app.db.models.interview import InvitationStatus, SessionStatus
-from app.interviews import planning
+from app.interviews import emails, planning
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +46,13 @@ class InterviewOut(BaseModel):
     duration_minutes: int
     status: SessionStatus
     invitation_status: InvitationStatus
+
+
+class SendOut(BaseModel):
+    """The result of sending the invitation email."""
+
+    sent: bool
+    message: str  # "Invitation sent" or why it failed
 
 
 class LinkOut(BaseModel):
@@ -94,6 +103,19 @@ def new_link(interview_id: int, db: Annotated[Session, Depends(get_db)]) -> Link
     db.commit()
     logger.info("New interview link: session %d", interview_id)
     return LinkOut(link_token=token)
+
+
+@router.post("/{interview_id}/send", response_model=SendOut)
+def send_invitation(
+    interview_id: int, db: Annotated[Session, Depends(get_db)]
+) -> SendOut:
+    """Email the invitation (again) with a new private link."""
+    session = _active(db, interview_id)
+    token, session.join_token_hash = planning.new_link_token()
+    text, _ = emails.template(db)
+    problem = emails.deliver(db, session, token, text)
+    db.commit()
+    return SendOut(sent=problem is None, message=problem or "Invitation sent")
 
 
 @router.post("/{interview_id}/cancel", status_code=status.HTTP_204_NO_CONTENT)

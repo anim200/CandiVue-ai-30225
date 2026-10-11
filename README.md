@@ -161,6 +161,8 @@ width.
 | `ollama-pull` | `ollama/ollama:0.35.1` | One-time job: downloads the embedding model on the first start, then exits. |
 | `jobboard-mcp` | built from `jobboard-mcp/Dockerfile` (target `runtime`) | Our small MCP server that posts approved JDs to Blogger. The only service that holds the Blogger credentials. Not exposed to the host. |
 | `jobboard-tests` | built from `jobboard-mcp/Dockerfile` (target `test`) | Only runs on demand (see below). |
+| `email-mcp` | built from `email-mcp/Dockerfile` (target `runtime`) | Our small MCP server that emails interview invitations (Gmail SMTP). The only service that holds the email login. Not exposed to the host. |
+| `email-tests` | built from `email-mcp/Dockerfile` (target `test`) | Only runs on demand (see below). |
 | `cv-collector` | built from `backend/Dockerfile` (target `runtime`), command `python -m app.collector` | Copies new CVs from the Google Form into the `cv_intake` volume every few minutes. The only service that holds the Google key (read-only). No ports. |
 | `frontend` | built from `frontend/Dockerfile` | React app served by nginx 1.31 (HTTP, and HTTPS when `certs/` has a certificate); forwards `/api` to the backend. |
 
@@ -195,6 +197,7 @@ Other external services (N18):
 | Service | What it receives |
 |---|---|
 | Blogger (Google), through `jobboard-mcp` | The approved job description (title, text, requirements) and the Google Form link. No candidate data. |
+| Gmail (Google), through `email-mcp` | Interview invitations: the candidate's name and email address, the job title, the interview date and time, and the private interview link. While `EMAIL_TEST_RECIPIENT` is set, every email goes to that test address instead. |
 | Google Forms, Google Drive and Google Sheets | Applicants send their name, email address, the job they apply for and their CV file through the form; Google stores the file in Drive and the answers in the response Sheet. The `cv-collector` only **reads** them. |
 
 - **Free-tier notice:** on Gemini's free tier, Google may use the data it
@@ -322,6 +325,36 @@ failed"; run step 5 again and replace the token (do it before a demo).
 
 The token only allows managing your Blogger blogs. To revoke it, remove
 CandiVue at <https://myaccount.google.com/permissions>.
+
+## Email (interview invitations)
+
+When the interviewer confirms interviews in the Hiring Assistant, each
+candidate is emailed a private link (moved interviews get a new one). The
+text comes from the knowledge base's **Email templates** collection (RAG):
+a template needs a `Subject:` line and may use `{candidate_name}`,
+`{job_title}`, `{date}`, `{time}`, `{duration}` and `{interview_link}`
+(see `test-data/knowledge-base/email-templates/`). Without one, a short
+standard text is used. The confirmation card shows a preview first.
+
+```
+backend --MCP (send_email)--> email-mcp --SMTP over TLS--> Gmail
+```
+
+Setup (once):
+
+1. Use a Gmail account with **2-Step Verification** on
+   (<https://myaccount.google.com/security>).
+2. Create an **app password** at <https://myaccount.google.com/apppasswords>
+   (name it "CandiVue"); Google shows 16 letters once.
+3. In `.env`: `SMTP_USER` = that Gmail address, `SMTP_PASSWORD` = the app
+   password (no spaces), and `EMAIL_TEST_RECIPIENT` = your own address.
+4. `docker compose up -d --build`
+
+Keep `EMAIL_TEST_RECIPIENT` set: every email then goes to you, with
+"[Test for <candidate address>]" in the subject, so no real person is
+mailed (N13). An email that fails never loses the interview: it shows
+"Invitation failed" and can be sent again on the Interviews page. To
+revoke access, delete the app password.
 
 ## CV Collector (Google Drive)
 
@@ -540,8 +573,9 @@ Security is built into each part instead of added at the end:
   checked by content and size before they are saved; logs never contain
   applicants' names or emails.
 - **Least privilege for integrations:** only `jobboard-mcp` holds the
-  Blogger credentials (one OAuth scope: Blogger); the backend cannot use
-  them directly. The posted page escapes all JD text, and only Google
+  Blogger credentials (one OAuth scope: Blogger) and only `email-mcp` the
+  email login; the backend cannot use them directly. Emails are plain
+  text to one checked address. The posted page escapes all JD text, and only Google
   Forms links (HTTPS) are accepted as the application link.
 - **No secrets or personal data in logs or error messages**, pinned and
   audited dependencies, localhost-only ports (see the sections above).
@@ -647,6 +681,12 @@ credentials needed):
 
 ```bash
 docker compose run --rm --build jobboard-tests
+```
+
+Email MCP server tests (a fake SMTP server, no email is sent):
+
+```bash
+docker compose run --rm --build email-tests
 ```
 
 Frontend tests (no backend needed; requires Node.js 22.22 or later):

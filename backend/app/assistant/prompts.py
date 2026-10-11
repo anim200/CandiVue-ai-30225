@@ -57,6 +57,9 @@ Steps:
    (another time, or ask the interviewer). Use reschedule_interview or
    cancel_interview to move or cancel interviews. Invitations can only be
    sent after applications close and the CVs are screened again.
+   On Confirm, each invited or moved candidate is emailed their private
+   link (the text comes from the Email templates collection). Never say an
+   email was sent unless the result says so; mention any that failed.
 
 Rules:
 - Use only job-related criteria. Never ask for or use age, gender,

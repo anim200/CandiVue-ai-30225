@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     # credentials live only in that container, never in the backend.
     jobboard_mcp_url: str = "http://jobboard-mcp:8001/mcp"
 
+    # Email MCP server (email-mcp container): interview invitations. The
+    # email login lives only in that container.
+    email_mcp_url: str = "http://email-mcp:8002/mcp"
+    # Where candidates open their private interview link (this app's address).
+    app_public_url: str = "http://localhost:5173"
+
     # CV Collector (app/collector, cv-collector container). The Google key is
     # given only to that container (read-only service account, N7).
     google_service_account_key: SecretStr | None = None  # JSON or base64 JSON

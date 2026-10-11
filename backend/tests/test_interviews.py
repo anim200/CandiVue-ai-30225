@@ -24,11 +24,14 @@ from app.db.models import (
     User,
 )
 from app.db.models.candidate import CandidateStatus
-from app.db.models.interview import SessionStatus
+from app.db.models.interview import InvitationStatus, SessionStatus
+from app.db.models.knowledge import KnowledgeCollection
 from app.db.models.run import RunStatus
 from app.graphs import hiring_assistant
 from app.graphs.checkpointer import open_checkpointer
-from app.interviews import planning, ranking, shortlist
+from app.integrations.email import EmailError
+from app.interviews import emails, planning, ranking, shortlist
+from app.knowledge.search import Passage
 from app.screening.weights import DIMENSIONS, effective_weights
 
 pytestmark = pytest.mark.usefixtures("database_available")
@@ -48,6 +51,24 @@ PEOPLE = [
     ("Cam Fine", 80, 70, False, None),
     ("Dee Out", None, None, False, "dee@example.com"),
 ]
+
+
+@pytest.fixture(autouse=True)
+def mailbox(monkeypatch):
+    """No real email and no template search: sent emails are recorded here
+    (set .fail to make sending fail; .templates to fake the knowledge base)."""
+    box = type("Mailbox", (), {"sent": [], "fail": None, "templates": []})()
+
+    def send(to, subject, text):
+        """Record the email, or fail like the email server would."""
+        if box.fail:
+            raise EmailError(box.fail)
+        box.sent.append({"to": to, "subject": subject, "text": text})
+        return {"sent_to": to, "message_id": "<1@test>"}
+
+    monkeypatch.setattr(emails, "send_email", send)
+    monkeypatch.setattr(emails, "search_knowledge", lambda *args: box.templates)
+    return box
 
 
 def local_iso(days_ahead: int, hour: int, minute: int = 0) -> str:
@@ -455,7 +476,7 @@ def test_shortlist_then_invite_through_the_chat(screened, client, scripted):
         clock.local_zone()
     )
     assert when.strftime("%Y-%m-%dT%H:%M") == later
-    assert interview["invitation_status"] == "pending"  # not emailed yet
+    assert interview["invitation_status"] == "sent"
 
     # Copy link makes a working link; cancelling stops it.
     token = client.post(
@@ -540,3 +561,112 @@ def test_a_plan_with_problems_goes_back_to_the_llm(screened, client, scripted):
 
     assert thread["pending_review"] is None  # no card: the LLM explains instead
     assert thread["items"][-1]["text"].startswith("Cam is not on the shortlist")
+
+
+# ---------- invitation emails ----------
+
+TEMPLATE = """# Email Template: Interview Invitation
+
+Subject: Interview invitation: {job_title}
+
+Hello {candidate_name},
+
+- **Date and time:** {date}, {time}
+- **Your personal link:** {interview_link}
+
+---
+
+# Email Template: Reminder
+Subject: Reminder
+"""
+
+
+def invite(screened, *people):
+    """Shortlist and invite these candidates two days ahead: the results."""
+    shortlist_people(screened["job_id"], *people)
+    items = [
+        {"candidate_id": person, "starts_at": local_iso(2, 9 + i)}
+        for i, person in enumerate(people)
+    ]
+    with SessionLocal() as db:
+        checked = planning.make_plan(
+            db, screened["job_id"], screened["user_id"], "invite", items
+        )
+        return checked, planning.apply(
+            db, checked, screened["job_id"], screened["user_id"]
+        )
+
+
+def test_invited_candidates_get_the_knowledge_base_template(screened, mailbox):
+    mailbox.templates = [
+        Passage(
+            1,
+            "interview-invitation.md",
+            KnowledgeCollection.EMAIL_TEMPLATES,
+            TEMPLATE,
+            0.9,
+        )
+    ]
+
+    checked, results = invite(screened, screened["Alex"])
+
+    assert checked.email["template"] == "interview-invitation.md"  # card preview
+    assert emails.PREVIEW_LINK in checked.email["text"]
+    assert results[0]["email"] == "sent"
+    (mail,) = mailbox.sent
+    assert mail["to"] == "alex@example.com"
+    assert mail["subject"] == "Interview invitation: PHP Developer"
+    assert "Hello Alex Strong," in mail["text"] and "**" not in mail["text"]
+    assert "/join/" in mail["text"] and "Reminder" not in mail["text"]
+    with SessionLocal() as db:
+        session = db.scalar(
+            select(InterviewSession).where(
+                InterviewSession.candidate_id == screened["Alex"]
+            )
+        )
+        assert session.invitation_status == InvitationStatus.SENT
+
+
+def test_without_a_template_the_standard_text_is_used(screened, mailbox):
+    checked, _ = invite(screened, screened["Alex"])
+
+    assert checked.email["template"] == emails.STANDARD_NAME
+    assert mailbox.sent[0]["subject"] == "Interview invitation: PHP Developer"
+
+
+def test_a_failed_email_keeps_the_interview(screened, mailbox):
+    mailbox.fail = "The email address was refused."
+
+    _, results = invite(screened, screened["Alex"], screened["Cam"])
+
+    assert [r["done"] for r in results] == [True, True]  # both interviews saved
+    assert results[0]["email"] == "The email address was refused."
+    assert results[1]["email"] == "No email address."  # Cam has none
+    with SessionLocal() as db:
+        statuses = db.scalars(
+            select(InterviewSession.invitation_status).where(
+                InterviewSession.job_id == screened["job_id"]
+            )
+        ).all()
+    assert statuses == [InvitationStatus.FAILED, InvitationStatus.FAILED]
+
+
+def test_send_again_from_the_interviews_page(screened, client, mailbox):
+    headers = {
+        "Authorization": f"Bearer {create_access_token(screened['user_id'], Role.INTERVIEWER)}"
+    }
+    mailbox.fail = "The email service could not be reached."
+    invite(screened, screened["Alex"])
+    mailbox.fail = None
+    upcoming = client.get("/api/interviews", headers=headers).json()
+    (interview,) = [i for i in upcoming if i["job_id"] == screened["job_id"]]
+
+    answer = client.post(
+        f"/api/interviews/{interview['id']}/send", headers=headers
+    ).json()
+
+    assert answer == {"sent": True, "message": "Invitation sent"}
+    link = mailbox.sent[-1]["text"].split("/join/")[1].split()[0]
+    assert (
+        client.post("/api/auth/candidate", json={"link_token": link}).status_code == 200
+    )

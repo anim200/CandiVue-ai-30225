@@ -4,8 +4,10 @@ confirms.
 
 make_plan() checks a request (invite, reschedule or cancel) and returns a
 Plan: one item per candidate with its problem (blocks it) or warnings (shown
-on the confirmation card). The same checks run again when the interviewer
-confirms, because time has passed (apply() skips what is no longer allowed).
+on the confirmation card), and a preview of the invitation email. The same
+checks run again when the interviewer confirms, because time has passed
+(apply() skips what is no longer allowed). Invited and moved candidates are
+then emailed their private link (app/interviews/emails.py).
 Times are stored in UTC and read/typed in local time (app/core/clock.py).
 """
 
@@ -20,7 +22,7 @@ from app.auth.security import hash_link_token
 from app.core import clock
 from app.db.models import Candidate, InterviewSession, Job
 from app.db.models.interview import SessionStatus
-from app.interviews import ranking
+from app.interviews import emails, ranking
 
 WORK_START, WORK_END = time(9), time(17)  # outside these hours: a warning only
 MIN_NOTICE = timedelta(hours=1)  # an interview starts at least 1 hour from now
@@ -39,6 +41,7 @@ class Plan:
     items: list[dict] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)  # block the whole plan
     warnings: list[str] = field(default_factory=list)
+    email: dict | None = None  # preview: subject, text and template name
 
     @property
     def ok(self) -> bool:
@@ -53,6 +56,7 @@ class Plan:
             "items": self.items,
             "problems": self.problems,
             "warnings": self.warnings,
+            "email": self.email,
         }
 
     def as_text(self) -> str:
@@ -148,42 +152,59 @@ def make_plan(
             if start and not problem:
                 busy.append((start, start + length, item["name"]))
         plan.items.append(item)
+    ready = [i for i in plan.items if not i["problem"] and i["starts_at"]]
+    if ready:  # the email the first one gets (the others: own name and time)
+        text, name = emails.template(db)
+        candidate = db.get(Candidate, ready[0]["candidate_id"])
+        subject, body = emails.compose(
+            text,
+            candidate,
+            job,
+            _utc(ready[0]["starts_at"]),
+            duration,
+            emails.PREVIEW_LINK,
+        )
+        plan.email = {"subject": subject, "text": body, "template": name}
     return plan
 
 
 def apply(db: Session, plan: Plan, job_id: int, interviewer_id: int) -> list[dict]:
     """Save a confirmed plan: what passed its checks is done, the rest is
-    skipped with the reason. Returns one result per candidate."""
-    results = []
+    skipped with the reason. Invited and moved candidates are emailed a new
+    private link. Returns one result per candidate."""
+    results, to_email = [], []
     for item in plan.items:
         reason = item["problem"] or (plan.problems[0] if plan.problems else None)
-        results.append(
-            {
-                "name": item["name"],
-                "starts_at": item["starts_at"],
-                "done": not reason,
-                "reason": reason,
-            }
-        )
+        result = {
+            "name": item["name"],
+            "starts_at": item["starts_at"],
+            "done": not reason,
+        }
+        results.append({**result, "reason": reason, "email": None})
         if reason:
             continue
         session = _active_session(db, job_id, item["candidate_id"])
-        if plan.action == "invite":
-            db.add(
-                InterviewSession(
-                    candidate_id=item["candidate_id"],
-                    job_id=job_id,
-                    interviewer_id=interviewer_id,
-                    scheduled_at=_utc(item["starts_at"]),
-                    duration_minutes=plan.duration,
-                    join_token_hash=new_link_token()[1],
-                )
-            )
-        elif plan.action == "reschedule":
-            session.scheduled_at = _utc(item["starts_at"])
-        else:
+        if plan.action == "cancel":
             session.status = SessionStatus.CANCELLED
-    db.commit()
+            continue
+        token, token_hash = new_link_token()
+        if plan.action == "invite":
+            session = InterviewSession(
+                candidate_id=item["candidate_id"],
+                job_id=job_id,
+                interviewer_id=interviewer_id,
+                duration_minutes=plan.duration,
+            )
+            db.add(session)
+        session.scheduled_at = _utc(item["starts_at"])
+        session.join_token_hash = token_hash  # a moved interview gets a new link
+        to_email.append((results[-1], session, token))
+    db.commit()  # saved first: a failed email never loses an interview
+    if to_email:
+        text, _ = emails.template(db)
+        for result, session, token in to_email:
+            result["email"] = emails.deliver(db, session, token, text) or "sent"
+        db.commit()
     return results
 
 

@@ -287,9 +287,14 @@ def confirm_invitations(state: AssistantState) -> dict:
         results = planning.apply(db, checked, state["job_id"], state["interviewer_id"])
     done = sum(r["done"] for r in results)
     skipped = "; ".join(f"{r['name']}: {r['reason']}" for r in results if not r["done"])
-    note = f"I confirmed ({plan['action']}): {done} done." + (
-        f" Skipped: {skipped}" if skipped else ""
+    unsent = "; ".join(
+        f"{r['name']}: {r['email']}"
+        for r in results
+        if r["email"] not in (None, "sent")
     )
+    note = f"I confirmed ({plan['action']}): {done} done."
+    note += f" Skipped: {skipped}." if skipped else ""
+    note += f" Emails not sent: {unsent}." if unsent else ""
     logger.info("Interviews %s: job %d, %d done", plan["action"], state["job_id"], done)
     marks = {"invitations": {"action": plan["action"], "results": results}}
     return {"messages": [HumanMessage(note, additional_kwargs=marks)]}
