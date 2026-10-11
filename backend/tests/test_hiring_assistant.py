@@ -8,24 +8,17 @@ Runs inside Docker; everything created is deleted afterwards.
 from datetime import UTC, datetime
 
 import pytest
-from fastapi.testclient import TestClient
-from langchain_core.language_models.chat_models import BaseChatModel
+from helpers import call
 from langchain_core.messages import AIMessage
-from langchain_core.outputs import ChatGeneration, ChatResult
 from sqlalchemy import select
 
-from app.ai import llm
 from app.assistant import drafting, tools
 from app.assistant.schemas import JobDescriptionContent
-from app.auth.security import Role, create_access_token, hash_password
 from app.db.database import SessionLocal
-from app.db.models import Job, JobDescription, User
+from app.db.models import Job, JobDescription
 from app.db.models.job import JobDescriptionStatus, JobStatus
 from app.db.models.knowledge import KnowledgeCollection
-from app.graphs import hiring_assistant
-from app.graphs.checkpointer import open_checkpointer
 from app.knowledge.search import Passage
-from app.main import app
 
 pytestmark = pytest.mark.usefixtures("database_available")
 
@@ -45,35 +38,6 @@ JD = {
 }
 
 
-class ScriptedModel(BaseChatModel):
-    """Fake chat model: returns the next prepared message on every call."""
-
-    replies: list
-
-    @property
-    def _llm_type(self) -> str:
-        """Name of this fake model type."""
-        return "scripted"
-
-    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
-        """Return the next prepared reply (or raise it, to fake an outage)."""
-        reply = self.replies.pop(0)
-        if isinstance(reply, Exception):
-            raise reply
-        return ChatResult(generations=[ChatGeneration(message=reply)])
-
-    def bind_tools(self, tools, **kwargs):
-        """Tools are 'bound' by simply returning the same fake model."""
-        return self
-
-
-def call(name: str, args: dict, call_id: str = "c1") -> AIMessage:
-    """A fake LLM answer that asks for one tool call."""
-    return AIMessage(
-        content="", tool_calls=[{"name": name, "args": args, "id": call_id}]
-    )
-
-
 @pytest.fixture
 def drafts(monkeypatch):
     """Fake JD writer: records the feedback it was given, returns a fixed JD."""
@@ -86,44 +50,6 @@ def drafts(monkeypatch):
 
     monkeypatch.setattr(drafting, "draft_job_description", fake_draft)
     return calls
-
-
-@pytest.fixture
-def scripted(monkeypatch):
-    """Install a scripted LLM; tests fill its list of replies."""
-    model = ScriptedModel(replies=[])
-    monkeypatch.setattr(llm, "get_chat_model", lambda name: model)
-    monkeypatch.setattr(llm, "WAIT_BETWEEN_RETRIES", False)
-    return model.replies
-
-
-@pytest.fixture
-def client():
-    """App client with the real checkpointer (normally opened at startup)."""
-    with open_checkpointer() as checkpointer:
-        app.state.checkpointer = checkpointer
-        yield TestClient(app)
-
-
-@pytest.fixture
-def headers():
-    """A test interviewer's Authorization header; their jobs are removed afterwards."""
-    with SessionLocal() as db:
-        user = User(
-            email="ha.tester@example.com",
-            full_name="HA Tester",
-            password_hash=hash_password("x" * 10),
-        )
-        db.add(user)
-        db.commit()
-        user_id = user.id
-    yield {"Authorization": f"Bearer {create_access_token(user_id, Role.INTERVIEWER)}"}
-    with open_checkpointer() as checkpointer, SessionLocal() as db:
-        for job in db.scalars(select(Job).where(Job.created_by_id == user_id)):
-            checkpointer.delete_thread(f"{hiring_assistant.THREAD_KIND}-{job.id}")
-            db.delete(job)
-        db.delete(db.get(User, user_id))
-        db.commit()
 
 
 def new_job(client, headers) -> int:
