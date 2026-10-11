@@ -163,6 +163,8 @@ width.
 | `jobboard-tests` | built from `jobboard-mcp/Dockerfile` (target `test`) | Only runs on demand (see below). |
 | `email-mcp` | built from `email-mcp/Dockerfile` (target `runtime`) | Our small MCP server that emails interview invitations (Gmail SMTP). The only service that holds the email login. Not exposed to the host. |
 | `email-tests` | built from `email-mcp/Dockerfile` (target `test`) | Only runs on demand (see below). |
+| `calendar-mcp` | built from `calendar-mcp/Dockerfile` (target `runtime`) | Our small MCP server for the interviewer's Google Calendar (busy times, interview events). The only service that holds the calendar sign-in. Not exposed to the host. |
+| `calendar-tests` | built from `calendar-mcp/Dockerfile` (target `test`) | Only runs on demand (see below). |
 | `livekit` | `livekit/livekit-server:v1.13.9` | Open-source video server for the interviews. Signalling through nginx (`/rtc`); video and audio on ports 7881/tcp and 7882/udp, bound to `127.0.0.1`. Nothing is recorded. |
 | `cv-collector` | built from `backend/Dockerfile` (target `runtime`), command `python -m app.collector` | Copies new CVs from the Google Form into the `cv_intake` volume every few minutes. The only service that holds the Google key (read-only). No ports. |
 | `frontend` | built from `frontend/Dockerfile` | React app served by nginx 1.31 (HTTP, and HTTPS when `certs/` has a certificate); forwards `/api` to the backend. |
@@ -198,7 +200,8 @@ Other external services (N18):
 | Service | What it receives |
 |---|---|
 | Blogger (Google), through `jobboard-mcp` | The approved job description (title, text, requirements) and the Google Form link. No candidate data. |
-| Gmail (Google), through `email-mcp` | Interview invitations: the candidate's name and email address, the job title, the interview date and time, and the private interview link. While `EMAIL_TEST_RECIPIENT` is set, every email goes to that test address instead. |
+| Gmail (Google), through `email-mcp` | Interview invitations and cancellations: the candidate's name and email address, the job title, the interview date and time, and the private interview link (also in the attached calendar invite). While `EMAIL_TEST_RECIPIENT` is set, every email goes to that test address instead. |
+| Google Calendar, through `calendar-mcp` | The interviewer's own calendar: one event per interview with the candidate's name, the job title, the time and the interviewer's room link (no email address, no scores). To find busy times only the start and end of events are read, never their titles. |
 | Google Forms, Google Drive and Google Sheets | Applicants send their name, email address, the job they apply for and their CV file through the form; Google stores the file in Drive and the answers in the response Sheet. The `cv-collector` only **reads** them. |
 
 - **Free-tier notice:** on Gemini's free tier, Google may use the data it
@@ -380,8 +383,12 @@ a template needs a `Subject:` line and may use `{candidate_name}`,
 `{interview_link}`; `- **Label:** value` lines become a details table and
 the link a "Join your interview" button (see
 `test-data/knowledge-base/email-templates/`). Each email has an HTML and a
-plain-text part. Without a template, a short standard text is used. The
-confirmation card shows a preview first.
+plain-text part, and an **invite.ics** calendar invite, so the interview
+appears in the candidate's calendar app; a moved interview updates the
+same event. A cancelled interview sends a short fixed "Interview
+cancelled" email whose invite removes the event (only to candidates who
+were sent the invitation). Without a template, a short standard text is
+used. The confirmation card shows a preview first.
 
 ```
 backend --MCP (send_email)--> email-mcp --SMTP over TLS--> Gmail
@@ -402,6 +409,56 @@ Keep `EMAIL_TEST_RECIPIENT` set: every email then goes to you, with
 mailed (N13). An email that fails never loses the interview: it shows
 "Invitation failed" and can be sent again on the Interviews page. To
 revoke access, delete the app password.
+
+## Calendar (Google Calendar)
+
+The interviewer's Google Calendar is used in two ways (§4B-8), through our
+own small MCP server in `calendar-mcp/`:
+
+```
+backend --MCP (list_busy, create_event, move_event, delete_event)--> calendar-mcp --HTTPS--> Google Calendar API
+```
+
+- **Before:** free times (`find_free_slots`) and proposed times skip the
+  interviewer's busy events as well as their CandiVue interviews. A clash
+  is a problem the assistant must fix; all-day events and events marked
+  "free" do not count. The confirmation card says "Free in your calendar".
+- **After Confirm:** each interview is added to the calendar as an event
+  (no guests, so Google never emails the candidate), moved when it is
+  rescheduled and deleted when it is cancelled. Resend on the Interviews
+  page adds it if it is still missing.
+
+If the calendar is not set up or not reachable, nothing is blocked:
+times are checked against CandiVue interviews only, with a warning, and
+the results card says "Calendar not updated: <reason>".
+
+**One-time setup** (reuses the Google Cloud project and OAuth client from
+"Job board (Blogger)"):
+
+1. In that project, enable **Google Calendar API** (*APIs & Services →
+   Library*). If the calendar belongs to another Google account, add it as
+   a test user on the OAuth consent screen.
+2. Refresh token (on your computer, not in Docker):
+
+   ```bash
+   cd calendar-mcp
+   python -m venv .venv
+   .venv\Scripts\activate            # Windows (source .venv/bin/activate on macOS/Linux)
+   pip install -r requirements-dev.txt
+   python get_refresh_token.py <client ID> <client secret>
+   ```
+
+   Sign in with the interviewer's Google account and allow access. The
+   script prints `CALENDAR_REFRESH_TOKEN=...`.
+3. Put `CALENDAR_CLIENT_ID`, `CALENDAR_CLIENT_SECRET` (the same client as
+   Blogger is fine) and `CALENDAR_REFRESH_TOKEN` in `.env`;
+   `CALENDAR_ID=primary` is the account's main calendar. Then
+   `docker compose up -d --build`.
+
+The token only allows managing calendar events (scope
+`calendar.events`). As with Blogger, a consent screen in *Testing* ends
+the token after 7 days: run step 2 again before a demo. To revoke it,
+remove CandiVue at <https://myaccount.google.com/permissions>.
 
 ## CV Collector (Google Drive)
 
@@ -734,6 +791,12 @@ Email MCP server tests (a fake SMTP server, no email is sent):
 
 ```bash
 docker compose run --rm --build email-tests
+```
+
+Calendar MCP server tests (a fake Google Calendar, no event is made):
+
+```bash
+docker compose run --rm --build calendar-tests
 ```
 
 Frontend tests (no backend needed; requires Node.js 22.22 or later):

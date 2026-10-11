@@ -87,17 +87,23 @@ The test job is **PHP Laravel Developer**, the job `EXPECTED.md` was written for
 4. Send: `Close applications now.` Then click **Screen CVs** again on the
    job page (the ranking must include every applicant).
 5. Ask again: `Invite the shortlist next week, mornings.`
-   The assistant finds free times and shows **Interview invitations**,
-   waiting for your confirmation. The chat box is locked until you answer.
+   The assistant finds free times (skipping busy events in your Google
+   Calendar) and shows **Interview invitations**, waiting for your
+   confirmation, with "Free in your calendar". The chat box is locked until
+   you answer. Without the calendar set up you see a warning instead.
 6. Click **Change**: untick one person and edit one time, then **Confirm**.
-   A result card shows what was scheduled (or skipped, with the reason).
-7. Open **Interviews**: each interview shows **Invited** (the email went to
-   your test inbox) or **Invitation failed**; use the send icon to send it
-   again. **Cancel** an interview: its link stops working.
+   A result card shows what was scheduled (or skipped, with the reason),
+   "Email sent" and "Added to your calendar". The event is now in your
+   Google Calendar, and the email in your test inbox has an invite.ics
+   (Gmail shows it as an event).
+7. Open **Interviews**: each interview shows **Invited** or **Invitation
+   failed** with the reason; use the send icon to send it again. **Cancel**
+   an interview: its link stops working, a "Interview cancelled" email
+   arrives and the event disappears from your calendar.
 8. More to try in the chat: `Move <name>'s interview to Thursday at 14:00.`,
    `Cancel the interview with <name>.`, `Invite <name> at 07:00` (a
    warning: outside working hours), two people at the same time (refused:
-   overlap).
+   overlap), or a time when your calendar has an event (refused: busy).
 
 ## 6. The video interview (two tabs on one laptop)
 
