@@ -130,3 +130,52 @@ def test_only_one_plain_address_is_accepted(smtp, to):
     result = call_tool({"to": to, "subject": "Interview invitation", "text": TEXT})
 
     assert result.is_error and smtp.sent == []
+
+
+INVITE = {
+    "method": "REQUEST",
+    "uid": "candivue-interview-7@candivue.local",
+    "start": "2026-10-20T10:00:00+06:00",
+    "end": "2026-10-20T10:45:00+06:00",
+    "summary": "Interview: Backend Developer",
+    "location": "https://candivue.example/join/abc",
+    "description": "Join with your personal link; it is private, please keep it.",
+}
+
+
+def test_a_calendar_invite_is_attached(smtp, monkeypatch):
+    monkeypatch.setenv("EMAIL_TEST_RECIPIENT", "tester@example.com")
+
+    result = call_tool(
+        {"to": "a@example.com", "subject": "Interview", "text": TEXT, "invite": INVITE}
+    )
+
+    assert not result.is_error
+    (message,) = smtp.sent
+    (invite,) = list(message.iter_attachments())
+    assert invite.get_content_type() == "text/calendar"
+    assert invite.get_param("method") == "REQUEST"
+    ics = invite.get_content()
+    lines = ics.split("\r\n")
+    assert all(len(line) <= 75 for line in lines)
+    unfolded = ics.replace("\r\n ", "")
+    assert "UID:candivue-interview-7@candivue.local" in unfolded
+    assert "DTSTART:20261020T040000Z" in unfolded  # stored in UTC
+    assert r"DESCRIPTION:Join with your personal link\; it is private\, please" in unfolded
+    assert "ORGANIZER;CN=CandiVue:mailto:hiring@example.com" in unfolded
+    assert "mailto:tester@example.com" in unfolded  # whoever really gets it
+
+
+def test_a_cancellation_removes_the_event(smtp):
+    call_tool(
+        {
+            "to": "a@example.com",
+            "subject": "Interview cancelled",
+            "text": TEXT,
+            "invite": {**INVITE, "method": "CANCEL"},
+        }
+    )
+
+    (invite,) = list(smtp.sent[0].iter_attachments())
+    ics = invite.get_content()
+    assert "METHOD:CANCEL" in ics and "STATUS:CANCELLED" in ics

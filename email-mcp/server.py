@@ -6,7 +6,9 @@ Only this container holds the email login, so the backend never sees it
 (least privilege). It has no port on the host: only other containers in
 Docker's network can reach it. Each email has a plain-text part and,
 optionally, an HTML part (built and escaped by the backend from a fixed
-layout).
+layout) and a calendar invite (invite.ics): the candidate's calendar app
+adds the interview, moves it (same uid, later sequence) or removes it
+(method CANCEL). The invite's organizer is the sending address.
 
 Settings (environment / .env):
   SMTP_HOST, SMTP_PORT (SSL, e.g. smtp.gmail.com and 465), SMTP_USER,
@@ -20,9 +22,11 @@ import logging
 import os
 import smtplib
 import ssl
+import time
+from datetime import UTC, datetime
 from email.message import EmailMessage
 from email.utils import formataddr, make_msgid
-from typing import Annotated
+from typing import Annotated, Literal
 
 import uvicorn
 from mcp.server.mcpserver import MCPServer
@@ -43,6 +47,18 @@ server = MCPServer(
 )
 
 
+class Invite(BaseModel):
+    """A calendar invite sent with the email (see make_ics)."""
+
+    method: Literal["REQUEST", "CANCEL"]  # add/move, or remove
+    uid: Annotated[str, Field(pattern=r"^[A-Za-z0-9.@_-]{3,200}$")]  # same event = same uid
+    start: datetime
+    end: datetime
+    summary: Annotated[str, Field(min_length=2, max_length=200)]
+    location: Annotated[str, Field(max_length=500)] = ""
+    description: Annotated[str, Field(max_length=4000)] = ""
+
+
 class SentEmail(BaseModel):
     """What a successful send returns: where it really went (the test
     recipient, if set) and the message id."""
@@ -57,9 +73,11 @@ def send_email(
     subject: Annotated[str, Field(min_length=2, max_length=200)],
     text: Annotated[str, Field(min_length=10, max_length=20_000)],
     html: Annotated[str, Field(max_length=100_000)] | None = None,
+    invite: Invite | None = None,
 ) -> SentEmail:
     """Send one email to one address: plain text, plus an HTML version if
-    given (email programs show the HTML one, or the text if they cannot)."""
+    given (email programs show the HTML one, or the text if they cannot),
+    plus a calendar invite if given."""
     if not all(os.environ.get(name) for name in SETTINGS):
         raise ToolError(NOT_SET_UP)
     test_recipient = os.environ.get("EMAIL_TEST_RECIPIENT")
@@ -73,6 +91,15 @@ def send_email(
     message.set_content(text)
     if html:
         message.add_alternative(html, subtype="html")
+    if invite:
+        ics = make_ics(invite, organizer=os.environ["SMTP_USER"], attendee=message["To"])
+        message.add_attachment(
+            ics.encode(),
+            maintype="text",
+            subtype="calendar",
+            filename="invite.ics",
+            params={"method": invite.method},
+        )
     # ToolError = an expected failure whose message the caller may see; any
     # other error is hidden by MCP (no internal details leak).
     try:
@@ -96,6 +123,53 @@ def send_email(
     # No addresses in the log (personal data, N22).
     logger.info("Email sent%s", " (to the test recipient)" if test_recipient else "")
     return SentEmail(sent_to=message["To"], message_id=message["Message-ID"])
+
+
+def make_ics(invite: Invite, organizer: str, attendee: str) -> str:
+    """The invite as an iCalendar file (RFC 5545). SEQUENCE grows with every
+    email (seconds since 1970), so the newest one wins in the calendar."""
+    stamp = datetime.now(UTC)
+    lines = [
+        "BEGIN:VCALENDAR",
+        "PRODID:-//CandiVue//Interviews//EN",
+        "VERSION:2.0",
+        "CALSCALE:GREGORIAN",
+        f"METHOD:{invite.method}",
+        "BEGIN:VEVENT",
+        f"UID:{invite.uid}",
+        f"DTSTAMP:{ics_time(stamp)}",
+        f"SEQUENCE:{int(time.time())}",
+        f"DTSTART:{ics_time(invite.start)}",
+        f"DTEND:{ics_time(invite.end)}",
+        f"SUMMARY:{ics_text(invite.summary)}",
+        f"LOCATION:{ics_text(invite.location)}",
+        f"DESCRIPTION:{ics_text(invite.description)}",
+        f"ORGANIZER;CN={ics_text(os.environ.get('EMAIL_FROM_NAME', 'CandiVue'))}:mailto:{organizer}",
+        f"ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE:mailto:{attendee}",
+        "STATUS:" + ("CANCELLED" if invite.method == "CANCEL" else "CONFIRMED"),
+        "END:VEVENT",
+        "END:VCALENDAR",
+    ]
+    return "\r\n".join(fold(line) for line in lines) + "\r\n"
+
+
+def ics_time(moment: datetime) -> str:
+    """A time in UTC as iCalendar writes it: 20261020T040000Z."""
+    return moment.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
+
+
+def ics_text(text: str) -> str:
+    """Escape text for iCalendar (backslash, ";", "," and line breaks)."""
+    for char in ("\\", ";", ","):
+        text = text.replace(char, "\\" + char)
+    return text.replace("\r\n", "\n").replace("\n", "\\n")
+
+
+def fold(line: str) -> str:
+    """iCalendar lines are at most 75 characters: longer ones continue on
+    the next line after a space."""
+    parts = [line[i : i + 73] for i in range(0, len(line), 73)]
+    return "\r\n ".join(parts)
 
 
 # Only accept requests addressed to this service's Docker name (or local
