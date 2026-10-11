@@ -41,6 +41,9 @@ services:
       SCREENING_MODEL: ${SCREENING_MODEL:-qwen3:4b-instruct}
       OLLAMA_BASE_URL: http://ollama:11434
       JOBBOARD_MCP_URL: http://jobboard-mcp:8001/mcp
+      EMAIL_MCP_URL: http://email-mcp:8002/mcp
+      # The address candidates open their interview link at.
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:5173}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-20}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-480}
@@ -60,6 +63,8 @@ services:
       ollama-pull:
         condition: service_completed_successfully  # local models are ready
       jobboard-mcp:
+        condition: service_healthy
+      email-mcp:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
@@ -115,6 +120,27 @@ services:
       timeout: 5s
       retries: 5
 
+  # Email MCP server: sends interview invitations (§4B-4, §4B-6). Only this
+  # container gets the email login. No "ports": only the backend can reach
+  # it. EMAIL_TEST_RECIPIENT sends every email to one test address (N13).
+  email-mcp:
+    build:
+      context: ./email-mcp
+      target: runtime
+    restart: unless-stopped
+    environment:
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-CandiVue Hiring}
+      EMAIL_TEST_RECIPIENT: ${EMAIL_TEST_RECIPIENT:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8002), 2)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # CV Collector (step 7): every few minutes it copies new CVs from the
   # Google Form (Drive + response Sheet) into the cv_intake volume and
   # records the candidates. Same image as the backend, other command. Only
@@ -147,6 +173,14 @@ services:
   jobboard-tests:
     build:
       context: ./jobboard-mcp
+      target: test
+    profiles: ["test"]
+
+  # Tests for the email MCP server (no real email is sent).
+  # Run: docker compose run --rm --build email-tests
+  email-tests:
+    build:
+      context: ./email-mcp
       target: test
     profiles: ["test"]
 
