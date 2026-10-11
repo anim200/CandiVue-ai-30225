@@ -332,9 +332,12 @@ When the interviewer confirms interviews in the Hiring Assistant, each
 candidate is emailed a private link (moved interviews get a new one). The
 text comes from the knowledge base's **Email templates** collection (RAG):
 a template needs a `Subject:` line and may use `{candidate_name}`,
-`{job_title}`, `{date}`, `{time}`, `{duration}` and `{interview_link}`
-(see `test-data/knowledge-base/email-templates/`). Without one, a short
-standard text is used. The confirmation card shows a preview first.
+`{job_title}`, `{date}`, `{time}`, `{time_zone}`, `{duration}` and
+`{interview_link}`; `- **Label:** value` lines become a details table and
+the link a "Join your interview" button (see
+`test-data/knowledge-base/email-templates/`). Each email has an HTML and a
+plain-text part. Without a template, a short standard text is used. The
+confirmation card shows a preview first.
 
 ```
 backend --MCP (send_email)--> email-mcp --SMTP over TLS--> Gmail
