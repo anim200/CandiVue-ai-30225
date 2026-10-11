@@ -42,6 +42,7 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434
       JOBBOARD_MCP_URL: http://jobboard-mcp:8001/mcp
       EMAIL_MCP_URL: http://email-mcp:8002/mcp
+      CALENDAR_MCP_URL: http://calendar-mcp:8003/mcp
       # Video calls: the LiveKit server below; the secret signs room tickets.
       LIVEKIT_URL: http://livekit:7880
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-candivue}
@@ -69,6 +70,8 @@ services:
       jobboard-mcp:
         condition: service_healthy
       email-mcp:
+        condition: service_healthy
+      calendar-mcp:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
@@ -145,6 +148,25 @@ services:
       timeout: 5s
       retries: 5
 
+  # Calendar MCP server: the interviewer's Google Calendar (§4B-8): busy
+  # times for scheduling, and the interview events. Only this container gets
+  # the Google sign-in. No "ports": only the backend can reach it.
+  calendar-mcp:
+    build:
+      context: ./calendar-mcp
+      target: runtime
+    restart: unless-stopped
+    environment:
+      CALENDAR_CLIENT_ID: ${CALENDAR_CLIENT_ID:-}
+      CALENDAR_CLIENT_SECRET: ${CALENDAR_CLIENT_SECRET:-}
+      CALENDAR_REFRESH_TOKEN: ${CALENDAR_REFRESH_TOKEN:-}
+      CALENDAR_ID: ${CALENDAR_ID:-primary}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8003), 2)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # Video server for the interviews (F3): LiveKit, open source, runs here.
   # Browsers reach its signalling through nginx (/rtc); the video and audio
   # use the ports below, bound to this computer only (N10). Nothing is
@@ -212,6 +234,14 @@ services:
   email-tests:
     build:
       context: ./email-mcp
+      target: test
+    profiles: ["test"]
+
+  # Tests for the calendar MCP server (no real calendar is changed).
+  # Run: docker compose run --rm --build calendar-tests
+  calendar-tests:
+    build:
+      context: ./calendar-mcp
       target: test
     profiles: ["test"]
 
