@@ -7,6 +7,8 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    """All app settings, read from environment variables (.env)."""
+
     app_env: str = "development"
     log_level: str = "INFO"
     database_url: str  # required: the app will not start without it
@@ -14,12 +16,45 @@ class Settings(BaseSettings):
 
     # AI model (see app/ai/llm.py). SecretStr hides the key in logs and errors.
     llm_provider: str = "google_genai"
-    llm_model: str = "gemini-2.5-flash"
+    llm_model: str = "gemini-3.5-flash-lite"  # used until the interviewer picks one
+    # Models the interviewer may pick under the chat (comma-separated).
+    llm_models: str = "gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite"
     llm_api_key: SecretStr | None = None
     llm_timeout_seconds: float = 60
     llm_max_retries: int = 2
     # 0 = least random: the same CV and job profile get the same score (F2, B2).
     llm_temperature: float = 0
+
+    # Embedding model for the knowledge base (see app/ai/embeddings.py).
+    # Default: a local Ollama model in Docker, so document text stays on this
+    # machine. "google_genai" uses Gemini with the LLM key instead.
+    embedding_provider: str = "ollama"
+    embedding_model: str = "qwen3-embedding:0.6b"
+    ollama_base_url: str = "http://ollama:11434"  # the ollama service in Compose
+
+    # Local model for CV screening (app/screening/local_model.py): reads the
+    # years when a CV has no readable job dates, and checks a missing
+    # mandatory requirement once more before a candidate is excluded.
+    screening_model: str = "qwen3:4b-instruct"
+    screening_model_timeout_seconds: float = Field(default=300, gt=0)
+
+    # Job board MCP server (jobboard-mcp container, Blogger). The Blogger
+    # credentials live only in that container, never in the backend.
+    jobboard_mcp_url: str = "http://jobboard-mcp:8001/mcp"
+
+    # CV Collector (app/collector, cv-collector container). The Google key is
+    # given only to that container (read-only service account, N7).
+    google_service_account_key: SecretStr | None = None  # JSON or base64 JSON
+    cv_responses_sheet_id: str | None = None  # the Google Form's response Sheet
+    cv_collect_interval_seconds: int = Field(default=300, ge=30)
+    cv_intake_dir: str = "/data/cv_intake"  # Docker named volume, never in git
+    max_cv_mb: int = Field(default=10, gt=0)
+    # The form question "Position applied for", e.g. "entry.123456789": the job
+    # post pre-fills it with "JOB-12 · title" so each CV finds its job.
+    google_form_position_field: str | None = None
+
+    # Largest document the knowledge base accepts (N8).
+    max_upload_mb: int = Field(default=20, gt=0)
 
     # Login tokens (see app/auth). The secret signs every token, so anyone who
     # knows it could create tokens: required, long, and only in .env.
@@ -32,7 +67,14 @@ class Settings(BaseSettings):
     demo_interviewer_password: SecretStr | None = None
 
     @property
+    def llm_model_list(self) -> list[str]:
+        """The models that may be chosen; the default model is always one."""
+        names = [name.strip() for name in self.llm_models.split(",") if name.strip()]
+        return names if self.llm_model in names else [self.llm_model, *names]
+
+    @property
     def cors_origin_list(self) -> list[str]:
+        """Turn the comma-separated CORS_ORIGINS text into a list."""
         return [
             origin.strip() for origin in self.cors_origins.split(",") if origin.strip()
         ]
@@ -40,4 +82,5 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    """Return the settings, created once and then reused."""
     return Settings()

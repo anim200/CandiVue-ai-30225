@@ -12,3 +12,15 @@ langchain==1.4.3
 langchain-google-genai==4.4.0
 pwdlib[argon2]==0.3.1
 PyJWT==2.15.1
+pypdf==6.19.0
+python-docx==1.2.0
+python-multipart==0.0.32
+langchain-ollama==1.1.0
+mcp==2.3.0
+# CV Collector: Google service account + Drive/Sheets REST calls
+google-auth==2.60.0
+requests==2.34.2
+# CV screening: PDF pages to images and OCR for scanned CVs (local Tesseract)
+pypdfium2==5.14.0
+pytesseract==0.3.13
+pillow==12.3.0

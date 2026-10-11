@@ -50,6 +50,7 @@ def client(db):
 
 @pytest.fixture
 def interviewer(db):
+    """Create a test interviewer account (rolled back afterwards)."""
     user = User(
         email=EMAIL, full_name="Test Interviewer", password_hash=hash_password(PASSWORD)
     )
@@ -60,6 +61,7 @@ def interviewer(db):
 
 @pytest.fixture
 def interview(db):
+    """Create a test job, candidate and interview with a known link token."""
     job = Job(title="Test Job")
     db.add(job)
     db.flush()

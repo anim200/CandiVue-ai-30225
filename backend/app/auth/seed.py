@@ -17,6 +17,7 @@ MIN_PASSWORD_LENGTH = 8
 
 
 def create_first_interviewer(db: Session) -> None:
+    """Create the first interviewer from .env if the database has no user yet."""
     settings = get_settings()
     email = (settings.demo_interviewer_email or "").strip().lower()
     password = settings.demo_interviewer_password

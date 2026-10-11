@@ -6,6 +6,7 @@ import { Navigate, useLocation } from 'react-router';
 
 import { loadSession } from './session';
 
+// Show the page only to a signed-in interviewer; send everyone else to the login page.
 export default function RequireInterviewer({ children }) {
   const location = useLocation();
 

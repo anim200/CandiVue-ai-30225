@@ -15,6 +15,8 @@ from app.db.base import status_column
 
 
 class RunStatus(StrEnum):
+    """The steps a background AI run goes through."""
+
     PENDING = "pending"  # created, not started yet
     RUNNING = "running"
     WAITING_FOR_REVIEW = "waiting_for_review"  # paused for the interviewer (HITL)
@@ -23,6 +25,8 @@ class RunStatus(StrEnum):
 
 
 class RunStateMixin:
+    """Columns every background AI run shares: status, start, end and error."""
+
     status: Mapped[RunStatus] = mapped_column(
         status_column(RunStatus), default=RunStatus.PENDING
     )

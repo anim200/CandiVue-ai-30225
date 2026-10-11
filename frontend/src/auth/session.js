@@ -6,10 +6,12 @@
 
 const KEY = 'candivue-session';
 
+// Remember the signed-in user and token for this tab.
 export function saveSession(session) {
   sessionStorage.setItem(KEY, JSON.stringify(session));
 }
 
+// Read the signed-in user and token of this tab (null if signed out).
 export function loadSession() {
   try {
     const saved = sessionStorage.getItem(KEY);
@@ -19,6 +21,7 @@ export function loadSession() {
   }
 }
 
+// Forget the signed-in user of this tab (sign out).
 export function clearSession() {
   sessionStorage.removeItem(KEY);
 }

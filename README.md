@@ -49,6 +49,9 @@ Before the first start, also set in `.env`:
 | Full reset (deletes the database volume) | `docker compose down -v` |
 | Full reset including built images | `docker compose down -v --rmi local` |
 
+The first start also downloads the Ollama image and the embedding model
+(a few GB in total), so it takes several minutes once.
+
 After a full reset, run `docker compose up --build -d` again. The database
 is recreated from scratch and the pgvector extension is enabled
 automatically.
@@ -154,27 +157,394 @@ width.
 | `db` | `pgvector/pgvector:0.8.7-pg17-bookworm` | PostgreSQL 17 with pgvector. Data in the named volume `pgdata`. Not exposed to the host. |
 | `backend` | built from `backend/Dockerfile` (target `runtime`) | FastAPI on Python 3.13. Applies migrations on start. |
 | `tests` | built from `backend/Dockerfile` (target `test`) | Only runs on demand (see below). |
+| `ollama` | `ollama/ollama:0.35.1` | Local embedding model for the knowledge base. Not exposed to the host; models kept in the `ollama_models` volume. |
+| `ollama-pull` | `ollama/ollama:0.35.1` | One-time job: downloads the embedding model on the first start, then exits. |
+| `jobboard-mcp` | built from `jobboard-mcp/Dockerfile` (target `runtime`) | Our small MCP server that posts approved JDs to Blogger. The only service that holds the Blogger credentials. Not exposed to the host. |
+| `jobboard-tests` | built from `jobboard-mcp/Dockerfile` (target `test`) | Only runs on demand (see below). |
+| `cv-collector` | built from `backend/Dockerfile` (target `runtime`), command `python -m app.collector` | Copies new CVs from the Google Form into the `cv_intake` volume every few minutes. The only service that holds the Google key (read-only). No ports. |
 | `frontend` | built from `frontend/Dockerfile` | React app served by nginx 1.31 (HTTP, and HTTPS when `certs/` has a certificate); forwards `/api` to the backend. |
 
 ## AI provider and data sent to it
 
 | Setting (`.env`) | Default | Meaning |
 |---|---|---|
-| `LLM_PROVIDER` / `LLM_MODEL` | `google_genai` / `gemini-2.5-flash` | Which AI model is used. |
+| `LLM_PROVIDER` / `LLM_MODEL` | `google_genai` / `gemini-3.5-flash-lite` | Which AI model is used until the interviewer picks one under the chat. |
+| `LLM_MODELS` | `gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite` | Models the interviewer may switch to under the chat (allowed list). |
 | `LLM_API_KEY` | none | Your own key (Gemini: free from Google AI Studio). |
 | `LLM_TIMEOUT_SECONDS` | `60` | Longest wait for one answer. |
 | `LLM_MAX_RETRIES` | `2` | Extra tries after a failure, with a growing pause. |
 | `LLM_TEMPERATURE` | `0` | Randomness of answers. `0` keeps candidate scores repeatable. |
+| `EMBEDDING_PROVIDER` / `EMBEDDING_MODEL` | `ollama` / `qwen3-embedding:0.6b` | Model that turns knowledge-base text into embeddings for search. Runs locally in Docker (no key). `google_genai` / `gemini-embedding-001` uses Gemini with the LLM key instead. |
+| `MAX_UPLOAD_MB` | `20` | Largest knowledge-base document accepted. |
 
 - **Provider:** Google Gemini API (external service). The provider can be
   changed in `.env` without code changes.
-- **What is sent:** job profiles, CV text, interview transcripts and the
-  instructions (prompts) needed to screen and assess candidates.
+- **What is sent:**
+  - Hiring Assistant: the interviewer's chat messages, the job profile,
+    knowledge-base passages found by search, and interviewer feedback on
+    job descriptions.
+  - Knowledge base: **nothing**. Embeddings are made by the local Ollama
+    model, so document text and search questions stay on this machine.
+    Only passages that the Hiring Assistant chooses to use are sent, as
+    part of the chat.
+  - Later steps: CV text, interview transcripts and the instructions
+    (prompts) needed to screen and assess candidates.
+
+Other external services (N18):
+
+| Service | What it receives |
+|---|---|
+| Blogger (Google), through `jobboard-mcp` | The approved job description (title, text, requirements) and the Google Form link. No candidate data. |
+| Google Forms, Google Drive and Google Sheets | Applicants send their name, email address, the job they apply for and their CV file through the form; Google stores the file in Drive and the answers in the response Sheet. The `cv-collector` only **reads** them. |
+
 - **Free-tier notice:** on Gemini's free tier, Google may use the data it
   receives to improve its products. Use only synthetic or sample data with a
   free key, never real candidate data.
 - **If the AI fails** (timeout, outage, wrong key, rate limit) after all
   retries, the API answers `503` with a clear message instead of crashing.
+
+**Choosing the model and seeing the quota.** Under the Hiring Assistant's
+chat box the interviewer can switch the AI model (only models in
+`LLM_MODELS`). The choice is saved (table `llm_models`) and used for every
+AI call. Gemini's free tier has a daily request limit **per model** (for
+example 20 a day for `gemini-3.5-flash`), and one job needs about 5-8
+requests.
+
+- Google has no API that tells how much quota is left, so CandiVue counts
+  its own requests per model and day (the count restarts at midnight
+  Pacific time, like Google's).
+- When Google answers "limit reached" (HTTP 429), the limit and the reset
+  time are read from Google's answer and shown: "20 of 20 requests today ·
+  limit reached, resets in 13 h". A daily limit is not retried (it would
+  only fail again); a short per-minute limit is.
+- Requests made with the same key elsewhere are not counted. "Usage on
+  Google" opens <https://ai.dev/rate-limit> for Google's exact numbers.
+- API: `GET /api/ai/models`, `PUT /api/ai/model` (interviewers only).
+
+## Hiring Assistant (LangGraph 1)
+
+The interviewer prepares a job by chatting with the Hiring Assistant
+(Figure 3 in `docs/diagrams/`). One chat thread per job, saved in the
+database, so it continues after a restart.
+
+```
+START -> load_context -> assistant --(tool call)--> tools --> assistant ...
+                                   \--(reply)-----> END
+         tools --(a JD was written)--> human_review (pause)
+         human_review --approve----> confirm_posting (pause)
+         human_review --reject-----> assistant
+         human_review --edit-------> human_review
+         confirm_posting --post----> post_to_job_board --> assistant
+         confirm_posting --skip----> assistant
+         tools --(request_job_posting)--> confirm_posting
+```
+
+- **assistant**: the LLM reads the chat and decides the next step.
+- **tools** (the LLM decides which to call):
+  - `save_job_profile`: title, minimum experience, and every requirement
+    as mandatory / required / preferred.
+  - `rag_search`: searches the knowledge base, only when useful.
+  - `write_job_description`: drafts the JD from the profile and any
+    passages found; records which documents it used.
+  - `save_job_profile` also saves the **scoring weights** the assistant
+    suggests (with a reason), and for each requirement short lists of
+    names that **also count** (e.g. Docker: Docker Compose, Laravel Sail)
+    and **related** close substitutes (e.g. Podman). Screening uses them
+    (see "CV screening"). Weights the interviewer states in the chat are
+    saved as the interviewer's.
+  - `save_application_form`: saves the Google Form link applicants use
+    to send their CV (only Google Forms links are accepted).
+  - `request_job_posting`: when the interviewer later asks to post a job
+    they did not post, this asks them again. It cannot post by itself.
+- **human_review**: the graph pauses (LangGraph `interrupt`) until the
+  interviewer approves, edits (saved as a new version that still needs
+  approval) or rejects with feedback (the assistant writes a new
+  version). Nothing is posted before approval.
+- **confirm_posting**: after approval the graph pauses again and asks
+  "Post this job to the job board?" with **Post to job board** and
+  **Don't post**. Don't post keeps the JD approved (job list: "Approved ·
+  not posted"); the interviewer can ask in the chat to post it later.
+- **post_to_job_board**: runs only after the interviewer chose Post. Posts the approved JD
+  and the form link to the job board (see below) and adds the result to
+  the chat. If the form link is missing, it asks for it first; if the
+  job board fails after 3 tries, the chat shows **Try again** and
+  **Copy job description**.
+- **Retry path**: a tool call with invalid arguments goes back to the LLM
+  as an error so it can correct itself; a turn that never ends is stopped
+  after 30 steps with a clear message; "Try again" continues a turn that
+  failed without sending the message twice.
+
+## Job board (Blogger)
+
+Approved JDs are posted to a **private Blogger blog** (free, no paid API),
+through our own small MCP server in `jobboard-mcp/`:
+
+```
+backend --MCP (create_job_post)--> jobboard-mcp --HTTPS--> Blogger API v3
+```
+
+The backend only knows the MCP address; the Google credentials stay in
+the `jobboard-mcp` container. Without them the app still works and the
+chat says "The job board is not set up yet".
+
+**One-time setup** (about 10 minutes, with your own Google account):
+
+1. **Blog:** on <https://www.blogger.com> create a blog, then
+   *Settings → Permissions → Reader access → Private* (only you can read
+   it; it is a demo job board). The **blog ID** is the number in the
+   address bar of the blog's dashboard (`.../blog/posts/<blog ID>`).
+2. **Google Cloud project:** on <https://console.cloud.google.com> create
+   a project and enable **Blogger API v3** (*APIs & Services → Library*).
+3. **OAuth consent screen:** user type *External*, status *Testing*, and
+   add your own Google account as a test user.
+4. **OAuth client:** *Credentials → Create credentials → OAuth client ID*,
+   type **Desktop app**. Keep the client ID and secret private.
+5. **Refresh token** (on your computer, not in Docker):
+
+   ```bash
+   cd jobboard-mcp
+   python -m venv .venv
+   .venv\Scripts\activate            # Windows (source .venv/bin/activate on macOS/Linux)
+   pip install -r requirements-dev.txt
+   python get_refresh_token.py <client ID> <client secret>
+   ```
+
+   A browser opens; sign in with the same account and allow access. The
+   script prints `BLOGGER_REFRESH_TOKEN=...`.
+6. Put the four values in `.env` (never in code or chat):
+   `BLOGGER_CLIENT_ID`, `BLOGGER_CLIENT_SECRET`, `BLOGGER_REFRESH_TOKEN`,
+   `BLOGGER_BLOG_ID`. Then restart: `docker compose up -d`.
+
+Sign in with the Google account that **owns the blog** (add it as a test
+user first). While the consent screen is in *Testing*, Google ends the
+refresh token after 7 days: the chat then says "The job board sign-in
+failed"; run step 5 again and replace the token (do it before a demo).
+
+The token only allows managing your Blogger blogs. To revoke it, remove
+CandiVue at <https://myaccount.google.com/permissions>.
+
+## CV Collector (Google Drive)
+
+Applicants apply through the Google Form linked in the job post (§4B-9):
+
+```
+Google Form ─► Drive (CV file) + response Sheet (name, email, job, CV link)
+                     │  read-only service account
+   cv-collector (every 5 min) ─► cv_intake volume: job-<id>/<candidate>.pdf|docx
+                              └► candidates table: received / rejected + reason
+```
+
+- **Which job?** The job post opens the form with "Position applied for"
+  already filled in, e.g. `JOB-12 · Python Developer`
+  (`GOOGLE_FORM_POSITION_FIELD`). Answers without a job reference, without
+  consent or without a CV are skipped; a CV already collected is never
+  downloaded again.
+- **Checks (N8):** PDF or Word (DOCX) only, decided by the file's content,
+  and at most `MAX_CV_MB` (checked before downloading). A rejected file is
+  not saved; the reason is recorded. One bad answer never stops the others.
+- **Storage:** the files are in the `cv_intake` named volume (never in the
+  project folder or git, N14); only the data about them is in PostgreSQL.
+  Look at them in Docker Desktop → Volumes → `candivue_cv_intake`.
+- The Jobs page shows **CVs received**. Clicking a job opens its page with
+  the **applicants**: name, email, when the CV arrived, file name and status
+  (received / rejected with the reason), **View CV** (PDF opens in the
+  browser, Word downloads; never cached) and **Remove** (deletes the
+  applicant and the CV file, N19). API (interviewers only):
+  `GET /api/jobs/{id}/cvs`, `GET /api/jobs/{id}/cvs/{candidate}/file`,
+  `DELETE /api/jobs/{id}/cvs/{candidate}`.
+- **Add CV (by hand):** for a CV received another way, or to load a set of
+  sample CVs, use **Add CV** on the job page (one or several PDF/DOCX files;
+  same checks; sent one file per request; shown as "Added by hand"; the name
+  is guessed from the file name until screening reads the CV).
+  API: `POST /api/jobs/{id}/cvs` (multipart `files`, at most 30 per request).
+  nginx accepts requests up to 25 MB (`client_max_body_size`).
+- **Synthetic test CVs:** `test-data/synthetic-cvs/` holds 20 made-up CVs for
+  the "PHP Laravel Developer" test job (strong, partial, excluded and edge
+  cases: scanned, DOCX, two-column, missing sections) and an answer key in
+  `EXPECTED.md`. Re-create them with `python test-data/synthetic-cvs/make_cvs.py`.
+- Without the settings below, the collector waits and logs "not set up yet".
+
+**One-time setup** (same Google Cloud project as the job board):
+
+1. **APIs:** *APIs & Services → Library*: enable **Google Drive API** and
+   **Google Sheets API**.
+2. **Service account:** *IAM & Admin → Service accounts → Create service
+   account*, name `cv-collector`, **no roles**. Open it → *Keys → Add key →
+   Create new key → JSON*. Keep the downloaded file outside the project.
+3. **Share, read-only:** with the account that owns the form, share the
+   form's upload folder in Google Drive (`<form title> (File responses)`)
+   and the response Sheet with the service account's email
+   (`cv-collector@<project>.iam.gserviceaccount.com`) as **Viewer**.
+4. **`.env`:**
+   - `GOOGLE_SERVICE_ACCOUNT_KEY`: the key on one line, e.g. in Git Bash
+     `base64 -w0 <key file>.json`. Then delete the downloaded key file.
+   - `CV_RESPONSES_SHEET_ID`: from the Sheet's address `/spreadsheets/d/<ID>/edit`.
+   - `GOOGLE_FORM_POSITION_FIELD`: in the form, *⋮ → Get pre-filled link*,
+     type anything in "Position applied for", *Get link*; the link contains
+     `entry.<number>=…`; use `entry.<number>`. Give that question the help
+     text "Filled in automatically, please don't change".
+5. `docker compose up -d`, then `docker compose logs -f cv-collector`.
+   Post the job again so its link pre-fills the job.
+
+Use only sample or synthetic CVs (N13, CN5).
+
+## CV screening (LangGraph 2)
+
+A fixed workflow (Figure 4), started with **Screen CVs** on the job page,
+not by the chatbot, so scores stay repeatable. It screens all of the job's
+CVs in one batch, one parallel branch per CV, in the background with
+progress ("12 of 20 CVs"). It is checkpointed, so after a restart it
+continues where it stopped (N26). **No Gemini is used**: everything runs
+locally, so there is no quota and CV text stays on this machine. Mostly
+rules and local embeddings; a small **local model** (Ollama,
+`SCREENING_MODEL`, default `qwen3:4b-instruct`, about 2.5 GB) is asked only
+in the two cases the rules cannot settle (see below).
+
+```
+load_cv_batch → Send (one branch per CV):
+  extract_text ─ no text → ocr_extract (Tesseract) ─┐
+       │ text ───────────────────────────────────────┴→ parse_cv
+       └ error → log_and_skip                           │ error → log_and_skip
+  check_hard_requirements ─ fail → record_exclusion
+       └ pass → match_requirements → score_skills ║ score_experience ║
+                score_qualifications ║ ats_match → combine_scores
+→ collect_results → rank_candidates → save_results
+```
+
+- **Reading:** the file's text (PDF or Word); a PDF without text is read
+  by OCR (local Tesseract). A CV that still cannot be read is listed as
+  "could not be read"; the batch goes on.
+- **Parsing (rules):** contact details, sections, jobs with dates, years
+  of experience (overlapping jobs counted once), highest degree,
+  certificates. Ligatures ("ﬁ") are normalised; two-column CVs are handled.
+  Dates such as "Jan 2020 – Present", "Jan 2020 – Till Date", "Feb 2019 to
+  date", "03/2022 – now", "01.2018 – 12.2019", "Jan, 2015 – Mar, 2016",
+  "2017 through 2018", "March 2019 until today" and "since 2014".
+  "Master" counts as a degree only as "Master of / Master's in" (not
+  "Scrum Master").
+- **Years without dates (local model):** when the rules find no job dates,
+  the local model reads the years the CV shows ("7 years of experience",
+  "over five years"). It must quote the CV lines it used; a rule checks the
+  quotes are really in the CV and the number comes from them. If nothing is
+  found, the years are **unknown**: the candidate is **not excluded** for
+  years, the experience score is 0 and the screen shows a "please check"
+  warning.
+- **Matching:** each requirement is **met** when the CV names it or one of
+  its "also counts" names; **partly met** through a "related" name; else
+  the CV line closest in meaning (local embeddings, cosine similarity)
+  decides: met ≥ 0.62, partly ≥ 0.58 (calibrated on the synthetic CVs).
+  A line that says the opposite ("has not used Laravel", "no experience
+  with Docker") or only a wish ("interested in learning Docker") never
+  counts; "no manual steps using Docker" still counts. A version number
+  does not hide a name ("PHP8" counts for PHP). Every result keeps the CV
+  line as evidence.
+- **Second look before excluding (local model):** when a mandatory
+  requirement is still not found (and the years are not too few anyway),
+  the local model reads the CV once more. It counts only with a quoted line
+  that is really in the CV and does not deny the skill; the panel then says
+  the local model found it. This protects against excluding a good
+  candidate because the rules missed a wording.
+- **Hard-requirement gate:** a candidate is **excluded** (not ranked, with
+  the reason) when a mandatory requirement is not met, is only "partly met
+  by meaning", or the years are below the minimum (unknown years never
+  exclude).
+- **Scores (0-100, rules, each with a written reason):** technical skills
+  (requirements weighted mandatory 3 / required 2 / preferred 1), relevant
+  experience (minimum + 3 years = full marks), qualifications (degree 60%,
+  qualification requirements 40%), ATS CV-JD match (key job terms found
+  60%, closeness of the whole CV to the JD 40%).
+- **Weights (human control):** the interviewer's weights on the job page
+  win; otherwise the Hiring Assistant's suggestion; otherwise defaults
+  (skills 35, experience 30, qualifications 15, ATS 20). Each run records
+  the weights it used; the page says when weights or CVs changed since.
+- **Results** (interviewers only, N9): ranking (overall score first), a
+  candidate panel with the score breakdown and each requirement's evidence,
+  excluded candidates with reasons, unreadable CVs.
+- API: `POST /api/jobs/{id}/screenings`, `GET /api/jobs/{id}/screenings/latest`,
+  `PUT /api/jobs/{id}/weights`, `DELETE /api/jobs/{id}/weights`.
+
+**Measured time (N1), 22 synthetic CVs, this laptop (CPU only):** about
+**5 minutes** for the first run (reading, OCR, embedding every CV line, and
+4 local-model questions: one CV without dates, three second looks; the
+first question also loads the model, about 40 s) and about **7 seconds**
+for a repeat run (parsed CVs, embeddings and the local model's answers are
+reused, e.g. after changing the weights). One local-model question takes
+about 6-16 s.
+
+**Checked against** `test-data/synthetic-cvs/EXPECTED.md`: the 5 expected
+candidates are excluded with the right reasons, the strong CVs rank on top,
+"Laravel Sail" counts for Docker and "Podman" gives partly met, the CV
+without dates gets its stated 7 years, and the "Till Date" CV is read
+correctly. A fresh run and a repeat run give the same ranking.
+
+**Known limitations (fairness and accuracy, N20):**
+- Only job-related data is scored; no age, gender, nationality or other
+  protected attribute is read or stored. Names and emails are shown but
+  not scored.
+- Years of experience count the whole career, not years per skill.
+- "Present" means the screening date, so the same CV gains experience over
+  time.
+- The "also counts" / "related" lists come from the AI when the profile is
+  saved; check them, since a missing name can make a skill look unmet.
+- Similarity thresholds were calibrated on synthetic CVs; unusual CV
+  layouts can lose lines. Scanned CVs are marked so they can be checked.
+- The local model is small: its answers are only used with a quote that
+  is checked against the CV, but it can still miss a wording (then the
+  result is the same as the rules alone). Years it computes from unusual
+  dates are checked for plausibility, not exactly.
+- English CVs only (OCR and rules are set up for English).
+- Scores support the interviewer's decision; nothing is rejected or hired
+  automatically.
+
+## Knowledge base (RAG)
+
+Documents the Hiring Assistant can search: reference library, company
+policies, previous job profiles, email templates and the interview
+question bank.
+
+- Upload PDF, DOCX, TXT or Markdown (up to `MAX_UPLOAD_MB`). The type is
+  checked from the file's content, not its name.
+- Only the extracted text is stored, cut into overlapping passages; the
+  file itself is not kept.
+- Each passage gets an embedding (1024 numbers, stored with pgvector),
+  made by `qwen3-embedding:0.6b` running locally in the `ollama` container
+  (CPU is enough). The model (about 640 MB) is downloaded automatically on
+  the first start and kept in the `ollama_models` volume.
+  Search compares the question's embedding with the passages (cosine
+  similarity) and returns the closest ones with a match score.
+- Indexing runs in the background with a visible status; a failed
+  document can be indexed again.
+- Never upload CVs, interview notes or other personal data here.
+
+## Secure by design
+
+Security is built into each part instead of added at the end:
+
+- **Deny by default:** every API route requires the interviewer role
+  unless it is on a short, explicit list; a test fails if a new route
+  forgets the check (`tests/test_auth_routes.py`).
+- **Validate all input:** request bodies have length limits (Pydantic);
+  uploads are checked by size and real file type; file names are cleaned.
+- **Least data:** uploaded files are not kept, only their text; no
+  candidate data in the knowledge base.
+- **AI output is checked:** the profile and JD the LLM writes must match
+  fixed shapes before they are saved; the job id is set by the graph, not
+  by the LLM.
+- **Prompt-injection care:** document text and chat messages are passed
+  to the LLM as data, and the instructions say never to follow
+  instructions found inside them.
+- **Human approval:** nothing is published before the interviewer
+  approves it.
+- **CV files:** only `cv-collector` holds the Google key (a service
+  account that can only read the shared folder and Sheet). Files are
+  checked by content and size before they are saved; logs never contain
+  applicants' names or emails.
+- **Least privilege for integrations:** only `jobboard-mcp` holds the
+  Blogger credentials (one OAuth scope: Blogger); the backend cannot use
+  them directly. The posted page escapes all JD text, and only Google
+  Forms links (HTTPS) are accepted as the application link.
+- **No secrets or personal data in logs or error messages**, pinned and
+  audited dependencies, localhost-only ports (see the sections above).
 
 ## Signing in and roles
 
@@ -270,6 +640,13 @@ python -m venv .venv
 .venv\Scripts\activate            # Windows (source .venv/bin/activate on macOS/Linux)
 pip install -r requirements-dev.txt
 pytest
+```
+
+Job board MCP server tests (Blogger is replaced by a fake, no
+credentials needed):
+
+```bash
+docker compose run --rm --build jobboard-tests
 ```
 
 Frontend tests (no backend needed; requires Node.js 22.22 or later):

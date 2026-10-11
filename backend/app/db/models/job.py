@@ -12,18 +12,25 @@ from app.db.base import Base, TimestampMixin, status_column
 
 
 class JobStatus(StrEnum):
+    """Whether a job is a draft, open or closed."""
+
     DRAFT = "draft"
     OPEN = "open"
     CLOSED = "closed"
 
 
 class JobBoardStatus(StrEnum):
+    """Whether the job has been posted to the job board."""
+
     NOT_POSTED = "not_posted"
+    AWAITING_CONFIRMATION = "awaiting_confirmation"  # asked "post it?"
     POSTED = "posted"
     FAILED = "failed"
 
 
 class Job(TimestampMixin, Base):
+    """One job opening and its requirement profile."""
+
     __tablename__ = "jobs"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -42,9 +49,16 @@ class Job(TimestampMixin, Base):
     created_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
     )
+    # Scoring weights for screening (F2), e.g. {"skills": 40, "experience": 30,
+    # "qualifications": 10, "ats": 20, "reason": "..."}. The interviewer's
+    # weights win; otherwise the AI suggestion; otherwise fixed defaults.
+    weights: Mapped[dict[str, Any] | None] = mapped_column(JSONB)  # interviewer
+    ai_weights: Mapped[dict[str, Any] | None] = mapped_column(JSONB)  # Hiring Assistant
 
 
 class JobDescriptionStatus(StrEnum):
+    """Where a JD draft is in the interviewer's approval."""
+
     DRAFT = "draft"
     APPROVED = "approved"
     REJECTED = "rejected"
@@ -67,3 +81,8 @@ class JobDescription(TimestampMixin, Base):
     )
     reviewer_feedback: Mapped[str | None] = mapped_column(Text)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Knowledge-base passages the draft was based on (RAG), shown as source
+    # chips on the approval card: [{"document_id", "filename", "collection"}].
+    sources: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, server_default="[]"
+    )

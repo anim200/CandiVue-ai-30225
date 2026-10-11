@@ -14,6 +14,9 @@ pytestmark = pytest.mark.usefixtures("database_available")
 
 class State(TypedDict):
     # operator.add: each step appends to the list instead of replacing it.
+
+    """The small state the test graph passes between steps."""
+
     steps: Annotated[list[str], operator.add]
 
 

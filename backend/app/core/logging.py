@@ -10,7 +10,10 @@ from datetime import datetime, timezone
 
 
 class JsonFormatter(logging.Formatter):
+    """Formats each log line as one JSON object."""
+
     def format(self, record: logging.LogRecord) -> str:
+        """Turn one log record into a JSON line (time, level, logger, message)."""
         entry = {
             "time": datetime.fromtimestamp(record.created, timezone.utc).isoformat(),
             "level": record.levelname,
@@ -23,6 +26,7 @@ class JsonFormatter(logging.Formatter):
 
 
 def setup_logging(level: str) -> None:
+    """Send all logs to the console as JSON at the given level."""
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(JsonFormatter())
     logging.basicConfig(level=level.upper(), handlers=[handler], force=True)

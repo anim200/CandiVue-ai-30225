@@ -14,6 +14,7 @@ export const TONES = {
   harbor: { bg: '#EDF5F6', color: '#1C5D65' },
 };
 
+// A rounded status badge with an icon, in the tone's design colours.
 export default function StatusBadge({ tone = 'neutral', icon, children, ...props }) {
   const { bg, color } = TONES[tone];
   return (
@@ -21,7 +22,7 @@ export default function StatusBadge({ tone = 'neutral', icon, children, ...props
       h={22}
       radius="xl"
       tt="none"
-      fz={12}
+      fz={13}
       fw={600}
       leftSection={icon}
       styles={{ root: { background: bg, color } }}

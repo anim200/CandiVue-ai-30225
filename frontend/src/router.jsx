@@ -5,11 +5,24 @@ import { createBrowserRouter, Navigate } from 'react-router';
 import RequireInterviewer from './auth/RequireInterviewer';
 import AppLayout from './layout/AppLayout';
 import { NAV_ITEMS } from './layout/navigation';
+import HiringAssistantPage from './pages/assistant/HiringAssistantPage';
 import CandidateJoinPage from './pages/CandidateJoinPage';
 import ComingSoonPage from './pages/ComingSoonPage';
 import ErrorPage from './pages/ErrorPage';
+import JobPage from './pages/job/JobPage';
+import JobsPage from './pages/JobsPage';
+import KnowledgeBasePage from './pages/knowledge/KnowledgeBasePage';
 import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
+
+// Screens that are built; other menu items still show "coming soon".
+const BUILT_PAGES = {
+  '/jobs': <JobsPage />,
+  '/knowledge-base': <KnowledgeBasePage />,
+};
+
+// The Hiring Assistant fills the whole area (no page padding).
+const FULL_BLEED = { fullBleed: true };
 
 // errorElement: shown instead of a crashed page; never shows technical
 // details (N12).
@@ -29,10 +42,15 @@ export const router = createBrowserRouter([
     errorElement: <ErrorPage />,
     children: [
       { index: true, element: <Navigate to="/jobs" replace /> },
+      { path: 'assistant', element: <HiringAssistantPage />, handle: FULL_BLEED },
+      { path: 'assistant/:jobId', element: <HiringAssistantPage />, handle: FULL_BLEED },
+      { path: 'jobs/:jobId', element: <JobPage /> },
       // Each module replaces its "coming soon" page with the real screen.
-      ...NAV_ITEMS.map((item) => ({
+      ...NAV_ITEMS.filter((item) => item.path !== '/assistant').map((item) => ({
         path: item.path,
-        element: <ComingSoonPage title={item.label} description={item.description} />,
+        element: BUILT_PAGES[item.path] ?? (
+          <ComingSoonPage title={item.label} description={item.description} />
+        ),
       })),
       { path: '*', element: <NotFoundPage /> },
     ],

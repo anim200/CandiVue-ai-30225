@@ -11,6 +11,8 @@ router = APIRouter(prefix="/api", tags=["health"])
 
 
 class HealthResponse(BaseModel):
+    """The health answer: is the app up, and can it reach the database?"""
+
     status: Literal["ok", "degraded"]
     database: Literal["ok", "unavailable"]
 
@@ -19,6 +21,7 @@ class HealthResponse(BaseModel):
 def health(
     response: Response, database_ok: bool = Depends(check_database)
 ) -> HealthResponse:
+    """Report whether the backend and its database are working (200 or 503)."""
     if database_ok:
         return HealthResponse(status="ok", database="ok")
     response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE

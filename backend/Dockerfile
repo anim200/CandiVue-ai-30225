@@ -11,6 +11,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Tesseract OCR reads scanned CVs (F1 OCR fallback); English only (A7).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install dependencies first so Docker can cache this layer.
 COPY requirements.txt .
 RUN pip install -r requirements.txt
@@ -19,8 +24,10 @@ COPY alembic.ini .
 COPY migrations ./migrations
 COPY app ./app
 
-# Run as a normal user, not root.
-RUN useradd --create-home --uid 1000 appuser
+# Run as a normal user, not root. The CV intake folder is created here so
+# the named volume mounted on it belongs to that user.
+RUN useradd --create-home --uid 1000 appuser \
+    && mkdir -p /data/cv_intake && chown appuser /data/cv_intake
 USER appuser
 
 EXPOSE 8000

@@ -1,0 +1,554 @@
+/* Job page (design: CV Screening Results.dc.html: JobHeader, "No CVs yet").
+   Font sizes are the design's + 1px (user, 07-10-2026). The applicants
+   table follows its own width (container query). */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: fadeUp 0.3s ease-out;
+}
+
+/* ---- Header ---- */
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #66717a;
+  min-width: 0;
+}
+
+.breadcrumb a {
+  color: #48535b;
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  color: #1c5d65;
+  text-decoration: underline;
+}
+
+.breadcrumb span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titleRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px 20px;
+  flex-wrap: wrap;
+}
+
+.titleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+  font-size: 15px;
+  color: #48535b;
+}
+
+.dot {
+  color: #c9d0d4;
+}
+
+.headerActions {
+  flex-wrap: wrap;
+}
+
+/* "Screening…" keeps the brand colour while disabled (design 2a). */
+.screeningButton:disabled {
+  background: #23717a;
+  color: #fff;
+  opacity: 0.7;
+}
+
+/* ---- Scoring weights (not in the design: user request) ---- */
+
+.weightsCard {
+  background: #fff;
+  border: 1px solid #dee3e6;
+  border-radius: 8px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: fadeUp 0.3s ease-out;
+}
+
+.weightsTop {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.weightsIcon {
+  color: #23717a;
+  flex: none;
+  margin-top: 2px;
+}
+
+.sparkle {
+  color: #23717a;
+  margin-right: 4px;
+  vertical-align: -2px;
+}
+
+.weightsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.weightsBottom {
+  flex-wrap: wrap;
+}
+
+.totalOk,
+.totalBad {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.2s;
+}
+
+.totalOk {
+  color: #245f3e;
+}
+
+.totalBad {
+  color: #932e24;
+}
+
+.weightsError {
+  font-size: 14px;
+  color: #932e24;
+}
+
+.staleNote {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #fbf0d9;
+  color: #5a3d00;
+  font-size: 15px;
+  animation: fadeUp 0.25s ease-out;
+}
+
+.staleNote span {
+  flex: 1;
+  min-width: 200px;
+}
+
+@media (max-width: 47.99em) {
+  .weightsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---- "Add CV" results ---- */
+
+.uploadResults {
+  background: #fff;
+  border: 1px solid #dee3e6;
+  border-radius: 8px;
+  padding: 12px 16px;
+  animation: fadeUp 0.25s ease-out;
+}
+
+.uploadTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.closeButton {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: #66717a;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.closeButton:hover {
+  background: #f1f4f5;
+}
+
+.uploadList {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.uploadList li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.uploadOk {
+  color: #245f3e;
+}
+
+.uploadBad {
+  color: #7a5000;
+}
+
+.uploadName {
+  font: 500 13px var(--mantine-font-family-monospace);
+  overflow-wrap: anywhere;
+}
+
+.progress {
+  font-size: 14px;
+  color: #48535b;
+  font-variant-numeric: tabular-nums;
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* "Added by hand" next to the email (CVs not from the Google Form). */
+.source {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #edf5f6;
+  color: #1c5d65;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ---- Empty state (design 2c) ---- */
+
+.empty {
+  background: #fff;
+  border: 1px dashed #c9d0d4;
+  border-radius: 8px;
+  padding: 56px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.emptyIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #edf5f6;
+  color: #23717a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  animation: bob 3s ease-in-out infinite;
+}
+
+.emptyTitle {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.emptyText {
+  font-size: 15px;
+  color: #48535b;
+  max-width: 440px;
+  line-height: 1.55;
+}
+
+/* ---- Applicants card ---- */
+
+.card {
+  background: #fff;
+  border: 1px solid #dee3e6;
+  border-radius: 8px;
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+.cardTop {
+  padding: 14px 20px;
+  border-bottom: 1px solid #dee3e6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.cardTitle {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.cardHint {
+  font-size: 14px;
+  color: #66717a;
+  margin-top: 2px;
+}
+
+.refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid #c9d0d4;
+  border-radius: 4px;
+  background: #fff;
+  color: #1a2227;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  flex: none;
+  transition: background 0.15s;
+}
+
+.refresh:hover {
+  background: #f1f4f5;
+}
+
+.refresh:active svg {
+  transform: rotate(-90deg);
+  transition: transform 0.2s;
+}
+
+.head,
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px minmax(0, 220px) 120px 150px;
+  gap: 0 14px;
+  align-items: center;
+  padding: 0 20px;
+}
+
+.head {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #dee3e6;
+  font-size: 13px;
+  font-weight: 600;
+  color: #66717a;
+}
+
+.item {
+  border-bottom: 1px solid #e9ecee;
+  animation: fadeUp 0.3s ease-out both;
+  transition: background 0.15s;
+}
+
+.item:last-child {
+  border-bottom: 0;
+}
+
+.item:hover {
+  background: #fafbfb;
+}
+
+.row {
+  min-height: 60px;
+  font-size: 15px;
+}
+
+.who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.email {
+  font-size: 14px;
+  color: #66717a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.when {
+  color: #48535b;
+  font-variant-numeric: tabular-nums;
+}
+
+.file {
+  font: 500 13px var(--mantine-font-family-monospace);
+  color: #48535b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+}
+
+.iconButton {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: #66717a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.iconButton:hover {
+  background: #fbe9e7;
+  color: #932e24;
+}
+
+.problem {
+  margin: -6px 20px 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #fff7e6;
+  color: #5a3d00;
+  font-size: 14px;
+}
+
+/* Medium: no CV file column. */
+@container (max-width: 760px) {
+  .head,
+  .row {
+    grid-template-columns: minmax(0, 1fr) 120px 110px 140px;
+  }
+
+  .fileColumn {
+    display: none;
+  }
+}
+
+/* Narrow (phones): name and email, then status, date and actions. */
+@container (max-width: 520px) {
+  .cardTop {
+    padding: 12px 16px;
+  }
+
+  .head {
+    display: none;
+  }
+
+  .row {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'who who'
+      'status when'
+      'actions actions';
+    gap: 8px 10px;
+    padding: 14px 16px;
+  }
+
+  .who {
+    grid-area: who;
+  }
+
+  .status {
+    grid-area: status;
+  }
+
+  .when {
+    grid-area: when;
+    font-size: 14px;
+  }
+
+  .actions {
+    grid-area: actions;
+    justify-content: flex-start;
+  }
+
+  .problem {
+    margin: -6px 16px 12px;
+  }
+
+  .refresh span {
+    display: none; /* icon only */
+  }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}

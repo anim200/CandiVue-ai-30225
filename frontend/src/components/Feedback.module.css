@@ -1,0 +1,100 @@
+/* Shared empty, loading and error blocks (design: the "states" frames). */
+
+/* Red message with an optional "Try again" (e.g. Jobs 2c, Assistant 2d). */
+.error {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #fbe9e7;
+  align-items: center;
+}
+
+.errorIcon {
+  flex: none;
+  color: #b03a2e;
+}
+
+.errorText {
+  flex: 1;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #5a2620;
+}
+
+.errorText b {
+  font-weight: 600;
+  color: #932e24;
+}
+
+.retry {
+  flex: none;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 4px;
+  background: #fff;
+  border: 1px solid #e3b7b1;
+  color: #932e24;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.retry:hover {
+  background: #fbe9e7;
+}
+
+/* Centered icon, title, text and action (e.g. "No jobs yet"). */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 44px 24px;
+}
+
+.emptyIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #edf5f6;
+  color: #23717a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.emptyTitle {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.emptyText {
+  font-size: 15px;
+  color: #48535b;
+  max-width: 440px;
+  line-height: 1.55;
+}
+
+/* Grey placeholder bars that softly pulse while loading. */
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  animation: pulse 1.6s infinite;
+}
+
+.bar {
+  height: 14px;
+  background: #edf0f2;
+  border-radius: 4px;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.45;
+  }
+}

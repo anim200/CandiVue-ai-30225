@@ -32,12 +32,14 @@ const STATES = {
   },
 };
 
+// Header badge: Checking / Connected / Server unavailable.
 export default function BackendStatus() {
   const [status, setStatus] = useState('checking'); // checking | connected | unavailable
 
   useEffect(() => {
     let active = true; // stops updates after the component is removed
 
+    // Ask the backend for its health once and update the badge.
     async function check() {
       try {
         await getHealth(); // fails if the backend or its database is down

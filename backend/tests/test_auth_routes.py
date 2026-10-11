@@ -6,7 +6,7 @@ forgets its guard makes this test fail.
 """
 
 from fastapi import Depends, FastAPI
-from fastapi.routing import APIRoute
+from fastapi.routing import iter_route_contexts
 from fastapi.testclient import TestClient
 
 from app.auth.dependencies import require_candidate, require_interviewer
@@ -25,20 +25,24 @@ CANDIDATE_ROUTES: set[str] = set()
 
 
 def guarded_test_app() -> TestClient:
+    """Build a tiny app with one interviewer-only and one candidate-only route."""
     test_app = FastAPI()
 
     @test_app.get("/scores", dependencies=[Depends(require_interviewer)])
     def scores():
+        """Pretend interviewer-only route that returns a score."""
         return {"score": 82}
 
     @test_app.get("/my-interview", dependencies=[Depends(require_candidate)])
     def my_interview():
+        """Pretend candidate-only route."""
         return {"ok": True}
 
     return TestClient(test_app)
 
 
 def auth(role: Role) -> dict:
+    """Return an Authorization header with a token for the given role."""
     return {"Authorization": f"Bearer {create_access_token(1, role)}"}
 
 
@@ -86,17 +90,39 @@ def dependencies_of(dependant):
         yield from dependencies_of(dependency)
 
 
+def api_routes():
+    """Every /api route of the real app, with its full path and dependencies.
+
+    Routers added with include_router are nested inside the app, so a plain
+    loop over app.routes would not see their routes; iter_route_contexts
+    walks into them. The effective route also includes dependencies added
+    when a router is included.
+    """
+    for context in iter_route_contexts(app.routes):
+        path = context.path or ""
+        effective = context._effective_route  # route as included in the app
+        dependant = getattr(effective, "dependant", None)
+        if path.startswith("/api") and dependant is not None:
+            yield path, set(dependencies_of(dependant))
+
+
 def test_every_api_route_is_guarded():
-    unguarded = []
-    for route in app.routes:
-        if not isinstance(route, APIRoute) or not route.path.startswith("/api"):
+    unguarded, checked = [], 0
+    for path, dependencies in api_routes():
+        if path in OPEN_ROUTES:
             continue
-        if route.path in OPEN_ROUTES:
-            continue
-        needed = (
-            require_candidate if route.path in CANDIDATE_ROUTES else require_interviewer
-        )
-        if needed not in set(dependencies_of(route.dependant)):
-            unguarded.append(route.path)
+        needed = require_candidate if path in CANDIDATE_ROUTES else require_interviewer
+        checked += 1
+        if needed not in dependencies:
+            unguarded.append(path)
 
     assert unguarded == [], f"add require_interviewer (or list on purpose): {unguarded}"
+    # The check must really have looked at guarded routes (never pass empty).
+    assert checked > 0
+
+
+def test_open_routes_list_is_up_to_date():
+    """Every route on the open list must exist, so the list cannot go stale."""
+    existing = {path for path, _ in api_routes()}
+
+    assert OPEN_ROUTES <= existing

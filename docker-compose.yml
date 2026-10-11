@@ -29,27 +29,124 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       LLM_PROVIDER: ${LLM_PROVIDER:-google_genai}
-      LLM_MODEL: ${LLM_MODEL:-gemini-2.5-flash}
+      LLM_MODEL: ${LLM_MODEL:-gemini-3.5-flash-lite}
+      LLM_MODELS: ${LLM_MODELS:-gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-60}
       LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-2}
       LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-ollama}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-qwen3-embedding:0.6b}
+      SCREENING_MODEL: ${SCREENING_MODEL:-qwen3:4b-instruct}
+      OLLAMA_BASE_URL: http://ollama:11434
+      JOBBOARD_MCP_URL: http://jobboard-mcp:8001/mcp
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-20}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-480}
       DEMO_INTERVIEWER_EMAIL: ${DEMO_INTERVIEWER_EMAIL:-}
       DEMO_INTERVIEWER_NAME: ${DEMO_INTERVIEWER_NAME:-Interviewer A}
       DEMO_INTERVIEWER_PASSWORD: ${DEMO_INTERVIEWER_PASSWORD:-}
+      GOOGLE_FORM_POSITION_FIELD: ${GOOGLE_FORM_POSITION_FIELD:-}
+      MAX_CV_MB: ${MAX_CV_MB:-10}
+    volumes:
+      - cv_intake:/data/cv_intake  # CVs for screening (later steps)
     ports:
       # Bound to localhost only (documented local-development exception, N10).
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     depends_on:
       db:
         condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully  # local models are ready
+      jobboard-mcp:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # Local models: embeddings for the knowledge base (RAG) and CV screening,
+  # and the screening model (local_model.py). Text never leaves this
+  # machine. No "ports": only the backend can reach it.
+  ollama:
+    image: ollama/ollama:0.35.1
+    restart: unless-stopped
+    volumes:
+      - ollama_models:/root/.ollama  # downloaded models survive restarts
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Downloads the local models once: the embedding model (about 640 MB) and
+  # the screening model (about 2.5 GB). Afterwards they are already in the
+  # volume and this finishes at once.
+  ollama-pull:
+    image: ollama/ollama:0.35.1
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - ollama pull "${EMBEDDING_MODEL:-qwen3-embedding:0.6b}" && ollama pull "${SCREENING_MODEL:-qwen3:4b-instruct}"
+    restart: "no"
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  # Job board MCP server: posts approved job descriptions to Blogger (§4B-2,
+  # §4B-6). Only this container gets the Blogger credentials. No "ports":
+  # only the backend can reach it.
+  jobboard-mcp:
+    build:
+      context: ./jobboard-mcp
+      target: runtime
+    restart: unless-stopped
+    environment:
+      BLOGGER_CLIENT_ID: ${BLOGGER_CLIENT_ID:-}
+      BLOGGER_CLIENT_SECRET: ${BLOGGER_CLIENT_SECRET:-}
+      BLOGGER_REFRESH_TOKEN: ${BLOGGER_REFRESH_TOKEN:-}
+      BLOGGER_BLOG_ID: ${BLOGGER_BLOG_ID:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8001), 2)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # CV Collector (step 7): every few minutes it copies new CVs from the
+  # Google Form (Drive + response Sheet) into the cv_intake volume and
+  # records the candidates. Same image as the backend, other command. Only
+  # this container gets the Google key (read-only service account).
+  cv-collector:
+    build:
+      context: ./backend
+      target: runtime
+    restart: unless-stopped
+    command: ["python", "-m", "app.collector"]
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # Required by the shared settings, but the collector never signs login
+      # tokens, so it does not get the real secret.
+      JWT_SECRET: not-used-by-the-cv-collector-000000
+      GOOGLE_SERVICE_ACCOUNT_KEY: ${GOOGLE_SERVICE_ACCOUNT_KEY:-}
+      CV_RESPONSES_SHEET_ID: ${CV_RESPONSES_SHEET_ID:-}
+      CV_COLLECT_INTERVAL_SECONDS: ${CV_COLLECT_INTERVAL_SECONDS:-300}
+      MAX_CV_MB: ${MAX_CV_MB:-10}
+    volumes:
+      - cv_intake:/data/cv_intake
+    depends_on:
+      backend:
+        condition: service_healthy  # the backend has applied the migrations
+
+  # Tests for the job board MCP server (no real Blogger calls).
+  # Run: docker compose run --rm --build jobboard-tests
+  jobboard-tests:
+    build:
+      context: ./jobboard-mcp
+      target: test
+    profiles: ["test"]
 
   # Runs the test suite against the real database. Not started by "up";
   # run it with: docker compose run --rm tests
@@ -88,3 +185,5 @@ services:
 
 volumes:
   pgdata:
+  ollama_models:
+  cv_intake:  # collected CV files (personal data: never in git, N14)

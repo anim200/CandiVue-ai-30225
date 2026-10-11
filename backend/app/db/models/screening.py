@@ -1,11 +1,14 @@
-"""CV screening runs and their results (F1, F2 — LangGraph 2)."""
+"""CV screening runs and their results (F1, F2 — LangGraph 2), and the CV
+passages with their embeddings used for semantic matching (vector store)."""
 
 from typing import Any
 
-from sqlalchemy import Float, ForeignKey, Text, UniqueConstraint
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import Float, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.ai.embeddings import EMBEDDING_DIMENSIONS
 from app.db.base import Base, TimestampMixin
 from app.db.models.run import RunStateMixin
 
@@ -22,6 +25,9 @@ class ScreeningRun(RunStateMixin, TimestampMixin, Base):
     # Progress shown in the UI, e.g. "12 of 20 CVs" (N25).
     processed: Mapped[int] = mapped_column(default=0)
     total: Mapped[int | None]
+    # The weights this run used and who set them, so a ranking can always be
+    # explained and repeated (F2), even after the weights are changed.
+    weights: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
 
 
 class CandidateScore(TimestampMixin, Base):
@@ -48,3 +54,19 @@ class CandidateScore(TimestampMixin, Base):
     overall_score: Mapped[float | None] = mapped_column(Float)  # 0-100
     rank: Mapped[int | None]  # 1 = best; empty when excluded
     summary: Mapped[str | None] = mapped_column(Text)
+
+
+class CvPassage(Base):
+    """One sentence or line of a candidate's CV and its embedding. Made once
+    per CV and reused by later screening runs (the CV does not change)."""
+
+    __tablename__ = "cv_passages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("candidates.id", ondelete="CASCADE"), index=True
+    )
+    position: Mapped[int]
+    section: Mapped[str] = mapped_column(String(30))  # experience, skills, ...
+    text: Mapped[str] = mapped_column(Text)
+    embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIMENSIONS))

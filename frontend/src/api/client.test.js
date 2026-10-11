@@ -4,8 +4,9 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { loadSession, saveSession } from '../auth/session';
-import { apiGet, apiPost, MESSAGES } from './client';
+import { apiGet, apiGetFile, apiPost, apiPut, MESSAGES } from './client';
 
+// Replace the browser's fetch with a fake that answers with the given handler.
 function fakeFetch(handler) {
   vi.stubGlobal('fetch', vi.fn(handler));
 }
@@ -21,6 +22,7 @@ beforeEach(() => {
   vi.stubGlobal('window', { location: { assign: vi.fn() } });
 });
 
+// Build a fake JSON answer with the given status code.
 function jsonResponse(body, status) {
   return new Response(JSON.stringify(body), {
     status,
@@ -95,6 +97,27 @@ test('sends JSON for a POST', async () => {
   expect(options.method).toBe('POST');
   expect(options.headers['Content-Type']).toBe('application/json');
   expect(JSON.parse(options.body)).toEqual({ email: 'a@example.com', password: 'x' });
+});
+
+test('sends JSON for a PUT (e.g. choosing the AI model)', async () => {
+  fakeFetch(async () => jsonResponse({ models: [] }, 200));
+
+  await apiPut('/ai/model', { name: 'gemini-3.5-flash-lite' });
+
+  const [path, options] = fetch.mock.calls[0];
+  expect(path).toBe('/api/ai/model');
+  expect(options.method).toBe('PUT');
+  expect(JSON.parse(options.body)).toEqual({ name: 'gemini-3.5-flash-lite' });
+});
+
+test('downloads a file as a Blob with the login token', async () => {
+  saveSession({ token: 'abc123', user: { role: 'interviewer', name: 'Interviewer A' } });
+  fakeFetch(async () => new Response(new Blob(['%PDF-1.4']), { status: 200 }));
+
+  const file = await apiGetFile('/jobs/1/cvs/2/file');
+
+  expect(await file.text()).toBe('%PDF-1.4');
+  expect(fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer abc123');
 });
 
 test('an expired session signs the interviewer out and opens the login page', async () => {

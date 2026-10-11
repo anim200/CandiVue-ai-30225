@@ -7,7 +7,7 @@ deleted at the end.
 
 import pytest
 
-from app.ai.llm import AIServiceError
+from app.ai.errors import AIServiceError
 from app.db.database import SessionLocal
 from app.db.models import Job, ScreeningRun
 from app.db.models.run import RunStatus
@@ -35,6 +35,7 @@ def job_id():
 
 
 def new_run(job_id: int, status: RunStatus = RunStatus.PENDING) -> int:
+    """Create a screening run row with the given status and return its id."""
     with SessionLocal() as db:
         run = ScreeningRun(job_id=job_id, status=status)
         db.add(run)
@@ -43,11 +44,13 @@ def new_run(job_id: int, status: RunStatus = RunStatus.PENDING) -> int:
 
 
 def load(run_id: int) -> ScreeningRun:
+    """Read a screening run back from the database."""
     with SessionLocal() as db:
         return db.get(ScreeningRun, run_id)
 
 
 def run_with(work, job_id: int) -> ScreeningRun:
+    """Register a fake work function, run it in the background and wait."""
     runner.register_run_kind(KIND, ScreeningRun, work)
     run_id = new_run(job_id)
     runner.start_run(KIND, run_id).result()  # wait for the background thread
@@ -64,6 +67,7 @@ def test_successful_run_is_completed(job_id):
 
 def test_ai_failure_gives_clear_message(job_id):
     def work(run_id):
+        """Fake work function for this test."""
         raise AIServiceError("The AI service is unavailable.")
 
     run = run_with(work, job_id)
@@ -74,6 +78,7 @@ def test_ai_failure_gives_clear_message(job_id):
 
 def test_unexpected_error_hides_technical_details(job_id):
     def work(run_id):
+        """Fake work function for this test."""
         raise ValueError("secret internal detail")
 
     run = run_with(work, job_id)
@@ -92,6 +97,7 @@ def test_pause_for_review_is_not_completed(job_id):
 
 def test_progress_is_kept_when_a_run_fails(job_id):
     def work(run_id):
+        """Fake work function for this test."""
         runner.save_progress(ScreeningRun, run_id, processed=12, total=20)
         raise AIServiceError("The AI service is unavailable.")
 
