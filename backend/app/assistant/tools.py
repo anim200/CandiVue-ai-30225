@@ -17,6 +17,7 @@ from langgraph.prebuilt import InjectedState
 from sqlalchemy import func, select
 
 from app.assistant import drafting, posting
+from app.assistant.interview_tools import INTERVIEW_TOOLS
 from app.assistant.posting import clean_form_url
 from app.assistant.schemas import JobProfile
 from app.core import clock
@@ -224,6 +225,7 @@ TOOLS = [
     save_application_form,
     set_application_deadline,
     request_job_posting,
+    *INTERVIEW_TOOLS,  # shortlist and invitations (after screening)
 ]
 
 

@@ -30,10 +30,18 @@ from app.collector.intake import CvRejected, check_cv, find_cv, remove_cv, save_
 from app.core import clock
 from app.core.config import get_settings
 from app.db.database import get_db
-from app.db.models import Candidate, CandidateScore, Job, JobDescription, ScreeningRun
+from app.db.models import (
+    Candidate,
+    CandidateScore,
+    InterviewSession,
+    Job,
+    JobDescription,
+    ScreeningRun,
+)
 from app.db.models.candidate import CandidateStatus
 from app.db.models.job import JobBoardStatus, JobDescriptionStatus, JobStatus
 from app.db.models.run import RunStatus
+from app.interviews import planning
 from app.knowledge.files import clean_filename
 from app.screening.weights import ScoringWeights, effective_weights
 
@@ -75,6 +83,8 @@ class JobOut(BaseModel):
     # The latest screening run: its status and how many passed the gate.
     screening_status: RunStatus | None = None
     ranked_count: int = 0
+    shortlisted_count: int = 0
+    interview_count: int = 0  # scheduled (or live) interviews
     updated_at: datetime
 
 
@@ -158,6 +168,17 @@ def to_job_out(db: Session, job: Job) -> JobOut:
         applications_close_at=job.applications_close_at,
         screening_status=run.status if run else None,
         ranked_count=ranked_count(db, run.id) if run else 0,
+        shortlisted_count=db.scalar(
+            select(func.count(Candidate.id)).where(
+                Candidate.job_id == job.id, Candidate.shortlisted_at.is_not(None)
+            )
+        ),
+        interview_count=db.scalar(
+            select(func.count(InterviewSession.id)).where(
+                InterviewSession.job_id == job.id,
+                InterviewSession.status.in_(planning.ACTIVE),
+            )
+        ),
         updated_at=max(job.updated_at, latest.updated_at) if latest else job.updated_at,
     )
 

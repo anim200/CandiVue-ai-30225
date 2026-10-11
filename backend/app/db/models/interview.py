@@ -42,6 +42,7 @@ class InterviewSession(TimestampMixin, Base):
         ForeignKey("users.id", ondelete="SET NULL")
     )
     scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    duration_minutes: Mapped[int] = mapped_column(default=45, server_default="45")
     # Only a hash of the link token is stored, so a database leak does not
     # leak working interview links.
     join_token_hash: Mapped[str] = mapped_column(String(64), unique=True)

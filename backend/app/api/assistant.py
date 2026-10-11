@@ -1,5 +1,5 @@
 """Hiring Assistant API: read a job's chat, send a message, review the JD,
-confirm posting it.
+confirm posting it, confirm interview invitations.
 
 Interviewers only (N9); the candidate never sees the assistant (§4B-10).
 Every request runs the graph until it answers or pauses for review; the
@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from app.assistant import posting
 from app.assistant.schemas import JobDescriptionContent
 from app.assistant.thread_view import thread_items
-from app.auth.dependencies import require_interviewer
+from app.auth.dependencies import CurrentUser, require_interviewer
 from app.db.database import get_db
 from app.db.models import Job, JobDescription
 from app.db.models.job import JobDescriptionStatus
@@ -43,6 +43,13 @@ REVIEW_FIRST = "Please approve, edit or reject the job description first."
 NOTHING_TO_REVIEW = "There is no job description waiting for review."
 NOTHING_TO_CONFIRM = "There is no post waiting for your confirmation."
 CONFIRM_FIRST = "Please choose Post or Don't post first."
+INVITATIONS_FIRST = "Please confirm, change or cancel the interviews first."
+NOTHING_TO_SCHEDULE = "There are no interviews waiting for your confirmation."
+# What to finish first, by what the paused graph waits for (JD review otherwise).
+FIRST = {
+    "post_confirmation": CONFIRM_FIRST,
+    "invitation_confirmation": INVITATIONS_FIRST,
+}
 APPROVE_FIRST = "Approve a job description before posting it."
 STUCK = "The assistant couldn't finish this request. Please rephrase it or try again."
 
@@ -76,6 +83,21 @@ class PostDecisionRequest(BaseModel):
     action: Literal["post", "skip"]
 
 
+class InvitationItem(BaseModel):
+    """One candidate on the confirmed card, with the (possibly changed) time."""
+
+    candidate_id: int
+    starts_at: str | None = Field(default=None, max_length=40)
+
+
+class InvitationDecisionRequest(BaseModel):
+    """The interviewer's answer on the interview card: confirm the items left
+    on it (with their times), or cancel everything."""
+
+    action: Literal["confirm", "cancel"]
+    items: list[InvitationItem] = Field(default=[], max_length=20)
+
+
 class ThreadOut(BaseModel):
     """The chat as the screen shows it, plus the review waiting (if any)."""
 
@@ -107,7 +129,7 @@ def _thread(graph, db: Session, job_id: int) -> ThreadOut:
 
 def _pending_kind(graph, db: Session, job_id: int) -> str | None:
     """What the paused graph is waiting for: "jd_approval",
-    "post_confirmation" or None."""
+    "post_confirmation", "invitation_confirmation" or None."""
     pending = _thread(graph, db, job_id).pending_review
     return pending["kind"] if pending else None
 
@@ -137,15 +159,21 @@ def send_message(
     body: MessageRequest,
     request: Request,
     db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_interviewer)],
 ) -> ThreadOut:
     """Send a chat message; the assistant answers (calling tools if needed)."""
     _require_job(db, job_id)
     graph = _graph(request)
     waiting = _pending_kind(graph, db, job_id)
     if waiting:
-        message = CONFIRM_FIRST if waiting == "post_confirmation" else REVIEW_FIRST
-        raise HTTPException(status.HTTP_409_CONFLICT, message)
-    _run(graph, {"messages": [HumanMessage(body.text)], "job_id": job_id}, job_id)
+        raise HTTPException(status.HTTP_409_CONFLICT, FIRST.get(waiting, REVIEW_FIRST))
+    # interviewer_id: whose calendar the interview tools check and book.
+    graph_input = {
+        "messages": [HumanMessage(body.text)],
+        "job_id": job_id,
+        "interviewer_id": user.id,
+    }
+    _run(graph, graph_input, job_id)
     return _thread(graph, db, job_id)
 
 
@@ -182,6 +210,22 @@ def decide_posting(
     return _thread(graph, db, job_id)
 
 
+@router.post("/jobs/{job_id}/invitation-decision", response_model=ThreadOut)
+def decide_invitations(
+    job_id: int,
+    body: InvitationDecisionRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+) -> ThreadOut:
+    """Confirm (as shown, or after changes) or cancel the planned interviews."""
+    _require_job(db, job_id)
+    graph = _graph(request)
+    if _pending_kind(graph, db, job_id) != "invitation_confirmation":
+        raise HTTPException(status.HTTP_409_CONFLICT, NOTHING_TO_SCHEDULE)
+    _run(graph, Command(resume=body.model_dump()), job_id)
+    return _thread(graph, db, job_id)
+
+
 @router.post("/jobs/{job_id}/retry", response_model=ThreadOut)
 def retry_turn(
     job_id: int, request: Request, db: Annotated[Session, Depends(get_db)]
@@ -206,8 +250,8 @@ def post_again(
     the application form link has been added. The result joins the chat."""
     _require_job(db, job_id)
     graph = _graph(request)
-    if _pending_kind(graph, db, job_id):
-        raise HTTPException(status.HTTP_409_CONFLICT, CONFIRM_FIRST)
+    if waiting := _pending_kind(graph, db, job_id):
+        raise HTTPException(status.HTTP_409_CONFLICT, FIRST.get(waiting, REVIEW_FIRST))
     approved = db.scalar(
         select(JobDescription.id).where(
             JobDescription.job_id == job_id,

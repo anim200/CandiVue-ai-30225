@@ -5,10 +5,11 @@ or marital status. Deleting a candidate deletes all their data (N19),
 because every child table uses ON DELETE CASCADE.
 """
 
+from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -46,3 +47,6 @@ class Candidate(TimestampMixin, Base):
         status_column(CandidateStatus), default=CandidateStatus.RECEIVED
     )
     parse_error: Mapped[str | None] = mapped_column(Text)
+    # Set when the interviewer shortlists the candidate in the Hiring
+    # Assistant; only shortlisted candidates can be invited to an interview.
+    shortlisted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

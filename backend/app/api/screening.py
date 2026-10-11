@@ -17,10 +17,18 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_interviewer
 from app.db.database import get_db
-from app.db.models import Candidate, CandidateScore, Job, ScreeningRun
+from app.db.models import (
+    Candidate,
+    CandidateScore,
+    InterviewSession,
+    Job,
+    ScreeningRun,
+)
 from app.db.models.candidate import CandidateStatus
+from app.db.models.interview import InvitationStatus
 from app.db.models.run import RunStatus
 from app.graphs import cv_screening
+from app.interviews import planning
 from app.runs.runner import start_run
 from app.screening.weights import DIMENSIONS, effective_weights
 
@@ -67,6 +75,10 @@ class ScreenedCandidate(BaseModel):
     summary: str | None
     scanned: bool  # read with OCR
     years_unknown: bool  # years of experience could not be read: check the CV
+    # Where the candidate is now: new, shortlisted, invitation_pending,
+    # invited or invitation_failed; and their interview time, if any.
+    pipeline: str
+    interview_at: datetime | None
 
 
 class ScreeningOut(BaseModel):
@@ -122,7 +134,19 @@ def latest_screening(
         .join(Candidate, Candidate.id == CandidateScore.candidate_id)
         .where(CandidateScore.screening_run_id == run.id)
     ).all()
-    results = [_result(score, candidate) for score, candidate in rows]
+    sessions = {
+        s.candidate_id: s
+        for s in db.scalars(
+            select(InterviewSession).where(
+                InterviewSession.job_id == job_id,
+                InterviewSession.status.in_(planning.ACTIVE),
+            )
+        )
+    }
+    results = [
+        _result(score, candidate, sessions.get(candidate.id))
+        for score, candidate in rows
+    ]
     current = effective_weights(job)
     new_cvs = db.scalar(
         select(func.count(Candidate.id)).where(
@@ -143,8 +167,10 @@ def latest_screening(
     )
 
 
-def _result(score: CandidateScore, candidate: Candidate) -> ScreenedCandidate:
-    """One saved result as the screen shows it."""
+def _result(
+    score: CandidateScore, candidate: Candidate, session: InterviewSession | None
+) -> ScreenedCandidate:
+    """One saved result as the screen shows it, with its interview (if any)."""
     if score.passed_gate:
         outcome = "ranked"
     elif (
@@ -167,7 +193,20 @@ def _result(score: CandidateScore, candidate: Candidate) -> ScreenedCandidate:
         summary=score.summary,
         scanned=bool((candidate.parsed_cv or {}).get("used_ocr")),
         years_unknown=(candidate.parsed_cv or {}).get("years_source") == "unknown",
+        pipeline=_pipeline(candidate, session),
+        interview_at=session.scheduled_at if session else None,
     )
+
+
+def _pipeline(candidate: Candidate, session: InterviewSession | None) -> str:
+    """The candidate's step after screening (design: candidate pipeline)."""
+    if session is not None:
+        return {
+            InvitationStatus.PENDING: "invitation_pending",  # not emailed yet
+            InvitationStatus.SENT: "invited",
+            InvitationStatus.FAILED: "invitation_failed",
+        }[session.invitation_status]
+    return "shortlisted" if candidate.shortlisted_at else "new"
 
 
 def _job(db: Session, job_id: int) -> Job:
