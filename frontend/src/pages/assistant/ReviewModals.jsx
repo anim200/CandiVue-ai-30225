@@ -5,16 +5,9 @@ import { Button, Group, Modal, Stack, Text, Textarea, TextInput } from '@mantine
 import { IconDeviceFloppy, IconHistory, IconLock } from '@tabler/icons-react';
 import { useState } from 'react';
 
+import { POP_TRANSITION } from '../../components/ConfirmModal';
 import classes from './Assistant.module.css';
 import { LEVELS } from './labels';
-
-// Opening animation from the design ("cvpop").
-const POP = {
-  in: { opacity: 1, transform: 'none' },
-  out: { opacity: 0, transform: 'scale(.97) translateY(8px)' },
-  transitionProperty: 'opacity, transform',
-};
-const TRANSITION = { transition: POP, duration: 250, timingFunction: 'ease-out' };
 
 // "Mandatory: PostgreSQL" chips for the locked requirements.
 function requirementChips(profile) {
@@ -51,7 +44,7 @@ export function JdEditModal({ opened, onClose, jd, job, onSave, busy }) {
       onClose={onClose}
       size={760}
       radius="md"
-      transitionProps={TRANSITION}
+      transitionProps={POP_TRANSITION}
       title={
         <div>
           <Text fz={19} fw={600}>
@@ -167,7 +160,7 @@ export function RejectModal({ opened, onClose, onSend, busy }) {
       onClose={onClose}
       size={440}
       radius="md"
-      transitionProps={TRANSITION}
+      transitionProps={POP_TRANSITION}
       title={
         <Text fz={18} fw={600}>
           Reject this draft
