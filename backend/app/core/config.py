@@ -50,6 +50,13 @@ class Settings(BaseSettings):
     # Where candidates open their private interview link (this app's address).
     app_public_url: str = "http://localhost:5173"
 
+    # Video calls (F3): the LiveKit server in Docker. The key and secret sign
+    # each room "ticket" (only this backend can make them) and LiveKit's
+    # webhooks. Empty secret: calls show "not set up".
+    livekit_url: str = "http://livekit:7880"
+    livekit_api_key: str = "candivue"
+    livekit_api_secret: SecretStr | None = None
+
     # CV Collector (app/collector, cv-collector container). The Google key is
     # given only to that container (read-only service account, N7).
     google_service_account_key: SecretStr | None = None  # JSON or base64 JSON

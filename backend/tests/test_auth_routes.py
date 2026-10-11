@@ -19,9 +19,10 @@ OPEN_ROUTES = {
     "/api/auth/login",  # how an interviewer gets a token
     "/api/auth/candidate",  # how a candidate gets a token from the link
     "/api/auth/me",  # any signed-in user may ask who they are
+    "/api/livekit/webhook",  # the video server; checked by its signature instead
 }
 # Routes for the candidate's own interview: must require the candidate role.
-CANDIDATE_ROUTES: set[str] = set()
+CANDIDATE_ROUTES = {"/api/candidate/interview", "/api/candidate/room"}
 
 
 def guarded_test_app() -> TestClient:

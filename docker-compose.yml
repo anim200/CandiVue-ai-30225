@@ -42,6 +42,10 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434
       JOBBOARD_MCP_URL: http://jobboard-mcp:8001/mcp
       EMAIL_MCP_URL: http://email-mcp:8002/mcp
+      # Video calls: the LiveKit server below; the secret signs room tickets.
+      LIVEKIT_URL: http://livekit:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-candivue}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET in .env}
       # The address candidates open their interview link at.
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:5173}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-20}
@@ -141,6 +145,33 @@ services:
       timeout: 5s
       retries: 5
 
+  # Video server for the interviews (F3): LiveKit, open source, runs here.
+  # Browsers reach its signalling through nginx (/rtc); the video and audio
+  # use the ports below, bound to this computer only (N10). Nothing is
+  # recorded. It tells the backend who joined (signed webhooks).
+  livekit:
+    image: livekit/livekit-server:v1.13.9
+    restart: unless-stopped
+    environment:
+      LIVEKIT_CONFIG: |
+        port: 7880
+        rtc:
+          tcp_port: 7881
+          udp_port: 7882
+          use_external_ip: false
+          node_ip: ${LIVEKIT_NODE_IP:-127.0.0.1}
+        keys:
+          ${LIVEKIT_API_KEY:-candivue}: ${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET in .env}
+        webhook:
+          api_key: ${LIVEKIT_API_KEY:-candivue}
+          urls:
+            - http://backend:8000/api/livekit/webhook
+        logging:
+          level: info
+    ports:
+      - "${LIVEKIT_BIND_ADDRESS:-127.0.0.1}:7881:7881"
+      - "${LIVEKIT_BIND_ADDRESS:-127.0.0.1}:7882:7882/udp"
+
   # CV Collector (step 7): every few minutes it copies new CVs from the
   # Google Form (Drive + response Sheet) into the cv_intake volume and
   # records the candidates. Same image as the backend, other command. Only
@@ -213,6 +244,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy  # nginx forwards /api to the backend
+      livekit:
+        condition: service_started  # nginx forwards /rtc (video signalling)
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
       interval: 10s

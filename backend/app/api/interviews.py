@@ -1,6 +1,7 @@
 """Interviews API: the Interviews page lists the scheduled and past
 interviews, (re)sends the invitation email, makes a candidate's private
-link and cancels an interview.
+link and cancels an interview; the interviewer joins the video call
+(a ticket for its LiveKit room) and ends it.
 
 Interviewers only (N9). Interviews are created from the Hiring Assistant
 after the interviewer confirms them (§4B-7b). Only a hash of each link is
@@ -17,11 +18,12 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import require_interviewer
+from app.auth.dependencies import CurrentUser, require_interviewer
+from app.core import clock
 from app.db.database import get_db
-from app.db.models import Candidate, InterviewSession, Job
+from app.db.models import Candidate, InterviewSession, Job, User
 from app.db.models.interview import InvitationStatus, SessionStatus
-from app.interviews import emails, planning
+from app.interviews import emails, planning, room
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +57,12 @@ class SendOut(BaseModel):
     message: str  # "Invitation sent" or why it failed
 
 
+class TicketOut(BaseModel):
+    """A ticket for the interview's video room (valid for that room only)."""
+
+    token: str
+
+
 class LinkOut(BaseModel):
     """A new private link token (the page builds the link: /join/<token>)."""
 
@@ -73,26 +81,52 @@ def list_interviews(
         planning.ACTIVE if upcoming else (SessionStatus.ENDED, SessionStatus.CANCELLED)
     )
     order = InterviewSession.scheduled_at
-    rows = db.execute(
-        select(InterviewSession, Candidate, Job)
-        .join(Candidate, Candidate.id == InterviewSession.candidate_id)
-        .join(Job, Job.id == InterviewSession.job_id)
+    rows = db.scalars(
+        select(InterviewSession)
         .where(InterviewSession.status.in_(statuses))
         .order_by(order if upcoming else order.desc())
     )
-    return [
-        InterviewOut(
-            id=session.id,
-            candidate_name=candidate.full_name or candidate.cv_filename,
-            job_id=job.id,
-            job_title=job.title,
-            scheduled_at=session.scheduled_at,
-            duration_minutes=session.duration_minutes,
-            status=session.status,
-            invitation_status=session.invitation_status,
-        )
-        for session, candidate, job in rows
-    ]
+    return [_out(db, session) for session in rows]
+
+
+@router.get("/{interview_id}", response_model=InterviewOut)
+def get_interview(
+    interview_id: int, db: Annotated[Session, Depends(get_db)]
+) -> InterviewOut:
+    """One interview (for its video room page)."""
+    return _out(db, _found(db, interview_id))
+
+
+@router.post("/{interview_id}/room", response_model=TicketOut)
+def join_room(
+    interview_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_interviewer)],
+) -> TicketOut:
+    """A ticket for the interviewer to join the video call (any time until
+    the interview ends)."""
+    session = _active(db, interview_id)
+    name = db.get(User, user.id).full_name
+    try:
+        token = room.ticket(session, f"interviewer-{user.id}", name)
+    except room.RoomError as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from None
+    return TicketOut(token=token)
+
+
+@router.post("/{interview_id}/end", response_model=InterviewOut)
+def end_interview(
+    interview_id: int, db: Annotated[Session, Depends(get_db)]
+) -> InterviewOut:
+    """End the interview: it is saved as ended with its end time, the call
+    closes for everyone and the candidate's link stops working."""
+    session = _active(db, interview_id)
+    session.status = SessionStatus.ENDED
+    session.ended_at = clock.now()
+    db.commit()
+    room.end_room(session.id)
+    logger.info("Interview ended: session %d", interview_id)
+    return _out(db, session)
 
 
 @router.post("/{interview_id}/link", response_model=LinkOut)
@@ -120,17 +154,40 @@ def send_invitation(
 
 @router.post("/{interview_id}/cancel", status_code=status.HTTP_204_NO_CONTENT)
 def cancel(interview_id: int, db: Annotated[Session, Depends(get_db)]) -> None:
-    """Cancel a scheduled interview (its link stops working)."""
+    """Cancel a scheduled interview (its link stops working and an open
+    call is closed)."""
     _active(db, interview_id).status = SessionStatus.CANCELLED
     db.commit()
+    room.end_room(interview_id)
     logger.info("Interview cancelled: session %d", interview_id)
+
+
+def _out(db: Session, session: InterviewSession) -> InterviewOut:
+    """An interview as the pages show it."""
+    candidate = db.get(Candidate, session.candidate_id)
+    return InterviewOut(
+        id=session.id,
+        candidate_name=candidate.full_name or candidate.cv_filename,
+        job_id=session.job_id,
+        job_title=db.get(Job, session.job_id).title,
+        scheduled_at=session.scheduled_at,
+        duration_minutes=session.duration_minutes,
+        status=session.status,
+        invitation_status=session.invitation_status,
+    )
+
+
+def _found(db: Session, interview_id: int) -> InterviewSession:
+    """The interview, or 404."""
+    session = db.get(InterviewSession, interview_id)
+    if session is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, NOT_FOUND)
+    return session
 
 
 def _active(db: Session, interview_id: int) -> InterviewSession:
     """The interview if it is still scheduled or live; 404 / 409 otherwise."""
-    session = db.get(InterviewSession, interview_id)
-    if session is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, NOT_FOUND)
+    session = _found(db, interview_id)
     if session.status not in planning.ACTIVE:
         raise HTTPException(status.HTTP_409_CONFLICT, NOT_ACTIVE)
     return session

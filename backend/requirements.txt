@@ -24,3 +24,5 @@ requests==2.34.2
 pypdfium2==5.14.0
 pytesseract==0.3.13
 pillow==12.3.0
+# Video calls (F3): LiveKit room tickets, webhooks and closing a room
+livekit-api==1.2.1

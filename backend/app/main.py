@@ -9,10 +9,12 @@ from app.api import (
     ai_models,
     assistant,
     auth,
+    candidate,
     health,
     interviews,
     jobs,
     knowledge,
+    livekit,
     screening,
 )
 from app.auth.seed import create_first_interviewer
@@ -66,3 +68,5 @@ app.include_router(assistant.router)
 app.include_router(ai_models.router)
 app.include_router(screening.router)
 app.include_router(interviews.router)
+app.include_router(candidate.router)
+app.include_router(livekit.router)
