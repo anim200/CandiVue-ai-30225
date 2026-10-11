@@ -1,0 +1,3 @@
+SYNTHETIC TEST FILE. This is plain text saved with a .pdf name.
+CandiVue checks a file's content, not its name, so "Add CV" must refuse it
+with "Only PDF or Word (DOCX) CVs are accepted." and show "File refused".
