@@ -191,6 +191,9 @@ def test_a_screening_run_ranks_excludes_and_skips(job_id, monkeypatch):
     assert set(best["dimensions"]) == {"skills", "experience", "qualifications", "ats"}
     assert best["dimensions"]["skills"]["reason"]
     assert result["run"]["weights"]["source"] == "default"
+    job = client.get(f"/api/jobs/{job_id}", headers=headers()).json()
+    assert job["screening_status"] == result["run"]["status"]  # the latest run
+    assert job["ranked_count"] == 2
     with SessionLocal() as db:
         alex = db.scalar(
             select(Candidate).where(

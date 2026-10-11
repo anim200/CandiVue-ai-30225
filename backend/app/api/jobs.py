@@ -29,9 +29,10 @@ from app.auth.dependencies import CurrentUser, require_interviewer
 from app.collector.intake import CvRejected, check_cv, find_cv, remove_cv, save_cv
 from app.core.config import get_settings
 from app.db.database import get_db
-from app.db.models import Candidate, Job, JobDescription
+from app.db.models import Candidate, CandidateScore, Job, JobDescription, ScreeningRun
 from app.db.models.candidate import CandidateStatus
 from app.db.models.job import JobBoardStatus, JobDescriptionStatus, JobStatus
+from app.db.models.run import RunStatus
 from app.knowledge.files import clean_filename
 from app.screening.weights import ScoringWeights, effective_weights
 
@@ -66,6 +67,9 @@ class JobOut(BaseModel):
     # The weights screening will use, with "source": interviewer / ai / default.
     weights: dict[str, Any]
     ai_weights: dict[str, Any] | None = None  # the AI suggestion, if any
+    # The latest screening run: its status and how many passed the gate.
+    screening_status: RunStatus | None = None
+    ranked_count: int = 0
     updated_at: datetime
 
 
@@ -107,12 +111,27 @@ def job_stage(job: Job, latest_jd: JobDescription | None) -> str:
     return "jd_rejected"
 
 
+def ranked_count(db: Session, run_id: int) -> int:
+    """How many candidates passed the gate in a screening run."""
+    return db.scalar(
+        select(func.count(CandidateScore.id)).where(
+            CandidateScore.screening_run_id == run_id, CandidateScore.passed_gate
+        )
+    )
+
+
 def to_job_out(db: Session, job: Job) -> JobOut:
     """Build the job's summary with its current stage."""
     latest = db.scalar(
         select(JobDescription)
         .where(JobDescription.job_id == job.id)
         .order_by(JobDescription.version.desc())
+        .limit(1)
+    )
+    run = db.scalar(
+        select(ScreeningRun)
+        .where(ScreeningRun.job_id == job.id)
+        .order_by(ScreeningRun.id.desc())
         .limit(1)
     )
     return JobOut(
@@ -131,6 +150,8 @@ def to_job_out(db: Session, job: Job) -> JobOut:
         ),
         weights=effective_weights(job),
         ai_weights=job.ai_weights,
+        screening_status=run.status if run else None,
+        ranked_count=ranked_count(db, run.id) if run else 0,
         updated_at=max(job.updated_at, latest.updated_at) if latest else job.updated_at,
     )
 
