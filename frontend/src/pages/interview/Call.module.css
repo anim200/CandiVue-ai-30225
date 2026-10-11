@@ -163,6 +163,26 @@
   flex-wrap: wrap;
 }
 
+/* Full screen: the call fills the screen on a dark background; the video
+   takes all the height the bar and the controls leave. */
+.call:fullscreen {
+  height: 100%;
+  padding: 16px;
+  background: #101619;
+  color: #ffffff;
+}
+
+.call:fullscreen .stage {
+  flex: 1;
+  aspect-ratio: auto;
+  max-height: none;
+}
+
+.call:fullscreen .timer,
+.call:fullscreen .notice {
+  color: #c9d0d4;
+}
+
 @keyframes pulse {
   50% {
     opacity: 0.35;
