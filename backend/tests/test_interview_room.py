@@ -20,7 +20,7 @@ from app.core import clock
 from app.core.config import get_settings
 from app.db.database import SessionLocal
 from app.db.models import Candidate, InterviewSession, Job, User
-from app.db.models.interview import SessionStatus
+from app.db.models.interview import InvitationStatus, SessionStatus
 from app.interviews import planning, room
 
 pytestmark = pytest.mark.usefixtures("database_available")
@@ -61,6 +61,7 @@ def interview():
             interviewer_id=None,
             scheduled_at=clock.now() + timedelta(days=3),  # later: join any time
             join_token_hash=token_hash,
+            invitation_status=InvitationStatus.SENT,  # emailed: joining is allowed
         )
         db.add(session)
         db.commit()
@@ -191,3 +192,19 @@ def test_a_forged_webhook_is_refused(client, interview):
         assert (
             db.get(InterviewSession, interview["id"]).status == SessionStatus.SCHEDULED
         )
+
+
+def test_nobody_joins_before_the_invitation_is_emailed(client, interview):
+    with SessionLocal() as db:
+        db.get(
+            InterviewSession, interview["id"]
+        ).invitation_status = InvitationStatus.PENDING
+        db.commit()
+
+    mine = client.post(
+        f"/api/interviews/{interview['id']}/room", headers=interviewer(interview)
+    )
+    theirs = client.post("/api/candidate/room", headers=candidate(client, interview))
+
+    assert mine.status_code == 409 and "send it first" in mine.json()["detail"]
+    assert theirs.status_code == 409 and "not been sent" in theirs.json()["detail"]

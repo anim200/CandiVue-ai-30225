@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import CurrentUser, require_candidate
 from app.db.database import get_db
 from app.db.models import Candidate, InterviewSession, Job
-from app.db.models.interview import SessionStatus
+from app.db.models.interview import InvitationStatus, SessionStatus
 from app.interviews import room
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,7 @@ router = APIRouter(
     dependencies=[Depends(require_candidate)],
 )
 
+NOT_INVITED = "Your invitation has not been sent yet. Please use the link in the email."
 OVER = {
     SessionStatus.ENDED: "The interview has ended.",
     SessionStatus.CANCELLED: "This interview was cancelled.",
@@ -69,11 +70,13 @@ def join_room(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[CurrentUser, Depends(require_candidate)],
 ) -> TicketOut:
-    """A ticket for the candidate's own video call (any time until the
-    interviewer ends it)."""
+    """A ticket for the candidate's own video call: any time until the
+    interviewer ends it, once the invitation email was sent."""
     session = db.get(InterviewSession, user.id)
     if session.status in OVER:
         raise HTTPException(status.HTTP_410_GONE, OVER[session.status])
+    if session.invitation_status != InvitationStatus.SENT:
+        raise HTTPException(status.HTTP_409_CONFLICT, NOT_INVITED)
     name = db.get(Candidate, session.candidate_id).full_name or "Candidate"
     try:
         token = room.ticket(session, f"candidate-{session.id}", name)

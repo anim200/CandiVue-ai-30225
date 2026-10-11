@@ -415,7 +415,7 @@ def test_free_slots_skip_weekends_and_booked_times(screened):
 # ---------- the whole flow through the chat and the API ----------
 
 
-def test_shortlist_then_invite_through_the_chat(screened, client, scripted):
+def test_shortlist_then_invite_through_the_chat(screened, client, scripted, mailbox):
     headers = {
         "Authorization": f"Bearer {create_access_token(screened['user_id'], Role.INTERVIEWER)}"
     }
@@ -479,10 +479,9 @@ def test_shortlist_then_invite_through_the_chat(screened, client, scripted):
     assert when.strftime("%Y-%m-%dT%H:%M") == later
     assert interview["invitation_status"] == "sent"
 
-    # Copy link makes a working link; cancelling stops it.
-    token = client.post(
-        f"/api/interviews/{interview['id']}/link", headers=headers
-    ).json()
+    # The emailed link works; cancelling stops it.
+    link = mailbox.sent[-1]["text"].split("/join/")[1].split()[0]
+    token = {"link_token": link}
     joined = client.post("/api/auth/candidate", json=token)
     assert joined.status_code == 200
     candidate = {"Authorization": f"Bearer {joined.json()['access_token']}"}
