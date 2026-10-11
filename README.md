@@ -345,9 +345,11 @@ Candidate: private link → welcome → camera check ──┤ ticket from the b
 - The backend gives each person a **ticket** (a signed LiveKit token) for
   their interview's room only: the interviewer after signing in, the
   candidate after opening their private link. Camera and microphone only.
-- **Join any time** until the interviewer clicks **End session** (or the
-  interview is cancelled). Ending closes the call for everyone and the
-  candidate's link stops working.
+- **Join any time** once the invitation email was sent, until the
+  interviewer clicks **End session** (or the interview is cancelled). The
+  email is the only way the candidate gets their link; before it is sent
+  nobody can join. Ending closes the call for everyone and the candidate's
+  link stops working.
 - **Reconnect:** LiveKit reconnects a dropped connection by itself (the
   bar shows "Reconnecting…"); a reloaded candidate tab goes straight back
   into the call.
@@ -358,8 +360,9 @@ Setup: `LIVEKIT_API_SECRET` in `.env` (32+ random characters, see
 `.env.example`); it signs the tickets and LiveKit's webhooks.
 
 **Try it on one computer:** sign in, open **Interviews → Join now**; open the
-candidate's link (**Copy link**) in a second window of the **same browser**
-(a private window works), so both tabs can use the camera. Use a headset,
+candidate's link from the invitation email (with `EMAIL_TEST_RECIPIENT` it
+comes to you) in a second window of the **same browser** (a private window
+works), so both tabs can use the camera. Use a headset,
 or mute the tab that is not speaking, to avoid echo.
 
 **From a phone or a second computer on the same network:** set

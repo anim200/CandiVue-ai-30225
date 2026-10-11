@@ -127,6 +127,7 @@ export default function CallView({ role, title, otherName, notice, onFinish, fin
         onClose={() => setConfirming(false)}
         title={interviewer ? 'End the interview?' : 'Leave the interview?'}
         confirmLabel={interviewer ? 'End interview' : 'Leave'}
+        cancelLabel={interviewer ? 'Cancel' : 'Stay'}
         busy={finishing}
         onConfirm={() => {
           setConfirming(false);

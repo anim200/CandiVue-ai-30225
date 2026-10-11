@@ -24,8 +24,10 @@ const BUILT_PAGES = {
   '/knowledge-base': <KnowledgeBasePage />,
 };
 
-// The Hiring Assistant and the interview room fill the whole area (no page padding).
+// The Hiring Assistant and the interview room fill the whole area (no page
+// padding); during an interview the menu is an icon rail (design).
 const FULL_BLEED = { fullBleed: true };
+const LIVE_ROOM = { fullBleed: true, rail: true };
 
 // errorElement: shown instead of a crashed page; never shows technical
 // details (N12).
@@ -48,7 +50,7 @@ export const router = createBrowserRouter([
       { path: 'assistant', element: <HiringAssistantPage />, handle: FULL_BLEED },
       { path: 'assistant/:jobId', element: <HiringAssistantPage />, handle: FULL_BLEED },
       { path: 'jobs/:jobId', element: <JobPage /> },
-      { path: 'interviews/:interviewId/room', element: <InterviewRoomPage />, handle: FULL_BLEED },
+      { path: 'interviews/:interviewId/room', element: <InterviewRoomPage />, handle: LIVE_ROOM },
       // Each module replaces its "coming soon" page with the real screen.
       ...NAV_ITEMS.filter((item) => item.path !== '/assistant').map((item) => ({
         path: item.path,

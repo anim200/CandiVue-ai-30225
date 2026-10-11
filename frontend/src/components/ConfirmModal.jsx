@@ -15,9 +15,18 @@ export const POP_TRANSITION = {
   timingFunction: 'ease-out',
 };
 
-// The dialog: a question as the title, what will happen, Cancel and a red
-// confirm button.
-export default function ConfirmModal({ opened, onClose, title, children, confirmLabel, onConfirm, busy }) {
+// The dialog: a question as the title, what will happen, a "keep as is"
+// button (Cancel unless cancelLabel says otherwise) and a red confirm button.
+export default function ConfirmModal({
+  opened,
+  onClose,
+  title,
+  children,
+  confirmLabel,
+  onConfirm,
+  busy,
+  cancelLabel = 'Cancel',
+}) {
   return (
     <Modal
       opened={opened}
@@ -37,7 +46,7 @@ export default function ConfirmModal({ opened, onClose, title, children, confirm
       </Text>
       <Group justify="flex-end" gap={8} mt="lg">
         <Button variant="default" onClick={onClose}>
-          Cancel
+          {cancelLabel}
         </Button>
         <Button color="#B03A2E" loading={busy} onClick={onConfirm}>
           {confirmLabel}

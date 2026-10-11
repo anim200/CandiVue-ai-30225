@@ -91,10 +91,9 @@ The test job is **PHP Laravel Developer**, the job `EXPECTED.md` was written for
    waiting for your confirmation. The chat box is locked until you answer.
 6. Click **Change**: untick one person and edit one time, then **Confirm**.
    A result card shows what was scheduled (or skipped, with the reason).
-7. Open **Interviews**: the interviews are listed with **Invitation
-   pending** (email sending comes later). **Copy link**, open it in a
-   private window: the candidate page says the link works. **Cancel** an
-   interview: its link stops working.
+7. Open **Interviews**: each interview shows **Invited** (the email went to
+   your test inbox) or **Invitation failed**; use the send icon to send it
+   again. **Cancel** an interview: its link stops working.
 8. More to try in the chat: `Move <name>'s interview to Thursday at 14:00.`,
    `Cancel the interview with <name>.`, `Invite <name> at 07:00` (a
    warning: outside working hours), two people at the same time (refused:
@@ -102,12 +101,13 @@ The test job is **PHP Laravel Developer**, the job `EXPECTED.md` was written for
 
 ## 6. The video interview (two tabs on one laptop)
 
-1. **Interviews → Join now** on an upcoming interview (any time before it
-   is ended). Allow the camera and microphone. The page shows LIVE, your
-   video small in the corner and "<candidate> hasn't joined yet".
-2. Click the send icon (or **Copy link**) and open the candidate's link in a
-   **private window of the same browser**. Welcome → **Check camera and
-   mic** → **Join interview**.
+1. **Interviews → Join now** on an upcoming interview whose invitation was
+   emailed (**Invited**; before that, Join now is off). Allow the camera and
+   microphone. The page shows LIVE, your video small in the corner and
+   "<candidate> hasn't joined yet".
+2. Open the candidate's link from the invitation email in a **private
+   window of the same browser**. Welcome → **Check camera and mic** →
+   **Join interview**.
 3. Both windows now show each other. Try **Mute** and **Camera off** on one
    side: the other side sees the microphone icon and "camera off".
 4. Reload the candidate's window: it goes straight back into the call.
