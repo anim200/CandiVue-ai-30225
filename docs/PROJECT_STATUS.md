@@ -82,7 +82,14 @@ Update this file at the end of each work session. Every Claude thread reads it.
 - Git Bash is used for git commands; check the branch name in the prompt before committing
 
 ## Next
-- Module 4/5: live transcript (F4, #647755): a Python bot joins the LiveKit room and sends each person's audio to speech-to-text (choose: local Whisper recommended); then Hiring Assistant in the room (§4B-10) and F7 identity
+- Module 4: live transcript (F4, #647755). **Decided 11-10-2026 (user): Google Cloud Speech-to-Text V2 streaming (gRPC)**, as in Figure 2 (not local Whisper). Plan presented (code not started yet):
+  1. New `transcriber` container (backend image, `python -m app.transcriber`): every few seconds finds LIVE sessions and joins their LiveKit room as a hidden, listen-only participant (identity `transcriber`; the webhook must ignore it).
+  2. Speaker = the audio track's participant identity (`interviewer-…` / `candidate-…`), no diarisation (trainer-accepted). Audio is sent to Google only while someone speaks (local silence check, saves cost); a turn ends after ~0.7 s of silence or 15 s.
+  3. Each final turn is saved at once in `transcript_turns` (speaker, text, start/end ms from `started_at`): survives drops and restarts; audio stays in memory only, never on disk (N16).
+  4. `GET /api/interviews/{id}/transcript` (interviewer only; candidates 403); the room page's "Live transcript" placeholder becomes the design's LiveTranscript panel (`00:15` · speaker colour · text, fade-in, auto-scroll), polled every 2 s.
+  5. Credentials: a separate service account with only the Cloud Speech Client role; key in `.env` as `SPEECH_SERVICE_ACCOUNT_KEY` (base64 of the JSON), only in the `transcriber` container. README N18 entry (Google receives the interview audio while it is transcribed), tests, TESTING.md.
+  - Waiting for the user: billing on, Cloud Speech-to-Text API enabled, service-account key in `.env`, and approval of the plan.
+- Then: Hiring Assistant in the room (§4B-10) and F7 identity
 - Technical risk prototype: two-party video call, speech-to-text trial, multi-node LangGraph trial
 
 ## Open decisions (need trainer confirmation)
