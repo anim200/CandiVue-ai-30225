@@ -37,6 +37,7 @@ from app.assistant import posting
 from app.assistant.prompts import ASSISTANT_PROMPT
 from app.assistant.schemas import JobDescriptionContent
 from app.assistant.tools import TOOLS
+from app.core import clock
 from app.db.database import SessionLocal
 from app.db.models import Job, JobDescription
 from app.db.models.job import JobBoardStatus, JobDescriptionStatus, JobStatus
@@ -80,8 +81,14 @@ def load_context(state: AssistantState) -> dict:
             if latest
             else "none yet"
         )
+        closes = job.applications_close_at
+        deadline = clock.local_text(closes) if closes else "not set yet"
         return {
-            "context": f"Current job: {job.title}\nSaved profile: {profile}\nLatest JD: {jd}",
+            "context": (
+                f"Now: {clock.local_text(clock.now())} ({clock.local_zone().key})\n"
+                f"Current job: {job.title}\nSaved profile: {profile}\nLatest JD: {jd}\n"
+                f"Applications close: {deadline}"
+            ),
             "review_action": None,
         }
 

@@ -16,9 +16,10 @@ from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
 from sqlalchemy import func, select
 
-from app.assistant import drafting
+from app.assistant import drafting, posting
 from app.assistant.posting import clean_form_url
 from app.assistant.schemas import JobProfile
+from app.core import clock
 from app.db.database import SessionLocal
 from app.db.models import Job, JobDescription
 from app.db.models.job import JobBoardStatus, JobDescriptionStatus
@@ -173,6 +174,28 @@ def save_application_form(
 
 
 @tool(response_format="content_and_artifact")
+def set_application_deadline(
+    job_id: Annotated[int, InjectedState("job_id")],
+    closes_at: str = "",
+    close_now: bool = False,
+) -> tuple[str, dict]:
+    """Set or change when applications close: closes_at in local time as
+    YYYY-MM-DDTHH:MM, or close_now=true to close them at once. CVs sent later
+    are not collected; invitations can only be sent after the close. If the
+    job is already posted, the post is updated with the new date."""
+    closes = clock.now() if close_now else clock.parse_local(closes_at)
+    if not close_now and closes <= clock.now():
+        raise ValueError("That time has already passed: give a future time.")
+    with SessionLocal() as db:
+        db.get(Job, job_id).applications_close_at = closes
+        db.commit()
+    logger.info("Application deadline set: job %d", job_id)
+    post = posting.update_post(job_id)
+    when = clock.local_text(closes)
+    return f"Applications close on {when}. {post}", {"kind": "deadline", "when": when}
+
+
+@tool(response_format="content_and_artifact")
 def request_job_posting(
     job_id: Annotated[int, InjectedState("job_id")],
 ) -> tuple[str, dict]:
@@ -199,6 +222,7 @@ TOOLS = [
     rag_search,
     write_job_description,
     save_application_form,
+    set_application_deadline,
     request_job_posting,
 ]
 

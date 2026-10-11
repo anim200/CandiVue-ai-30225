@@ -37,8 +37,8 @@ import WeightsCard from './WeightsCard';
 const POLL_MS = 2000; // progress refresh while screening runs
 const ACTIVE = ['pending', 'running'];
 
-// "7 Oct, 15:09" for the time a CV arrived.
-function receivedAt(value) {
+// "7 Oct, 15:09": when a CV arrived, a run finished or applications close.
+function dateTime(value) {
   return new Date(value).toLocaleString('en-GB', {
     day: 'numeric',
     month: 'short',
@@ -77,12 +77,13 @@ async function openCv(jobId, applicant) {
 }
 
 // "Add CV": pick one or a few PDF/Word files (checked again by the backend).
-function AddCvButton({ onFiles, busy, variant = 'default' }) {
+function AddCvButton({ onFiles, busy, disabled, variant = 'default' }) {
   return (
     <FileButton
       onChange={onFiles}
       accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
       multiple
+      disabled={disabled}
     >
       {(props) => (
         <Button {...props} variant={variant} loading={busy} leftSection={<IconUpload size={16} />}>
@@ -132,7 +133,7 @@ function ApplicantRow({ applicant, onView, onRemove, viewing }) {
             {applicant.email || (applicant.source === 'upload' ? '' : '—')}
           </span>
         </div>
-        <div className={classes.when}>{receivedAt(applicant.received_at)}</div>
+        <div className={classes.when}>{dateTime(applicant.received_at)}</div>
         <div className={`${classes.file} ${classes.fileColumn}`} title={applicant.cv_filename}>
           {applicant.cv_filename}
         </div>
@@ -334,6 +335,8 @@ export default function JobPage() {
   }
 
   const stage = STAGES[job.stage];
+  // After the closing date no CVs are added (the backend refuses them too).
+  const closed = Boolean(job.applications_close_at) && new Date(job.applications_close_at) <= new Date();
   const rejected = applicants.filter((a) => a.status === 'rejected').length;
   // Once there is a ranking, the applicants list starts folded (shorter page).
   const showApplicants = applicantsOpen ?? screening?.run?.status !== 'completed';
@@ -354,7 +357,15 @@ export default function JobPage() {
               {screening?.run?.finished_at && (
                 <>
                   <span className={classes.dot}>·</span>
-                  <span>Last screened {receivedAt(screening.run.finished_at)}</span>
+                  <span>Last screened {dateTime(screening.run.finished_at)}</span>
+                </>
+              )}
+              {job.applications_close_at && (
+                <>
+                  <span className={classes.dot}>·</span>
+                  <span>
+                    {closed ? 'Applications closed' : 'Applications close'} {dateTime(job.applications_close_at)}
+                  </span>
                 </>
               )}
               {stage && (
@@ -377,7 +388,7 @@ export default function JobPage() {
                 {running ? 'Screening…' : 'Screen CVs'}
               </Button>
             )}
-            <AddCvButton onFiles={addCvs} busy={uploading} />
+            <AddCvButton onFiles={addCvs} busy={uploading} disabled={closed} />
             {uploadProgress && <span className={classes.progress}>Adding {uploadProgress}…</span>}
             {job.job_board_post_url && (
               <Button
@@ -400,6 +411,12 @@ export default function JobPage() {
         {applicants.length > 0 && !job.profile && (
           <div className={classes.hint}>
             Save the job profile in the chat before screening: the CVs are checked against it.
+          </div>
+        )}
+        {closed && (
+          <div className={classes.hint}>
+            Applications are closed, so no more CVs are added. Change the closing date in the chat to
+            reopen them.
           </div>
         )}
       </header>

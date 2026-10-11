@@ -85,6 +85,9 @@ def thread_items(db: Session, messages: list) -> list[dict]:
                 items.append(
                     {"kind": "step", "text": "Saved the application form link"}
                 )
+            elif kind == "deadline":
+                text = f"Applications close on {artifact['when']}"
+                items.append({"kind": "step", "text": text})
             elif kind == "rag":
                 count = len(artifact.get("passages", []))
                 items.append(

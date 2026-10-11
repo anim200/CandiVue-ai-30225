@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import CurrentUser, require_interviewer
 from app.collector.intake import CvRejected, check_cv, find_cv, remove_cv, save_cv
+from app.core import clock
 from app.core.config import get_settings
 from app.db.database import get_db
 from app.db.models import Candidate, CandidateScore, Job, JobDescription, ScreeningRun
@@ -51,6 +52,9 @@ CV_MEDIA_TYPES = {
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
 NEW_JOB_TITLE = "New job"
+CLOSED = (
+    "Applications closed on {when}. To add CVs, change the closing date in the chat."
+)
 
 
 class JobOut(BaseModel):
@@ -67,6 +71,7 @@ class JobOut(BaseModel):
     # The weights screening will use, with "source": interviewer / ai / default.
     weights: dict[str, Any]
     ai_weights: dict[str, Any] | None = None  # the AI suggestion, if any
+    applications_close_at: datetime | None = None  # CVs after it are not taken
     # The latest screening run: its status and how many passed the gate.
     screening_status: RunStatus | None = None
     ranked_count: int = 0
@@ -150,6 +155,7 @@ def to_job_out(db: Session, job: Job) -> JobOut:
         ),
         weights=effective_weights(job),
         ai_weights=job.ai_weights,
+        applications_close_at=job.applications_close_at,
         screening_status=run.status if run else None,
         ranked_count=ranked_count(db, run.id) if run else 0,
         updated_at=max(job.updated_at, latest.updated_at) if latest else job.updated_at,
@@ -230,10 +236,14 @@ def upload_cvs(
     files: Annotated[list[UploadFile], File()],
 ) -> list[UploadResult]:
     """Add CVs by hand (fallback when the Google Form route is not available).
-    Same checks as the collector; each file gets its own result, and one
-    refused file does not stop the others."""
-    if db.get(Job, job_id) is None:
+    Same checks as the collector, and none after the closing date; each file
+    gets its own result, and one refused file does not stop the others."""
+    job = db.get(Job, job_id)
+    if job is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, NOT_FOUND)
+    if job.applications_close_at and job.applications_close_at <= clock.now():
+        closed = clock.local_text(job.applications_close_at)
+        raise HTTPException(status.HTTP_409_CONFLICT, CLOSED.format(when=closed))
     if len(files) > MAX_FILES_PER_UPLOAD:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,

@@ -31,7 +31,10 @@ Steps:
    profiles, the reference library), call rag_search. Skip it when it
    would not add anything.
 4. Ask for the Google Form link where applicants upload their CV and save
-   it with save_application_form (it goes into the job post).
+   it with save_application_form (it goes into the job post). Ask when
+   applications close and save it with set_application_deadline (local
+   time, YYYY-MM-DDTHH:MM; "Now" in the context tells today's date). The
+   interviewer can change the date or close applications at any time.
 5. Call write_job_description to draft the job description. The
    interviewer then approves, edits or rejects it. After a rejection,
    write a new version that follows the feedback.

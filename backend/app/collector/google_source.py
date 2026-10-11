@@ -20,6 +20,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets.readonly",
 ]
 SHEET_URL = "https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/A:Z"
+SHEET_INFO_URL = "https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}"
 FILE_URL = "https://www.googleapis.com/drive/v3/files/{file_id}"
 TIMEOUT_SECONDS = 30
 
@@ -69,10 +70,22 @@ class GoogleSource:
             raise GoogleSourceError(f"Google answered HTTP {response.status_code}.")
         return response
 
-    def response_rows(self) -> list[list[str]]:
-        """All rows of the response Sheet; the first row holds the questions."""
+    def response_rows(self) -> list[list]:
+        """All rows of the response Sheet; the first row holds the questions.
+        The submission time comes as a number (days since 30 Dec 1899 in the
+        Sheet's time zone), so it never depends on the Sheet's date format."""
         url = SHEET_URL.format(sheet_id=self.sheet_id)
-        return self._get(url).json().get("values", [])
+        params = {
+            "valueRenderOption": "UNFORMATTED_VALUE",
+            "dateTimeRenderOption": "SERIAL_NUMBER",
+        }
+        return self._get(url, params).json().get("values", [])
+
+    def time_zone(self) -> str:
+        """The Sheet's time zone, e.g. "Asia/Dhaka" (for the submission times)."""
+        url = SHEET_INFO_URL.format(sheet_id=self.sheet_id)
+        params = {"fields": "properties.timeZone"}
+        return self._get(url, params).json()["properties"]["timeZone"]
 
     def file_info(self, file_id: str) -> dict:
         """A Drive file's name and size (checked before downloading it)."""

@@ -5,22 +5,30 @@ Secure by design:
 - every piece of text is HTML-escaped, so the post can never carry code;
 - the application form link must be a Google Forms address;
 - if posting fails, the approved JD stays saved and the error is recorded.
+update_post() rewrites a published post in place (e.g. a new closing date).
 """
 
 import html
 import logging
 import re
+from datetime import datetime
 from urllib.parse import parse_qsl, urlencode, urlparse
 
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.assistant.schemas import JobDescriptionContent, JobProfile
 from app.collector.collect import job_reference
+from app.core.clock import local_text
 from app.core.config import get_settings
 from app.db.database import SessionLocal
 from app.db.models import Job, JobDescription
 from app.db.models.job import JobBoardStatus, JobDescriptionStatus
-from app.integrations.job_board import JobBoardError, publish_job_post
+from app.integrations.job_board import (
+    JobBoardError,
+    publish_job_post,
+    update_job_post,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -68,10 +76,13 @@ def application_link(form_url: str, job_id: int, title: str) -> str:
 
 
 def render_post_html(
-    content: JobDescriptionContent, profile: JobProfile, form_url: str
+    content: JobDescriptionContent,
+    profile: JobProfile,
+    form_url: str,
+    closes_at: datetime | None = None,
 ) -> str:
-    """Build the job post body: the JD sections, requirements from the profile
-    and the application form link. All text is escaped."""
+    """Build the job post body: the JD sections, requirements from the profile,
+    the application form link and the closing date. All text is escaped."""
     by_level = {
         level: [r.text for r in profile.requirements if r.level == level]
         for level in ("mandatory", "required", "preferred")
@@ -99,6 +110,9 @@ def render_post_html(
                 "Apply through our application form</a> and upload your CV "
                 "(PDF or Word).</p>"
             ),
+            f"<p>Applications close on {html.escape(local_text(closes_at))}.</p>"
+            if closes_at
+            else "",
         ]
     )
 
@@ -111,15 +125,7 @@ def post_job(job_id: int) -> dict:
     """
     with SessionLocal() as db:
         job = db.get(Job, job_id)
-        jd = db.scalar(
-            select(JobDescription)
-            .where(
-                JobDescription.job_id == job_id,
-                JobDescription.status == JobDescriptionStatus.APPROVED,
-            )
-            .order_by(JobDescription.version.desc())
-            .limit(1)
-        )
+        jd = _approved_jd(db, job_id)
         if jd is None:
             return {
                 "status": "failed",
@@ -134,14 +140,9 @@ def post_job(job_id: int) -> dict:
                 "url": None,
                 "form_url": None,
             }
-        content = JobDescriptionContent.model_validate_json(jd.content)
-        # The link pre-fills the job, so collected CVs find the right job.
-        form_url = application_link(job.google_form_url, job.id, job.title)
-        body = render_post_html(
-            content, JobProfile.model_validate(job.profile), form_url
-        )
+        title, body, form_url = _post_content(job, jd)
         try:
-            post = publish_job_post(content.title, body, ["Jobs"])
+            post = publish_job_post(title, body, ["Jobs"])
         except JobBoardError as exc:
             job.job_board_status = JobBoardStatus.FAILED
             db.commit()
@@ -154,6 +155,7 @@ def post_job(job_id: int) -> dict:
             }
         job.job_board_status = JobBoardStatus.POSTED
         job.job_board_post_url = post["url"]
+        job.job_board_post_id = post["post_id"]
         db.commit()
         logger.info("Job posted: job %d", job_id)
         return {
@@ -162,3 +164,50 @@ def post_job(job_id: int) -> dict:
             "url": post["url"],
             "form_url": form_url,
         }
+
+
+def update_post(job_id: int) -> str:
+    """Rewrite the job's published post with its current details (e.g. a new
+    closing date). Returns a plain sentence saying what happened."""
+    with SessionLocal() as db:
+        job = db.get(Job, job_id)
+        jd = _approved_jd(db, job_id)
+        if job.job_board_status != JobBoardStatus.POSTED or jd is None:
+            return "The job is not posted yet, so there is no post to update."
+        if not job.job_board_post_id:
+            return "The job post was made before posts could be updated: post it again."
+        title, body, _ = _post_content(job, jd)
+        try:
+            update_job_post(job.job_board_post_id, title, body)
+        except JobBoardError as exc:
+            logger.warning("Job post update failed: job %d", job_id)
+            return f"The job post could not be updated: {exc}"
+    logger.info("Job post updated: job %d", job_id)
+    return "The job post is updated."
+
+
+def _approved_jd(db: Session, job_id: int) -> JobDescription | None:
+    """The job's newest approved JD, if any."""
+    return db.scalar(
+        select(JobDescription)
+        .where(
+            JobDescription.job_id == job_id,
+            JobDescription.status == JobDescriptionStatus.APPROVED,
+        )
+        .order_by(JobDescription.version.desc())
+        .limit(1)
+    )
+
+
+def _post_content(job: Job, jd: JobDescription) -> tuple[str, str, str]:
+    """The post's title, HTML body and application link."""
+    content = JobDescriptionContent.model_validate_json(jd.content)
+    # The link pre-fills the job, so collected CVs find the right job.
+    form_url = application_link(job.google_form_url, job.id, job.title)
+    body = render_post_html(
+        content,
+        JobProfile.model_validate(job.profile),
+        form_url,
+        job.applications_close_at,
+    )
+    return content.title, body, form_url

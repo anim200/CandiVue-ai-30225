@@ -11,6 +11,8 @@ class Settings(BaseSettings):
 
     app_env: str = "development"
     log_level: str = "INFO"
+    # Local time zone for application deadlines and interview times.
+    app_timezone: str = "Asia/Dhaka"
     database_url: str  # required: the app will not start without it
     cors_origins: str = "http://localhost:5173"
 
