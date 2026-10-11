@@ -777,3 +777,38 @@ def test_html_is_escaped_and_the_link_always_included(screened):
     assert "<b>Strong</b>" not in email.html and "&lt;b&gt;Strong" in email.html
     assert "Your personal link: https://app.example.com/join/t" in email.text
     assert 'href="https://app.example.com/join/t"' in email.html
+
+
+def test_the_ranking_follows_the_interview(screened, client):
+    headers = {
+        "Authorization": f"Bearer {create_access_token(screened['user_id'], Role.INTERVIEWER)}"
+    }
+    with SessionLocal() as db:
+        for name, state in (
+            ("Alex", SessionStatus.ENDED),
+            ("Bea", SessionStatus.LIVE),
+            ("Cam", SessionStatus.CANCELLED),
+        ):
+            db.add(
+                InterviewSession(
+                    candidate_id=screened[name],
+                    job_id=screened["job_id"],
+                    interviewer_id=screened["user_id"],
+                    scheduled_at=clock.now(),
+                    join_token_hash=f"{name:0>64}",
+                    status=state,
+                    invitation_status=InvitationStatus.SENT,
+                )
+            )
+        db.commit()
+
+    ranked = client.get(
+        f"/api/jobs/{screened['job_id']}/screenings/latest", headers=headers
+    ).json()["ranked"]
+
+    pipeline = {r["name"]: r["pipeline"] for r in ranked}
+    assert pipeline == {
+        "Alex Strong": "interviewed",
+        "Bea Good": "in_interview",
+        "Cam Fine": "new",  # cancelled: as before the invitation
+    }

@@ -6,11 +6,13 @@ import { Button, Collapse, Drawer } from '@mantine/core';
 import {
   IconAlertTriangle,
   IconCalendarQuestion,
+  IconCircleCheck,
   IconCircleDashed,
   IconClock,
   IconListCheck,
   IconMailCheck,
   IconMailX,
+  IconPlayerRecord,
   IconCheck,
   IconChevronDown,
   IconChevronRight,
@@ -39,6 +41,8 @@ const PIPELINE = {
   invitation_pending: { tone: 'warning', icon: IconClock, text: 'Invitation pending' },
   invited: { tone: 'success', icon: IconMailCheck, text: 'Invited' },
   invitation_failed: { tone: 'danger', icon: IconMailX, text: 'Invitation failed' },
+  in_interview: { tone: 'info', icon: IconPlayerRecord, text: 'In interview' },
+  interviewed: { tone: 'success', icon: IconCircleCheck, text: 'Interviewed' },
 };
 
 const SECTION_NAMES = {

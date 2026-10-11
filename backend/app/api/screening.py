@@ -25,10 +25,9 @@ from app.db.models import (
     ScreeningRun,
 )
 from app.db.models.candidate import CandidateStatus
-from app.db.models.interview import InvitationStatus
+from app.db.models.interview import InvitationStatus, SessionStatus
 from app.db.models.run import RunStatus
 from app.graphs import cv_screening
-from app.interviews import planning
 from app.runs.runner import start_run
 from app.screening.weights import DIMENSIONS, effective_weights
 
@@ -76,7 +75,8 @@ class ScreenedCandidate(BaseModel):
     scanned: bool  # read with OCR
     years_unknown: bool  # years of experience could not be read: check the CV
     # Where the candidate is now: new, shortlisted, invitation_pending,
-    # invited or invitation_failed; and their interview time, if any.
+    # invited, invitation_failed, in_interview or interviewed; and their
+    # interview time, if any.
     pipeline: str
     interview_at: datetime | None
 
@@ -134,13 +134,17 @@ def latest_screening(
         .join(Candidate, Candidate.id == CandidateScore.candidate_id)
         .where(CandidateScore.screening_run_id == run.id)
     ).all()
+    # Each candidate's newest interview that was not cancelled (a cancelled
+    # one does not count: they are back on the shortlist).
     sessions = {
         s.candidate_id: s
         for s in db.scalars(
-            select(InterviewSession).where(
+            select(InterviewSession)
+            .where(
                 InterviewSession.job_id == job_id,
-                InterviewSession.status.in_(planning.ACTIVE),
+                InterviewSession.status != SessionStatus.CANCELLED,
             )
+            .order_by(InterviewSession.id)
         )
     }
     results = [
@@ -200,6 +204,10 @@ def _result(
 
 def _pipeline(candidate: Candidate, session: InterviewSession | None) -> str:
     """The candidate's step after screening (design: candidate pipeline)."""
+    if session is not None and session.status == SessionStatus.LIVE:
+        return "in_interview"
+    if session is not None and session.status == SessionStatus.ENDED:
+        return "interviewed"
     if session is not None:
         return {
             InvitationStatus.PENDING: "invitation_pending",  # not emailed yet
