@@ -72,3 +72,30 @@ The test job is **PHP Laravel Developer**, the job `EXPECTED.md` was written for
    **Screen again**.
 6. **Jobs** list: the job shows "n ranked". In the Hiring Assistant, the
    progress bar ticks **CVs screened**.
+
+## 5. Shortlist and invitations (in the Hiring Assistant chat)
+
+1. Open the job's chat and send: `Shortlist the top 5.`
+   A **Shortlist** card shows 5 candidates with rank and scores, plus notes
+   (e.g. a tie at the cut). The ranking on the job page now says
+   **Shortlisted** for them.
+2. Try changing it: `Add everyone with skills at least 90.`,
+   `Remove rank 3.`, `Shortlist everyone who meets Docker with an overall
+   score above 70.`, or an excluded name (it is refused with the reason).
+3. Send: `Invite the shortlist next week, mornings.` It is **refused**:
+   applications are still open (or no closing date is set).
+4. Send: `Close applications now.` Then click **Screen CVs** again on the
+   job page (the ranking must include every applicant).
+5. Ask again: `Invite the shortlist next week, mornings.`
+   The assistant finds free times and shows **Interview invitations**,
+   waiting for your confirmation. The chat box is locked until you answer.
+6. Click **Change**: untick one person and edit one time, then **Confirm**.
+   A result card shows what was scheduled (or skipped, with the reason).
+7. Open **Interviews**: the interviews are listed with **Invitation
+   pending** (email sending comes later). **Copy link**, open it in a
+   private window: the candidate page says the link works. **Cancel** an
+   interview: its link stops working.
+8. More to try in the chat: `Move <name>'s interview to Thursday at 14:00.`,
+   `Cancel the interview with <name>.`, `Invite <name> at 07:00` (a
+   warning: outside working hours), two people at the same time (refused:
+   overlap).
