@@ -4,7 +4,7 @@
 import { IconCheck, IconSparkles } from '@tabler/icons-react';
 
 import classes from './Assistant.module.css';
-import { LEVELS } from './labels';
+import { DIMENSION_NAMES, LEVELS } from './labels';
 
 // The interviewer's message, on the right.
 export function UserBubble({ text }) {
@@ -61,15 +61,6 @@ export function ReviewNote({ text }) {
   return <div className={classes.reviewNote}>{text}</div>;
 }
 
-// The job profile: requirements grouped as Mandatory / Required / Preferred.
-// "Skills 40 · Experience 30 · ..." for the weights line on the profile card.
-const WEIGHT_NAMES = [
-  ['skills', 'Skills'],
-  ['experience', 'Experience'],
-  ['qualifications', 'Qualifications'],
-  ['ats', 'ATS match'],
-];
-
 // The saved job profile: experience, requirements by level, and the
 // scoring weights (suggested by the assistant or given by the interviewer).
 export function ProfileCard({ profile, weights }) {
@@ -95,7 +86,7 @@ export function ProfileCard({ profile, weights }) {
         <>
           <span className={classes.profileLabel}>Scoring weights</span>
           <span>
-            {WEIGHT_NAMES.map(([key, name]) => `${name} ${weights[key]}%`).join(' · ')}
+            {DIMENSION_NAMES.map(([key, name]) => `${name} ${weights[key]}%`).join(' · ')}
             <span className={classes.weightsNote}>
               {weights.source === 'interviewer'
                 ? ' (set by you)'

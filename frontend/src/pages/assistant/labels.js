@@ -13,6 +13,14 @@ export const STAGES = {
   posting_failed: { text: 'Posting failed', attention: true },
 };
 
+// Short names of the four scoring dimensions, e.g. "Skills 40 · Experience 30".
+export const DIMENSION_NAMES = [
+  ['skills', 'Skills'],
+  ['experience', 'Experience'],
+  ['qualifications', 'Qualifications'],
+  ['ats', 'ATS match'],
+];
+
 // Requirement levels, in the order the profile card lists them.
 export const LEVELS = [
   ['mandatory', 'Mandatory'],

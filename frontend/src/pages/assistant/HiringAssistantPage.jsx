@@ -2,8 +2,9 @@
 // the interviewer describes the role, the assistant saves the profile,
 // may search the knowledge base, writes the JD and waits for review.
 // After approval it asks "Post this job to the job board?" (Post / Don't
-// post); the job board result appears as a card. The AI model can be
-// switched under the chat box.
+// post); the job board result appears as a card. After screening it keeps
+// the shortlist and plans interviews, which wait for the interviewer's
+// Confirm on a card. The AI model can be switched under the chat box.
 // Interviewers only (route guard + backend, N9).
 
 import { Button } from '@mantine/core';
@@ -26,12 +27,20 @@ import {
   UserBubble,
   WorkingLine,
 } from './ChatItems';
+import { InvitationConfirmCard, InvitationResultsCard, ShortlistCard } from './InterviewCards';
 import JdCard from './JdCard';
 import JobProgressBar from './JobProgressBar';
 import ModelPicker from './ModelPicker';
 import PostingCard, { PostConfirmCard } from './PostingCard';
 import { JdEditModal, RejectModal } from './ReviewModals';
 import ThreadList from './ThreadList';
+
+// What to do first while the graph waits for the interviewer.
+const LOCKED_HINTS = {
+  jd_approval: 'Approve, edit or reject the job description to continue the chat.',
+  post_confirmation: 'Choose Post or Don’t post to continue the chat.',
+  invitation_confirmation: 'Confirm, change or cancel the interviews to continue the chat.',
+};
 
 // Example openers for an empty chat (design frame 2b).
 const STARTERS = ['Start from a previous job', 'Backend developer, 3+ years'];
@@ -98,6 +107,18 @@ function ChatRows({ items, profile, pending, reviewBusy, onApprove, onEdit, onRe
             onEdit={onEdit}
             onReject={onReject}
           />
+        </AssistantRow>,
+      );
+    if (item.kind === 'shortlist')
+      rows.push(
+        <AssistantRow key={index}>
+          <ShortlistCard card={item} />
+        </AssistantRow>,
+      );
+    if (item.kind === 'invitations')
+      rows.push(
+        <AssistantRow key={index}>
+          <InvitationResultsCard result={item} />
         </AssistantRow>,
       );
     if (item.kind === 'posting')
@@ -277,7 +298,8 @@ export default function HiringAssistantPage() {
   }
 
   // Send a decision the paused graph waits for: the JD review (approve,
-  // edit, reject) or the posting question (post, skip).
+  // edit, reject), the posting question (post, skip) or the interviews
+  // (confirm, cancel).
   async function decide(path, decision) {
     setReviewBusy(true);
     setReviewError(null);
@@ -318,11 +340,7 @@ export default function HiringAssistantPage() {
   const pendingJd = thread?.items.find((item) => item.kind === 'jd' && item.jd.id === pending?.jd_id)?.jd;
   const isEmpty = thread && thread.items.length === 0 && !sentText;
   // What locks the chat box (and the hint shown above it), if anything.
-  const lockedHint = !pending
-    ? null
-    : pending.kind === 'post_confirmation'
-      ? 'Choose Post or Don’t post to continue the chat.'
-      : 'Approve, edit or reject the job description to continue the chat.';
+  const lockedHint = pending && LOCKED_HINTS[pending.kind];
 
   return (
     <div className={classes.layout}>
@@ -395,6 +413,16 @@ export default function HiringAssistantPage() {
                     question={pending}
                     busy={reviewBusy}
                     onDecide={(action) => decide('post-decision', { action })}
+                  />
+                </AssistantRow>
+              )}
+              {pending?.kind === 'invitation_confirmation' && (
+                <AssistantRow>
+                  <InvitationConfirmCard
+                    key={JSON.stringify(pending.items)} // a new plan starts a fresh card
+                    plan={pending}
+                    busy={reviewBusy}
+                    onDecide={(decision) => decide('invitation-decision', decision)}
                   />
                 </AssistantRow>
               )}

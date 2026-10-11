@@ -441,6 +441,100 @@
   background: #fffaef;
 }
 
+/* ---- Shortlist and interview cards ---- */
+
+.people {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.person {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 10px;
+  padding: 9px 16px;
+  border-bottom: 1px solid #f0f2f4;
+  font-size: 15px;
+}
+
+.person:last-child {
+  border-bottom: 0;
+}
+
+.skipped {
+  opacity: 0.5;
+}
+
+.personRank {
+  color: #66717a;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.personName {
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.personScore,
+.personTime {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.personScore {
+  font-weight: 600;
+}
+
+.personMeta {
+  grid-column: 2 / -1;
+  font-size: 13px;
+  color: #66717a;
+}
+
+.timeInput {
+  width: 200px;
+}
+
+.cardNotes {
+  padding: 10px 16px;
+  border-top: 1px solid #e9ecee;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  color: #48535b;
+}
+
+.noteLine {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.noteLine svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.warningText {
+  color: #7a5000;
+}
+
+.problemText {
+  color: #932e24;
+}
+
+/* "Nothing is booked until you confirm" sits left of the buttons and wraps
+   before the buttons do. */
+.actionsHint {
+  flex: 1 1 120px;
+  align-self: center;
+}
+
 /* ---- Example openers (empty chat) ---- */
 
 .chips {

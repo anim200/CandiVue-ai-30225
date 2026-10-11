@@ -2,7 +2,8 @@
 // Assistant: the button makes an empty job and opens its chat (§4B-8).
 // Clicking a job opens its page with the applicants.
 // "CVs received" counts the CVs the CV Collector took from the Google Form;
-// "Screening" shows the job's latest screening run.
+// "Screening" shows the job's latest screening run; "Interviews" the
+// scheduled ones.
 
 import { Button, Loader } from '@mantine/core';
 import { useDocumentTitle } from '@mantine/hooks';
@@ -154,7 +155,7 @@ export default function JobsPage() {
             <div className={classes.status}>
               <ScreeningBadge job={job} />
             </div>
-            <div className={`${classes.muted} ${classes.medium}`}>—</div>
+            <div className={`${classes.muted} ${classes.medium}`}>{job.interview_count || '—'}</div>
             <div className={`${classes.muted} ${classes.medium}`}>{shortDate(job.updated_at)}</div>
             <IconChevronRight size={16} className={classes.chevron} />
           </button>

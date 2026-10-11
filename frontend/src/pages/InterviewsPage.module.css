@@ -1,0 +1,132 @@
+/* Interviews list (design: Interviews.dc.html, frame 1a and states 2a-2c).
+   Same look as the Jobs list. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #dee3e6;
+  border-radius: 8px;
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+/* Wide: 6 columns. Medium: Job and Session hidden. Narrow: stacked. */
+.row,
+.head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 210px 120px 170px 215px;
+  gap: 0 12px;
+  align-items: center;
+  padding: 0 20px;
+}
+
+.head {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #dee3e6;
+  font-size: 13px;
+  font-weight: 600;
+  color: #66717a;
+}
+
+.row {
+  min-height: 52px;
+  border-bottom: 1px solid #e9ecee;
+  font-size: 15px;
+  transition: background 0.15s;
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.row:hover {
+  background: #f1f4f5;
+}
+
+.name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.job {
+  color: #23717a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.when {
+  font-variant-numeric: tabular-nums;
+  color: #48535b;
+  white-space: nowrap;
+}
+
+.actions {
+  justify-content: flex-end;
+}
+
+@container (max-width: 900px) {
+  .row,
+  .head {
+    grid-template-columns: minmax(0, 1fr) 210px 170px 215px;
+  }
+
+  .medium {
+    display: none;
+  }
+}
+
+@container (max-width: 600px) {
+  .head {
+    display: none;
+  }
+
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'name invitation'
+      'when when'
+      'actions actions';
+    gap: 6px 10px;
+    padding: 12px 16px;
+  }
+
+  .name {
+    grid-area: name;
+  }
+
+  .invitation {
+    grid-area: invitation;
+  }
+
+  .when {
+    grid-area: when;
+    font-size: 14px;
+  }
+
+  .actions {
+    grid-area: actions;
+    justify-content: flex-start;
+  }
+}

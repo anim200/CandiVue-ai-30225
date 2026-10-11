@@ -9,6 +9,7 @@ import HiringAssistantPage from './pages/assistant/HiringAssistantPage';
 import CandidateJoinPage from './pages/CandidateJoinPage';
 import ComingSoonPage from './pages/ComingSoonPage';
 import ErrorPage from './pages/ErrorPage';
+import InterviewsPage from './pages/InterviewsPage';
 import JobPage from './pages/job/JobPage';
 import JobsPage from './pages/JobsPage';
 import KnowledgeBasePage from './pages/knowledge/KnowledgeBasePage';
@@ -18,6 +19,7 @@ import NotFoundPage from './pages/NotFoundPage';
 // Screens that are built; other menu items still show "coming soon".
 const BUILT_PAGES = {
   '/jobs': <JobsPage />,
+  '/interviews': <InterviewsPage />,
   '/knowledge-base': <KnowledgeBasePage />,
 };
 

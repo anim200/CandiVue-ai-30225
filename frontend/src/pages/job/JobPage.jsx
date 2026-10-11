@@ -86,7 +86,7 @@ function AddCvButton({ onFiles, busy, disabled, variant = 'default' }) {
       disabled={disabled}
     >
       {(props) => (
-        <Button {...props} variant={variant} loading={busy} leftSection={<IconUpload size={16} />}>
+        <Button {...props} variant={variant} loading={busy} disabled={disabled} leftSection={<IconUpload size={16} />}>
           Add CV
         </Button>
       )}

@@ -6,6 +6,11 @@ import { Button, Collapse, Drawer } from '@mantine/core';
 import {
   IconAlertTriangle,
   IconCalendarQuestion,
+  IconCircleDashed,
+  IconClock,
+  IconListCheck,
+  IconMailCheck,
+  IconMailX,
   IconCheck,
   IconChevronDown,
   IconChevronRight,
@@ -18,6 +23,7 @@ import {
 } from '@tabler/icons-react';
 import { useState } from 'react';
 
+import StatusBadge from '../../components/StatusBadge';
 import { WEIGHT_FIELDS } from './WeightsCard';
 import classes from './Screening.module.css';
 
@@ -26,6 +32,15 @@ const STATUS_STYLE = {
   partial: { text: 'Partly met', icon: IconProgress, className: classes.statusPartial },
   unmet: { text: 'Not met', icon: IconX, className: classes.statusUnmet },
 };
+// Where each candidate is after screening (design: candidate pipeline).
+const PIPELINE = {
+  new: { tone: 'neutral', icon: IconCircleDashed, text: 'New' },
+  shortlisted: { tone: 'harbor', icon: IconListCheck, text: 'Shortlisted' },
+  invitation_pending: { tone: 'warning', icon: IconClock, text: 'Invitation pending' },
+  invited: { tone: 'success', icon: IconMailCheck, text: 'Invited' },
+  invitation_failed: { tone: 'danger', icon: IconMailX, text: 'Invitation failed' },
+};
+
 const SECTION_NAMES = {
   experience: 'Work history',
   skills: 'Skills',
@@ -61,6 +76,19 @@ export function ScreeningProgress({ run }) {
         candidates are compared on the same basis.
       </div>
     </div>
+  );
+}
+
+// The candidate's status badge; an interview's time shows on hover.
+function PipelineBadge({ result }) {
+  const { tone, icon: Icon, text } = PIPELINE[result.pipeline];
+  const when = result.interview_at && `Interview ${new Date(result.interview_at).toLocaleString('en-GB')}`;
+  return (
+    <span className={classes.statusCol} title={when || undefined}>
+      <StatusBadge tone={tone} icon={<Icon size={13} />}>
+        {text}
+      </StatusBadge>
+    </span>
   );
 }
 
@@ -227,6 +255,7 @@ export default function ScreeningResults({ data, onViewCv, viewingId }) {
               <div className={classes.dimCol}>Relevant experience</div>
               <div className={classes.dimCol}>Qualifi­cations</div>
               <div className={classes.dimCol}>ATS CV–JD match</div>
+              <div>Status</div>
               <div />
             </div>
             {ranked.map((result) => (
@@ -261,6 +290,7 @@ export default function ScreeningResults({ data, onViewCv, viewingId }) {
                     {result.dimensions[key]?.score}
                   </div>
                 ))}
+                <PipelineBadge result={result} />
                 <IconChevronRight size={16} className={classes.chevron} />
               </button>
             ))}
