@@ -5,6 +5,7 @@
 // "Keep me signed in". The light/dark switch comes with dark mode later.
 
 import { Anchor, Box, Button, PasswordInput, TextInput } from '@mantine/core';
+import { useDocumentTitle } from '@mantine/hooks';
 import {
   IconAlertCircle,
   IconCheck,
@@ -133,6 +134,7 @@ export default function LoginPage() {
   const [errorKey, setErrorKey] = useState(0); // restarts the shake on each new error
   const [stage, setStage] = useState('idle'); // idle | signingIn | signedIn
   const goTo = location.state?.from ?? '/jobs';
+  useDocumentTitle('Sign in · CandiVue AI');
 
   // After "Signed in" has been visible for a moment, open the app.
   useEffect(() => {

@@ -4,8 +4,9 @@
 // Not built yet: document preview, and the "personal data" scan (a design
 // proposal), so the banner does not claim files are scanned.
 
-import { Button, Modal, Select, Text, TextInput } from '@mantine/core';
+import { Button, Select, Text, TextInput } from '@mantine/core';
 import { Dropzone } from '@mantine/dropzone';
+import { useDocumentTitle } from '@mantine/hooks';
 import {
   IconAlertTriangle,
   IconBook2,
@@ -27,7 +28,9 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { apiDelete, apiGet, apiPost, apiPostAi, apiUpload } from '../../api/client';
+import ConfirmModal from '../../components/ConfirmModal';
 import { EmptyState, ErrorBanner } from '../../components/Feedback';
+import { notifyDone, notifyError } from '../../components/notify';
 import StatusBadge from '../../components/StatusBadge';
 import { shortDate } from '../JobsPage';
 import { COLLECTION_SHORT } from '../assistant/labels';
@@ -268,6 +271,7 @@ export default function KnowledgeBasePage() {
   const [removing, setRemoving] = useState(null); // document waiting for confirmation
   const [removeBusy, setRemoveBusy] = useState(false);
   const openRef = useRef(null);
+  useDocumentTitle('Knowledge base · CandiVue AI');
 
   // Load the document list.
   const load = useCallback(async () => {
@@ -340,17 +344,24 @@ export default function KnowledgeBasePage() {
     setRemoveBusy(true);
     try {
       await apiDelete(`/knowledge/documents/${removing.id}`);
-      setRemoving(null);
+      notifyDone(`Removed “${removing.filename}”`);
       await load();
+    } catch (error) {
+      notifyError('The document wasn’t removed.', error);
     } finally {
+      setRemoving(null);
       setRemoveBusy(false);
     }
   }
 
   // Index a failed document again.
   async function retry(doc) {
-    await apiPost(`/knowledge/documents/${doc.id}/retry`);
-    await load();
+    try {
+      await apiPost(`/knowledge/documents/${doc.id}/retry`);
+      await load();
+    } catch (error) {
+      notifyError('Indexing couldn’t start again.', error);
+    }
   }
 
   if (failed && docs === null) {
@@ -505,39 +516,17 @@ export default function KnowledgeBasePage() {
         </div>
       </div>
 
-      <Modal
+      <ConfirmModal
         opened={Boolean(removing)}
         onClose={() => setRemoving(null)}
-        size={440}
-        radius="md"
-        transitionProps={{
-          transition: {
-            in: { opacity: 1, transform: 'none' },
-            out: { opacity: 0, transform: 'scale(.97) translateY(8px)' },
-            transitionProperty: 'opacity, transform',
-          },
-          duration: 250,
-          timingFunction: 'ease-out',
-        }}
-        title={
-          <Text fz={18} fw={600}>
-            Remove “{removing?.filename}”?
-          </Text>
-        }
+        title={`Remove “${removing?.filename}”?`}
+        confirmLabel="Remove"
+        onConfirm={confirmRemove}
+        busy={removeBusy}
       >
-        <Text fz={15} c="#48535B" lh={1.55}>
-          Its {removing?.chunk_count} passages are deleted from the search index. Job descriptions
-          already written keep their text.
-        </Text>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-          <Button variant="subtle" onClick={() => setRemoving(null)}>
-            Cancel
-          </Button>
-          <Button color="#B03A2E" loading={removeBusy} onClick={confirmRemove}>
-            Remove
-          </Button>
-        </div>
-      </Modal>
+        Its {removing?.chunk_count} passages are deleted from the search index. Job descriptions
+        already written keep their text.
+      </ConfirmModal>
     </div>
   );
 }

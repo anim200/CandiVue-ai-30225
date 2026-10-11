@@ -8,6 +8,7 @@ import { IconAdjustments, IconSparkles } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 
 import { apiDelete, apiPut } from '../../api/client';
+import { notifyDone } from '../../components/notify';
 import classes from './JobPage.module.css';
 
 export const WEIGHT_FIELDS = [
@@ -48,6 +49,7 @@ export default function WeightsCard({ job, onSaved, disabled }) {
     setError(null);
     try {
       onSaved(await apiPut(`/jobs/${job.id}/weights`, values));
+      notifyDone('Weights saved');
     } catch (exc) {
       setError(exc.message);
     } finally {
@@ -60,7 +62,9 @@ export default function WeightsCard({ job, onSaved, disabled }) {
     setBusy(true);
     setError(null);
     try {
-      onSaved(await apiDelete(`/jobs/${job.id}/weights`));
+      const saved = await apiDelete(`/jobs/${job.id}/weights`);
+      onSaved(saved);
+      notifyDone(saved.ai_weights ? 'Using the AI suggestion again.' : 'Using the default weights again.');
     } catch (exc) {
       setError(exc.message);
     } finally {

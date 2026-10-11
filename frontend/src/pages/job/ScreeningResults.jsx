@@ -121,7 +121,8 @@ function CandidateDrawer({ result, rankedCount, onClose, onViewCv, viewing }) {
                   <IconScan size={13} /> Scanned CV, read with text recognition
                 </div>
               )}
-              <div className={classes.drawerName}>{result.name || 'Name not found'}</div>
+              {/* Drawer.Title also names the dialog for screen readers. */}
+              <Drawer.Title className={classes.drawerName}>{result.name || 'Name not found'}</Drawer.Title>
               {result.email && <div className={classes.muted}>{result.email}</div>}
             </div>
             <div className={classes.drawerActions}>

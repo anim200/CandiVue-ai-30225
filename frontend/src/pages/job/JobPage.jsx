@@ -4,9 +4,11 @@
 // CVs the CV Collector took from the job's Google Form, plus any added by
 // hand ("Add CV"). Interviewers only (route guard + backend).
 
-import { Anchor, Button, FileButton, Group, Loader, Modal, Text } from '@mantine/core';
+import { Anchor, Button, Collapse, FileButton, Group, Loader, Text } from '@mantine/core';
+import { useDocumentTitle } from '@mantine/hooks';
 import {
   IconAlertTriangle,
+  IconChevronDown,
   IconChevronRight,
   IconCircleCheck,
   IconExternalLink,
@@ -23,7 +25,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 
 import { apiDelete, apiGet, apiGetFile, apiPost, apiUpload } from '../../api/client';
+import ConfirmModal from '../../components/ConfirmModal';
 import { ErrorBanner, Skeleton } from '../../components/Feedback';
+import { notifyDone } from '../../components/notify';
 import StatusBadge from '../../components/StatusBadge';
 import { STAGES } from '../assistant/labels';
 import classes from './JobPage.module.css';
@@ -138,8 +142,9 @@ function ApplicantRow({ applicant, onView, onRemove, viewing }) {
               Received
             </StatusBadge>
           ) : (
+            // The file was refused, not the person: CandiVue never rejects anyone.
             <StatusBadge tone="warning" icon={<IconAlertTriangle size={13} />}>
-              Rejected
+              File refused
             </StatusBadge>
           )}
         </div>
@@ -186,6 +191,9 @@ export default function JobPage() {
   const [uploadProgress, setUploadProgress] = useState(null); // "3 of 19"
   const [screening, setScreening] = useState(null); // latest run and results
   const [starting, setStarting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [applicantsOpen, setApplicantsOpen] = useState(null); // null = automatic
+  useDocumentTitle(`${job?.title ?? 'Job'} · CandiVue AI`);
 
   // Load the job and its applicants.
   const load = useCallback(async () => {
@@ -224,7 +232,9 @@ export default function JobPage() {
       const latest = await apiGet(`/jobs/${jobId}/screenings/latest`).catch(() => null);
       if (!latest) return;
       setScreening(latest);
-      if (!ACTIVE.includes(latest.run?.status)) load(); // names/emails read from CVs
+      if (ACTIVE.includes(latest.run?.status)) return;
+      load(); // names/emails read from CVs
+      if (latest.run?.status === 'completed') notifyDone(`Screening finished: ${latest.ranked.length} ranked`);
     }, POLL_MS);
     return () => clearInterval(timer);
   }, [running, jobId, load]);
@@ -289,6 +299,7 @@ export default function JobPage() {
     setActionError(null);
     try {
       await apiDelete(`/jobs/${jobId}/cvs/${removing.id}`);
+      notifyDone(`Removed ${removing.full_name || 'the applicant'}`);
       setRemoving(null);
       await load();
     } catch (error) {
@@ -297,6 +308,13 @@ export default function JobPage() {
     } finally {
       setRemoveBusy(false);
     }
+  }
+
+  // "Refresh": check for new CVs, with a spinner so the click is visible.
+  async function refresh() {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
   }
 
   if (failed) {
@@ -317,6 +335,8 @@ export default function JobPage() {
 
   const stage = STAGES[job.stage];
   const rejected = applicants.filter((a) => a.status === 'rejected').length;
+  // Once there is a ranking, the applicants list starts folded (shorter page).
+  const showApplicants = applicantsOpen ?? screening?.run?.status !== 'completed';
 
   return (
     <div className={classes.page}>
@@ -353,7 +373,6 @@ export default function JobPage() {
                 disabled={!job.profile || running}
                 leftSection={running ? <Loader size={14} color="white" /> : <IconPlayerPlay size={16} />}
                 className={running ? classes.screeningButton : undefined}
-                title={job.profile ? undefined : 'Save the job profile in the chat first'}
               >
                 {running ? 'Screening…' : 'Screen CVs'}
               </Button>
@@ -377,6 +396,12 @@ export default function JobPage() {
             </Button>
           </Group>
         </div>
+        {/* Says why "Screen CVs" is disabled (a tooltip never shows on a disabled button). */}
+        {applicants.length > 0 && !job.profile && (
+          <div className={classes.hint}>
+            Save the job profile in the chat before screening: the CVs are checked against it.
+          </div>
+        )}
       </header>
 
       {actionError && <ErrorBanner title="That didn’t work.">{actionError}</ErrorBanner>}
@@ -387,7 +412,7 @@ export default function JobPage() {
       {screening?.run && !running && (screening.weights_changed || screening.new_cvs > 0) && (
         <div className={classes.staleNote} role="status">
           <IconAlertTriangle size={17} />
-          <span>
+          <span className={classes.staleText}>
             {screening.weights_changed && 'The weights changed since the last screening. '}
             {screening.new_cvs > 0 && `${screening.new_cvs} new ${screening.new_cvs === 1 ? 'CV' : 'CVs'} arrived since then. `}
             Screen again to update the ranking.
@@ -424,7 +449,11 @@ export default function JobPage() {
             </Anchor>
           ) : (
             <Text fz={15} c="#7A5000">
-              The job is not posted yet. Post it from the chat so people can apply.
+              The job is not posted yet.{' '}
+              <Anchor component={Link} to={`/assistant/${job.id}`} fz={15} fw={600}>
+                Post it from the chat
+              </Anchor>{' '}
+              so people can apply.
             </Text>
           )}
           <Text fz={14} c="#66717A">
@@ -434,56 +463,66 @@ export default function JobPage() {
       ) : (
         <section className={classes.card} aria-label="Applicants">
           <div className={classes.cardTop}>
-            <div>
-              <div className={classes.cardTitle}>Applicants</div>
-              <div className={classes.cardHint}>
-                {cvCount(job.cvs_received)}
-                {rejected > 0 && ` · ${rejected} rejected`} · new CVs arrive every 5 minutes
+            <button
+              type="button"
+              className={classes.collapseHead}
+              onClick={() => setApplicantsOpen(!showApplicants)}
+              aria-expanded={showApplicants}
+            >
+              {showApplicants ? <IconChevronDown size={18} /> : <IconChevronRight size={18} />}
+              <div>
+                <div className={classes.cardTitle}>Applicants</div>
+                <div className={classes.cardHint}>
+                  {cvCount(job.cvs_received)}
+                  {rejected > 0 && ` · ${rejected} ${rejected === 1 ? 'file' : 'files'} refused`} · new
+                  CVs arrive every 5 minutes
+                </div>
               </div>
-            </div>
-            <button type="button" className={classes.refresh} onClick={load} title="Check for new CVs">
-              <IconRefresh size={16} />
-              <span>Refresh</span>
             </button>
+            <Button
+              variant="default"
+              size="xs"
+              onClick={refresh}
+              loading={refreshing}
+              leftSection={<IconRefresh size={15} />}
+              className={classes.noShrink}
+              title="Check for new CVs"
+            >
+              Refresh
+            </Button>
           </div>
-          <div className={classes.head}>
-            <div>Applicant</div>
-            <div className={classes.when}>Received</div>
-            <div className={classes.fileColumn}>CV file</div>
-            <div>Status</div>
-            <div />
-          </div>
-          {applicants.map((applicant) => (
-            <ApplicantRow
-              key={applicant.id}
-              applicant={applicant}
-              viewing={viewingId === applicant.id}
-              onView={view}
-              onRemove={setRemoving}
-            />
-          ))}
+          <Collapse expanded={showApplicants}>
+            <div className={classes.head}>
+              <div>Applicant</div>
+              <div className={classes.when}>Received</div>
+              <div className={classes.fileColumn}>CV file</div>
+              <div>Status</div>
+              <div />
+            </div>
+            {applicants.map((applicant) => (
+              <ApplicantRow
+                key={applicant.id}
+                applicant={applicant}
+                viewing={viewingId === applicant.id}
+                onView={view}
+                onRemove={setRemoving}
+              />
+            ))}
+          </Collapse>
         </section>
       )}
 
-      <Modal
+      <ConfirmModal
         opened={Boolean(removing)}
         onClose={() => setRemoving(null)}
         title="Remove this applicant?"
-        centered
+        confirmLabel="Remove"
+        onConfirm={remove}
+        busy={removeBusy}
       >
-        <Text fz={15} c="#48535B" lh={1.55}>
-          {removing?.full_name || 'This applicant'} and their CV will be deleted from CandiVue. This
-          can’t be undone. The answer in the Google Form is not changed.
-        </Text>
-        <Group justify="flex-end" mt="lg" gap={8}>
-          <Button variant="default" onClick={() => setRemoving(null)}>
-            Cancel
-          </Button>
-          <Button color="red" loading={removeBusy} onClick={remove}>
-            Remove
-          </Button>
-        </Group>
-      </Modal>
+        {removing?.full_name || 'This applicant'} and their CV will be deleted from CandiVue. This
+        can’t be undone. The answer in the Google Form is not changed.
+      </ConfirmModal>
     </div>
   );
 }

@@ -7,12 +7,14 @@
 // Interviewers only (route guard + backend, N9).
 
 import { Button } from '@mantine/core';
+import { useDocumentTitle } from '@mantine/hooks';
 import { IconPlus, IconSparkles } from '@tabler/icons-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 
 import { apiGet, apiPost, apiPostAi, apiPut } from '../../api/client';
 import { EmptyState, ErrorBanner } from '../../components/Feedback';
+import { notifyError } from '../../components/notify';
 import classes from './Assistant.module.css';
 import ChatComposer from './ChatComposer';
 import {
@@ -136,6 +138,8 @@ export default function HiringAssistantPage() {
   const [models, setModels] = useState(null); // { models, usage_url } for the picker
   const [modelBusy, setModelBusy] = useState(false);
   const endRef = useRef(null);
+  const job = jobs?.find((j) => j.id === id);
+  useDocumentTitle(`${job?.title ?? 'Hiring Assistant'} · CandiVue AI`);
 
   // Load all jobs for the thread list (also refreshes their stage lines).
   const loadJobs = useCallback(async () => {
@@ -201,6 +205,8 @@ export default function HiringAssistantPage() {
       const job = await apiPost('/jobs');
       await loadJobs();
       navigate(`/assistant/${job.id}`);
+    } catch (error) {
+      notifyError('The job wasn’t created.', error);
     } finally {
       setCreating(false);
     }
@@ -308,7 +314,6 @@ export default function HiringAssistantPage() {
     );
   }
 
-  const job = jobs?.find((j) => j.id === id);
   const pending = thread?.pending_review ?? null;
   const pendingJd = thread?.items.find((item) => item.kind === 'jd' && item.jd.id === pending?.jd_id)?.jd;
   const isEmpty = thread && thread.items.length === 0 && !sentText;

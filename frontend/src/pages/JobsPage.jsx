@@ -1,16 +1,25 @@
 // Jobs list (design: Jobs.dc.html). Jobs are created through the Hiring
 // Assistant: the button makes an empty job and opens its chat (§4B-8).
 // Clicking a job opens its page with the applicants.
-// "CVs received" counts the CVs the CV Collector took from the Google Form.
-// Screening comes with the next steps; until then it shows "Not screened".
+// "CVs received" counts the CVs the CV Collector took from the Google Form;
+// "Screening" shows the job's latest screening run.
 
-import { Button } from '@mantine/core';
-import { IconBriefcase, IconChevronRight, IconClock, IconSparkles } from '@tabler/icons-react';
+import { Button, Loader } from '@mantine/core';
+import { useDocumentTitle } from '@mantine/hooks';
+import {
+  IconAlertTriangle,
+  IconBriefcase,
+  IconCheck,
+  IconChevronRight,
+  IconClock,
+  IconSparkles,
+} from '@tabler/icons-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { apiGet, apiPost } from '../api/client';
 import { EmptyState, ErrorBanner, Skeleton } from '../components/Feedback';
+import { notifyError } from '../components/notify';
 import StatusBadge from '../components/StatusBadge';
 import classes from './JobsPage.module.css';
 
@@ -20,6 +29,36 @@ export function shortDate(value) {
   const today = new Date();
   if (date.toDateString() === today.toDateString()) return 'Today';
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+// The job's latest screening run as a badge (design: run status badges).
+function ScreeningBadge({ job }) {
+  if (job.screening_status === 'completed') {
+    return (
+      <StatusBadge tone="success" icon={<IconCheck size={13} />}>
+        {job.ranked_count} ranked
+      </StatusBadge>
+    );
+  }
+  if (job.screening_status === 'pending' || job.screening_status === 'running') {
+    return (
+      <StatusBadge tone="info" icon={<Loader size={10} color="#234E8B" />}>
+        Screening…
+      </StatusBadge>
+    );
+  }
+  if (job.screening_status === 'failed') {
+    return (
+      <StatusBadge tone="danger" icon={<IconAlertTriangle size={13} />}>
+        Screening stopped
+      </StatusBadge>
+    );
+  }
+  return (
+    <StatusBadge tone="neutral" icon={<IconClock size={13} />}>
+      Not screened
+    </StatusBadge>
+  );
 }
 
 // Button that creates an empty job and opens its Hiring Assistant chat.
@@ -33,7 +72,8 @@ function CreateJobButton() {
     try {
       const job = await apiPost('/jobs');
       navigate(`/assistant/${job.id}`);
-    } catch {
+    } catch (error) {
+      notifyError('The job wasn’t created.', error);
       setCreating(false);
     }
   }
@@ -50,6 +90,7 @@ export default function JobsPage() {
   const navigate = useNavigate();
   const [jobs, setJobs] = useState(null); // null = still loading
   const [failed, setFailed] = useState(false);
+  useDocumentTitle('Jobs · CandiVue AI');
 
   // Load the jobs from the backend.
   const load = useCallback(async () => {
@@ -111,9 +152,7 @@ export default function JobsPage() {
               <span className={classes.cvLabel}>{job.cvs_received === 1 ? ' CV' : ' CVs'}</span>
             </div>
             <div className={classes.status}>
-              <StatusBadge tone="neutral" icon={<IconClock size={13} />}>
-                Not screened
-              </StatusBadge>
+              <ScreeningBadge job={job} />
             </div>
             <div className={`${classes.muted} ${classes.medium}`}>—</div>
             <div className={`${classes.muted} ${classes.medium}`}>{shortDate(job.updated_at)}</div>

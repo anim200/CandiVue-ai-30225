@@ -6,6 +6,7 @@
 // No account, no scores: candidates only ever see their own interview (N9).
 
 import { Anchor, Box, Button, Stack, Text } from '@mantine/core';
+import { useDocumentTitle } from '@mantine/hooks';
 import { IconAlertCircle, IconCircleCheck, IconCloudOff, IconHelpCircle } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
@@ -78,6 +79,7 @@ export default function CandidateJoinPage() {
   const { linkToken } = useParams();
   const [result, setResult] = useState({ status: 'checking' }); // checking | joined | failed
   const [attempt, setAttempt] = useState(0); // "Try again" checks the link once more
+  useDocumentTitle('Your interview · CandiVue AI');
 
   useEffect(() => {
     let active = true; // ignore the answer if the page was left meanwhile
