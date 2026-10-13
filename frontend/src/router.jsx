@@ -25,9 +25,10 @@ const BUILT_PAGES = {
 };
 
 // The Hiring Assistant and the interview room fill the whole area (no page
-// padding); during an interview the menu is an icon rail (design).
+// padding); during an interview the menu is hidden: the left column shows
+// the candidate's CV instead (user request, 13-10-2026).
 const FULL_BLEED = { fullBleed: true };
-const LIVE_ROOM = { fullBleed: true, rail: true };
+const LIVE_ROOM = { fullBleed: true, immersive: true };
 
 // errorElement: shown instead of a crashed page; never shows technical
 // details (N12).

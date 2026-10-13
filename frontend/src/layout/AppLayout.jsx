@@ -5,8 +5,9 @@
 // Menu style (deliberate change from the design, user 07-10-2026): section
 // titles, a teal bar on the active item, a count of jobs that need the
 // interviewer, and a reminder card at the bottom.
-// During a live interview the menu becomes a 64px icon rail (design: Live
-// Interview), so the call gets the room; the phone menu stays full.
+// Pages may ask for an icon rail (64px) or no menu at all ("immersive": the
+// live interview, whose left column shows the CV; the burger still opens
+// the menu on phones and tablets).
 
 import { AppShell, Box, Burger, Group, NavLink, Tooltip } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
@@ -50,12 +51,13 @@ export default function AppLayout() {
   const [menuOpen, { toggle: toggleMenu, close: closeMenu }] = useDisclosure(false);
   // Icons only (rail) on pages that ask for it, unless the phone menu is open.
   const rail = matches.some((match) => match.handle?.rail) && !menuOpen;
+  const immersive = matches.some((match) => match.handle?.immersive);
   const waiting = useJobsNeedingAttention(pathname);
 
   return (
     <AppShell
       header={{ height: 56 }}
-      navbar={{ width: rail ? 64 : 240, breakpoint: 'md', collapsed: { mobile: !menuOpen } }}
+      navbar={{ width: rail ? 64 : 240, breakpoint: 'md', collapsed: { mobile: !menuOpen, desktop: immersive } }}
     >
       <AppShell.Header px={{ base: 12, sm: 20 }}>
         <Group h="100%" justify="space-between" wrap="nowrap">

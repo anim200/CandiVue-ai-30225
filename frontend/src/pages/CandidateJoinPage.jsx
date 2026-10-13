@@ -115,10 +115,12 @@ export default function CandidateJoinPage() {
         </span>
       </header>
 
+      {/* A working link: the waiting room and the call use the full width. */}
+      {result.status === 'joined' ? (
+        <CandidateInterview onEnded={showEnded} />
+      ) : (
       <Box px={{ base: 16, sm: 24 }} py={40} style={{ display: 'flex', justifyContent: 'center' }}>
-        {result.status === 'joined' ? (
-          <CandidateInterview onEnded={showEnded} />
-        ) : result.status === 'checking' ? (
+        {result.status === 'checking' ? (
           <StateCard>
             <span className={classes.spinner} />
             <Text fz={17} fw={600}>
@@ -150,6 +152,7 @@ export default function CandidateJoinPage() {
           </StateCard>
         )}
       </Box>
+      )}
     </Box>
   );
 }

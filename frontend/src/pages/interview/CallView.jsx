@@ -1,16 +1,26 @@
 // The video call itself, shared by the interviewer's room and the candidate's
-// page (design: SessionBar, VideoTile ×2, CallControls). It must sit inside
+// page (design: VideoTile ×2, CallControls). It must sit inside
 // <LiveKitRoom>, which connects to the LiveKit server with the ticket from
 // the backend. LiveKit reconnects by itself after a dropped connection; the
-// bar then says "Reconnecting…". "Full screen" shows the whole call (videos,
-// bar and controls) on the full screen; Esc or the button leaves it.
+// stage then says "Reconnecting…".
+// - The stage fills the column: 16:9 when there is room, wider on short
+//   screens. The other person's video is always shown whole and sharp in
+//   the middle; a blurred copy of it fills the sides (like Meet or Zoom),
+//   so the stage never shows empty bands.
+// - The controls float over the bottom of the stage (below it on phones).
+// - Full screen: the icon in the stage's top-right corner (Esc leaves it).
+// - Screen sharing: the shared screen fills the stage and the cameras move
+//   to a strip; your own shared screen is not shown back to you (it would
+//   repeat itself endlessly), only a note with "Stop sharing".
+// - A ring shows who is speaking.
 
-import { Button } from '@mantine/core';
+import { Tooltip } from '@mantine/core';
 import {
   RoomAudioRenderer,
   VideoTrack,
   isTrackReference,
   useConnectionState,
+  useIsSpeaking,
   useLocalParticipant,
   useTracks,
 } from '@livekit/components-react';
@@ -20,25 +30,22 @@ import {
   IconMicrophoneOff,
   IconMinimize,
   IconPhoneOff,
+  IconScreenShare,
+  IconScreenShareOff,
+  IconUser,
   IconVideo,
   IconVideoOff,
+  IconWifiOff,
 } from '@tabler/icons-react';
 import { Track } from 'livekit-client';
 import { useEffect, useRef, useState } from 'react';
 
 import ConfirmModal from '../../components/ConfirmModal';
+import { notifyError } from '../../components/notify';
 import classes from './Call.module.css';
 
-// "12:48" since the call opened on this screen.
-function useElapsed() {
-  const [seconds, setSeconds] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => setSeconds((s) => s + 1), 1000);
-    return () => clearInterval(timer);
-  }, []);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${pad(Math.floor(seconds / 60))}:${pad(seconds % 60)}`;
-}
+// Screen sharing needs getDisplayMedia (not on phones and tablets).
+const CAN_SHARE = typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getDisplayMedia);
 
 // Full screen for one element: [isFull, toggle]. The browser decides when it
 // ends too (Esc), so the state follows its "fullscreenchange" event.
@@ -49,53 +56,111 @@ function useFullScreen(ref) {
     document.addEventListener('fullscreenchange', follow);
     return () => document.removeEventListener('fullscreenchange', follow);
   }, [ref]);
-  const toggle = () => (isFull ? document.exitFullscreen() : ref.current.requestFullscreen());
+  const toggle = () => (isFull ? document.exitFullscreen() : ref.current?.requestFullscreen());
   return [isFull, toggle];
 }
 
-// One person's video, or their name while the camera is off / not joined.
-function VideoTile({ trackRef, label, waiting, small }) {
-  const participant = trackRef?.participant;
+// Initials for a camera-off tile, e.g. "Alex Strong" → "AS".
+function initials(name) {
+  return (name || '?')
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+}
+
+// One person's camera, or their initials while the camera is off.
+// backdrop: a blurred copy of the video fills the space around it (the same
+// stream shown twice; nothing extra is downloaded).
+function CameraTile({ trackRef, label, className, backdrop = false }) {
+  const participant = trackRef.participant;
+  const speaking = useIsSpeaking(participant);
   const showVideo = isTrackReference(trackRef) && !trackRef.publication.isMuted;
   return (
-    <div className={`${classes.tile} ${small ? classes.small : ''}`}>
+    <div className={`${classes.tile} ${className} ${speaking ? classes.speaking : ''}`}>
+      {showVideo && backdrop && <VideoTrack trackRef={trackRef} className={classes.backdrop} aria-hidden="true" />}
       {showVideo ? (
-        <VideoTrack trackRef={trackRef} className={classes.video} />
+        <VideoTrack trackRef={trackRef} className={participant.isLocal ? classes.mirror : classes.video} />
       ) : (
-        <div className={classes.placeholder}>{participant ? `${label} · camera off` : waiting}</div>
+        <div className={classes.cameraOff}>
+          <span className={classes.initials}>{initials(label === 'You' ? participant.name : label)}</span>
+          <span className={classes.offText}>Camera off</span>
+        </div>
       )}
-      {participant && (
-        <span className={classes.label}>
-          {participant.isMicrophoneEnabled ? <IconMicrophone size={14} /> : <IconMicrophoneOff size={14} />}
-          {label}
-        </span>
-      )}
+      <span className={classes.nameTag}>
+        {participant.isMicrophoneEnabled ? (
+          <IconMicrophone size={13} />
+        ) : (
+          <IconMicrophoneOff size={13} className={classes.mutedIcon} />
+        )}
+        {label}
+      </span>
     </div>
   );
 }
 
-const CONNECTION = {
-  connected: { text: 'Connected', className: classes.ok },
-  connecting: { text: 'Connecting…', className: classes.busy },
-  reconnecting: { text: 'Reconnecting…', className: classes.busy },
-  signalReconnecting: { text: 'Reconnecting…', className: classes.busy },
-  disconnected: { text: 'Disconnected', className: classes.bad },
+// A round control button with a tooltip. off: red (e.g. microphone muted);
+// on: teal (e.g. sharing the screen now).
+export function ControlButton({ label, off, on, onClick, children, disabled }) {
+  return (
+    <Tooltip label={label} withArrow openDelay={300}>
+      <button
+        type="button"
+        className={`${classes.control} ${off ? classes.controlOff : ''} ${on ? classes.controlOn : ''}`}
+        onClick={onClick}
+        aria-label={label}
+        disabled={disabled}
+      >
+        {children}
+      </button>
+    </Tooltip>
+  );
+}
+
+const STATES = {
+  connecting: 'Connecting…',
+  reconnecting: 'Reconnecting…',
+  signalReconnecting: 'Reconnecting…',
+  disconnected: 'Connection lost',
 };
 
-// The call: bar, the other person's video, own video, controls.
-// role: "interviewer" (End session) or "candidate" (Leave).
-// otherName: the person on the other side; onFinish: End / Leave confirmed.
-export default function CallView({ role, title, otherName, notice, onFinish, finishing }) {
-  const tracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: true }], { onlySubscribed: false });
-  const own = tracks.find((t) => t.participant.isLocal);
-  const other = tracks.find((t) => !t.participant.isLocal);
-  const connection = CONNECTION[useConnectionState()] ?? CONNECTION.connecting;
-  const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
+// The call: stage, controls and the "are you sure" dialog.
+// role: "interviewer" (End interview) or "candidate" (Leave).
+// otherName: the person on the other side. waiting: what the stage shows
+// while they are not in the call. banner: shown over the top of the stage
+// (e.g. "… is waiting · Let in"). extraControls: more buttons (e.g. chat).
+export default function CallView({ role, otherName, waiting, banner, extraControls, onFinish, finishing }) {
+  const tracks = useTracks(
+    [
+      { source: Track.Source.Camera, withPlaceholder: true },
+      { source: Track.Source.ScreenShare, withPlaceholder: false },
+    ],
+    { onlySubscribed: false },
+  );
+  const cameras = tracks.filter((t) => t.source === Track.Source.Camera);
+  const own = cameras.find((t) => t.participant.isLocal);
+  const other = cameras.find((t) => !t.participant.isLocal);
+  const shares = tracks.filter((t) => t.source === Track.Source.ScreenShare && isTrackReference(t));
+  const share = shares.find((t) => !t.participant.isLocal) ?? shares.find((t) => t.participant.isLocal);
+  const connection = useConnectionState();
+  const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant();
   const [confirming, setConfirming] = useState(false);
-  const elapsed = useElapsed();
   const interviewer = role === 'interviewer';
   const callRef = useRef(null);
   const [isFull, toggleFull] = useFullScreen(callRef);
+  const otherLabel = other?.participant.name || otherName;
+
+  // Switch a device; a busy or blocked device gets a plain message.
+  async function toggle(action, what) {
+    try {
+      await action();
+    } catch (error) {
+      if (error?.name === 'NotAllowedError') return; // e.g. the share picker was closed
+      notifyError(`Your ${what} couldn’t be switched.`, {
+        message: 'Another app may be using it, or the browser blocked it (see the icon in the address bar).',
+      });
+    }
+  }
 
   // The "are you sure" dialog opens outside the call, so leave full screen
   // first or it would be hidden behind it.
@@ -104,59 +169,105 @@ export default function CallView({ role, title, otherName, notice, onFinish, fin
     setConfirming(true);
   }
 
-  return (
-    <div className={classes.call} ref={callRef}>
-      <div className={classes.bar}>
-        {interviewer && <span className={classes.live}>LIVE</span>}
-        <span className={classes.title}>{title}</span>
-        <span className={classes.timer}>{elapsed}</span>
-        {notice && <span className={classes.notice}>{notice}</span>}
-        <span className={`${classes.connection} ${connection.className}`}>{connection.text}</span>
+  // The large area: a shared screen, the other person, or the waiting text.
+  let main;
+  if (share?.participant.isLocal) {
+    main = (
+      <div className={classes.presenting}>
+        <IconScreenShare size={34} />
+        <div>You are sharing your screen</div>
+        <button type="button" className={classes.stopShare} onClick={() => toggle(() => localParticipant.setScreenShareEnabled(false), 'screen')}>
+          Stop sharing
+        </button>
       </div>
+    );
+  } else if (share) {
+    main = (
+      <div className={`${classes.tile} ${classes.mainTile}`}>
+        <VideoTrack trackRef={share} className={classes.screen} />
+        <span className={classes.nameTag}>
+          <IconScreenShare size={13} /> {otherLabel}’s screen
+        </span>
+      </div>
+    );
+  } else if (other) {
+    main = <CameraTile trackRef={other} label={otherLabel} className={classes.mainTile} backdrop />;
+  } else {
+    main = (
+      <div className={classes.waiting}>
+        <span className={classes.waitingIcon}>
+          <IconUser size={26} />
+        </span>
+        {waiting}
+      </div>
+    );
+  }
 
+  return (
+    <div className={`${classes.call} ${isFull ? classes.full : ''}`} ref={callRef}>
       <div className={classes.stage}>
-        <VideoTile
-          trackRef={other}
-          label={other?.participant.name || otherName}
-          waiting={`${otherName} hasn’t joined yet. They appear here as soon as they join.`}
-        />
-        <VideoTile trackRef={own} label="You" small />
-        {connection.text === 'Reconnecting…' && (
+        {main}
+
+        {/* While a screen is shared, both cameras sit in a strip. */}
+        <div className={`${classes.strip} ${share ? classes.stripShare : ''}`}>
+          {share && other && <CameraTile trackRef={other} label={otherLabel} className={classes.thumb} />}
+          {own && <CameraTile trackRef={own} label="You" className={classes.thumb} />}
+        </div>
+
+        {document.fullscreenEnabled && ( // not on every phone (e.g. iPhone Safari)
+          <Tooltip label={isFull ? 'Exit full screen' : 'Full screen'} withArrow>
+            <button
+              type="button"
+              className={classes.fullButton}
+              onClick={toggleFull}
+              aria-label={isFull ? 'Exit full screen' : 'Full screen'}
+            >
+              {isFull ? <IconMinimize size={18} /> : <IconMaximize size={18} />}
+            </button>
+          </Tooltip>
+        )}
+        {banner && <div className={classes.banner}>{banner}</div>}
+        {STATES[connection] && connection !== 'connecting' && (
           <div className={classes.overlay} role="status">
-            Reconnecting… You’ll be back in the same interview automatically.
+            <IconWifiOff size={26} />
+            {connection === 'disconnected'
+              ? 'The connection was lost. Reload the page to rejoin the same interview.'
+              : 'Reconnecting… You’ll be back in the same interview automatically.'}
           </div>
         )}
       </div>
 
       <div className={classes.controls}>
-        <Button
-          variant={isMicrophoneEnabled ? 'default' : 'light'}
-          color={isMicrophoneEnabled ? undefined : 'red'}
-          leftSection={isMicrophoneEnabled ? <IconMicrophone size={17} /> : <IconMicrophoneOff size={17} />}
-          onClick={() => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
+        <ControlButton
+          label={isMicrophoneEnabled ? 'Mute microphone' : 'Unmute microphone'}
+          off={!isMicrophoneEnabled}
+          onClick={() => toggle(() => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled), 'microphone')}
         >
-          {isMicrophoneEnabled ? 'Mute' : 'Unmute'}
-        </Button>
-        <Button
-          variant={isCameraEnabled ? 'default' : 'light'}
-          color={isCameraEnabled ? undefined : 'red'}
-          leftSection={isCameraEnabled ? <IconVideo size={17} /> : <IconVideoOff size={17} />}
-          onClick={() => localParticipant.setCameraEnabled(!isCameraEnabled)}
+          {isMicrophoneEnabled ? <IconMicrophone size={20} /> : <IconMicrophoneOff size={20} />}
+        </ControlButton>
+        <ControlButton
+          label={isCameraEnabled ? 'Turn camera off' : 'Turn camera on'}
+          off={!isCameraEnabled}
+          onClick={() => toggle(() => localParticipant.setCameraEnabled(!isCameraEnabled), 'camera')}
         >
-          {isCameraEnabled ? 'Camera off' : 'Camera on'}
-        </Button>
-        {document.fullscreenEnabled && ( // not on every phone (e.g. iPhone Safari)
-          <Button
-            variant="default"
-            leftSection={isFull ? <IconMinimize size={17} /> : <IconMaximize size={17} />}
-            onClick={toggleFull}
+          {isCameraEnabled ? <IconVideo size={20} /> : <IconVideoOff size={20} />}
+        </ControlButton>
+        {CAN_SHARE && (
+          <ControlButton
+            label={isScreenShareEnabled ? 'Stop sharing your screen' : 'Share your screen'}
+            on={isScreenShareEnabled}
+            onClick={() =>
+              toggle(() => localParticipant.setScreenShareEnabled(!isScreenShareEnabled, { audio: false }), 'screen')
+            }
           >
-            {isFull ? 'Exit full screen' : 'Full screen'}
-          </Button>
+            {isScreenShareEnabled ? <IconScreenShareOff size={20} /> : <IconScreenShare size={20} />}
+          </ControlButton>
         )}
-        <Button color="#B03A2E" leftSection={<IconPhoneOff size={17} />} onClick={askToFinish}>
-          {interviewer ? 'End session' : 'Leave'}
-        </Button>
+        {extraControls}
+        <button type="button" className={classes.finish} onClick={askToFinish}>
+          <IconPhoneOff size={19} />
+          {interviewer ? 'End interview' : 'Leave'}
+        </button>
       </div>
 
       {/* Plays the other person's voice. */}
@@ -180,4 +291,12 @@ export default function CallView({ role, title, otherName, notice, onFinish, fin
       </ConfirmModal>
     </div>
   );
+}
+
+// "Connected" / "Reconnecting…" for a page's header (call connection).
+export function CallConnection() {
+  const connection = useConnectionState();
+  const text = connection === 'connected' ? 'Call connected' : (STATES[connection] ?? 'Connecting…');
+  const tone = connection === 'connected' ? classes.ok : connection === 'disconnected' ? classes.bad : classes.busy;
+  return <span className={`${classes.connection} ${tone}`}>{text}</span>;
 }
