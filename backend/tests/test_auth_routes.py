@@ -22,7 +22,12 @@ OPEN_ROUTES = {
     "/api/livekit/webhook",  # the video server; checked by its signature instead
 }
 # Routes for the candidate's own interview: must require the candidate role.
-CANDIDATE_ROUTES = {"/api/candidate/interview", "/api/candidate/room"}
+CANDIDATE_ROUTES = {
+    "/api/candidate/interview",
+    "/api/candidate/room",
+    "/api/candidate/waiting",
+    "/api/candidate/messages",
+}
 
 
 def guarded_test_app() -> TestClient:

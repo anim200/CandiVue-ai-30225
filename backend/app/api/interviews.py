@@ -8,14 +8,19 @@ after the interviewer confirms them (§4B-7b). The email is the only way a
 candidate gets their private link, and nobody can join the call before it
 was sent. Only a hash of each link is stored, so sending the email again
 makes a new link; the previous one stops working.
+
+In the room: the interviewer's page sends a heartbeat (presence) and sees
+whether the candidate waits; "Let in" admits them (the candidate's ticket
+needs it). The chat with the candidate and the candidate's CV panel are
+here too.
 """
 
 import logging
 from datetime import datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -23,8 +28,8 @@ from app.auth.dependencies import CurrentUser, require_interviewer
 from app.core import clock
 from app.db.database import get_db
 from app.db.models import Candidate, InterviewSession, Job, User
-from app.db.models.interview import InvitationStatus, SessionStatus
-from app.interviews import calendar_sync, emails, planning, room
+from app.db.models.interview import InvitationStatus, SessionStatus, Speaker
+from app.interviews import calendar_sync, chat, cv_view, emails, planning, room
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +51,7 @@ class InterviewOut(BaseModel):
     """One interview in the list."""
 
     id: int
+    candidate_id: int
     candidate_name: str
     job_id: int
     job_title: str
@@ -54,6 +60,23 @@ class InterviewOut(BaseModel):
     status: SessionStatus
     invitation_status: InvitationStatus
     invitation_error: str | None  # why the last email failed
+    started_at: datetime | None  # when the call first opened (Live)
+    admitted: bool  # the candidate was let in from the waiting room
+
+
+class LobbyOut(BaseModel):
+    """The waiting room: is the candidate waiting, were they let in."""
+
+    interviewer_present: bool
+    candidate_waiting: bool
+    admitted: bool
+    status: SessionStatus
+
+
+class MessageIn(BaseModel):
+    """A chat message to the candidate."""
+
+    text: str = Field(min_length=1, max_length=chat.MAX_LENGTH)
 
 
 class SendOut(BaseModel):
@@ -122,7 +145,62 @@ def join_room(
         token = room.ticket(session, f"interviewer-{user.id}", name)
     except room.RoomError as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from None
+    session.interviewer_seen_at = clock.now()  # the candidate sees "here"
+    db.commit()
     return TicketOut(token=token)
+
+
+@router.post("/{interview_id}/presence", response_model=LobbyOut)
+def presence(interview_id: int, db: Annotated[Session, Depends(get_db)]) -> LobbyOut:
+    """Heartbeat from the interviewer's open room page (every few seconds);
+    answers whether the candidate is waiting to be let in."""
+    session = _found(db, interview_id)
+    if session.status in planning.ACTIVE:
+        session.interviewer_seen_at = clock.now()
+        db.commit()
+    return LobbyOut(**room.lobby(session), status=session.status)
+
+
+@router.post("/{interview_id}/admit", response_model=LobbyOut)
+def admit(interview_id: int, db: Annotated[Session, Depends(get_db)]) -> LobbyOut:
+    """Let the candidate in from the waiting room. Once let in, they can
+    rejoin after a dropped connection without asking again."""
+    session = _active(db, interview_id)
+    if session.invitation_status != InvitationStatus.SENT:
+        raise HTTPException(status.HTTP_409_CONFLICT, NOT_INVITED)
+    if session.admitted_at is None:
+        session.admitted_at = clock.now()
+        db.commit()
+        logger.info("Candidate let in: session %d", interview_id)
+    return LobbyOut(**room.lobby(session), status=session.status)
+
+
+@router.get("/{interview_id}/candidate")
+def candidate_cv(interview_id: int, db: Annotated[Session, Depends(get_db)]) -> dict:
+    """The candidate's CV panel in the room: parsed facts and screening."""
+    return cv_view.overview(db, _found(db, interview_id))
+
+
+@router.get("/{interview_id}/messages")
+def list_messages(
+    interview_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    after: Annotated[int, Query(ge=0)] = 0,
+) -> list[dict]:
+    """The chat with the candidate (only messages after `after`)."""
+    return chat.history(db, _found(db, interview_id).id, after)
+
+
+@router.post("/{interview_id}/messages")
+def send_message(
+    interview_id: int, body: MessageIn, db: Annotated[Session, Depends(get_db)]
+) -> dict:
+    """Send a chat message to the candidate."""
+    session = _active(db, interview_id)
+    try:
+        return chat.send(db, session, Speaker.INTERVIEWER, body.text)
+    except chat.ChatError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
 
 
 @router.post("/{interview_id}/end", response_model=InterviewOut)
@@ -178,6 +256,7 @@ def _out(db: Session, session: InterviewSession) -> InterviewOut:
     candidate = db.get(Candidate, session.candidate_id)
     return InterviewOut(
         id=session.id,
+        candidate_id=candidate.id,
         candidate_name=candidate.full_name or candidate.cv_filename,
         job_id=session.job_id,
         job_title=db.get(Job, session.job_id).title,
@@ -186,6 +265,8 @@ def _out(db: Session, session: InterviewSession) -> InterviewOut:
         status=session.status,
         invitation_status=session.invitation_status,
         invitation_error=session.invitation_error,
+        started_at=session.started_at,
+        admitted=session.admitted_at is not None,
     )
 
 

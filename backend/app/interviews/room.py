@@ -9,11 +9,22 @@ LiveKit tells us who joined through signed webhooks: the first join makes
 the interview Live and saves its start time. End closes the room for
 everyone. Video and audio go browser to LiveKit to browser; nothing is
 recorded (N16).
+
+Waiting room: the candidate gets a ticket only after the interviewer let
+them in (admitted_at); once let in, a dropped connection or a reload goes
+straight back in (F3). Each open page sends a heartbeat, so each side knows
+whether the other is there.
+
+Chat: messages are saved by the backend and then pushed to everyone in the
+room by LiveKit (send_data, topic "chat"). Browsers cannot send data into
+the room themselves (can_publish_data is off), so every message goes
+through the backend's checks.
 """
 
 import asyncio
+import json
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from livekit import api
 from sqlalchemy.orm import Session
@@ -27,6 +38,9 @@ logger = logging.getLogger(__name__)
 
 TICKET_HOURS = 4  # long enough for an interview with reconnects
 NOT_SET_UP = "Video calls are not set up yet: add LIVEKIT_API_SECRET to .env."
+# A page that has not sent a heartbeat for this long has been closed.
+PRESENCE_SECONDS = 15
+CHAT_TOPIC = "chat"
 
 
 class RoomError(Exception):
@@ -73,6 +87,47 @@ def end_room(session_id: int) -> None:
         logger.info("Room not closed (%s): session %d", type(exc).__name__, session_id)
 
 
+def is_present(seen_at: datetime | None) -> bool:
+    """True when a page sent its heartbeat within PRESENCE_SECONDS."""
+    return seen_at is not None and clock.now() - seen_at < timedelta(
+        seconds=PRESENCE_SECONDS
+    )
+
+
+def lobby(session: InterviewSession) -> dict:
+    """The waiting room as both sides see it."""
+    return {
+        "interviewer_present": is_present(session.interviewer_seen_at),
+        "candidate_waiting": session.admitted_at is None
+        and is_present(session.candidate_waiting_at),
+        "admitted": session.admitted_at is not None,
+    }
+
+
+def push_message(session_id: int, message: dict) -> None:
+    """Send a saved chat message to everyone in the call at once. Never
+    fails: if LiveKit cannot be reached, the pages still load it from the
+    backend (they check every few seconds)."""
+
+    async def send() -> None:
+        """Ask LiveKit to deliver the message to the room."""
+        key, secret = _keys()
+        async with api.LiveKitAPI(get_settings().livekit_url, key, secret) as livekit:
+            await livekit.room.send_data(
+                api.SendDataRequest(
+                    room=room_name(session_id),
+                    data=json.dumps(message).encode(),
+                    kind=api.DataPacket.Kind.RELIABLE,
+                    topic=CHAT_TOPIC,
+                )
+            )
+
+    try:
+        asyncio.run(send())
+    except Exception as exc:  # noqa: BLE001 - nobody in the call yet, or LiveKit down
+        logger.info("Chat not pushed (%s): session %d", type(exc).__name__, session_id)
+
+
 def handle_webhook(db: Session, body: str, authorization: str) -> None:
     """Record who joined, from LiveKit's signed webhook. A forged or
     altered message raises an error (it is signed with our secret)."""
@@ -88,6 +143,8 @@ def handle_webhook(db: Session, body: str, authorization: str) -> None:
     if session is None:
         return
     role, _, person_id = event.participant.identity.partition("-")
+    if role not in ("interviewer", "candidate"):
+        return  # e.g. a future listen-only helper: not a participant
     if role == "interviewer":
         session.interviewer_id = int(person_id)  # who actually took part
     if session.status == SessionStatus.SCHEDULED:
