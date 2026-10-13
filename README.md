@@ -192,8 +192,15 @@ width.
     model, so document text and search questions stay on this machine.
     Only passages that the Hiring Assistant chooses to use are sent, as
     part of the chat.
-  - Later steps: CV text, interview transcripts and the instructions
-    (prompts) needed to screen and assess candidates.
+  - Hiring Assistant in the interview room: the interviewer's messages,
+    the job's requirements, question-bank passages found by search, and,
+    only when the interviewer asks for questions from the CV, a **reduced
+    CV summary**: job titles with dates, years, skills, degree level,
+    certificates and how each requirement was met in screening. No name,
+    email, phone number, address or links (they are removed first).
+  - CV screening: nothing (it runs locally, see "CV screening").
+  - Later steps: interview transcripts and the instructions (prompts)
+    needed to assess candidates.
 
 Other external services (N18):
 
@@ -336,28 +343,68 @@ Interviews are 1-on-1 video calls in the browser, using **LiveKit**, an
 open-source video server that runs here in Docker (no cloud, no account).
 
 ```
-Interviewer (signed in): Interviews → "Join now" ─┐
-Candidate: private link → welcome → camera check ──┤ ticket from the backend
-                                                   ▼ (this room only)
-             browser ⇄ LiveKit (Docker) ⇄ browser   video + audio, encrypted
-                         │ signed webhooks
-                         ▼
-             backend: Live + start time, who joined; End session → Ended
+Interviewer (signed in): Interviews → "Join now" ──────────────┐
+Candidate: private link → waiting room (preview, devices) ─────┤
+           heartbeat "I'm waiting" ──► interviewer sees        │
+           "… is waiting · Let in" ──► Let in ──► ticket ──────┤ (this room only)
+                                                               ▼
+                     browser ⇄ LiveKit (Docker) ⇄ browser   video, audio, screen
+                                 │ signed webhooks
+                                 ▼
+             backend: Live + start time, who joined; End interview → Ended
 ```
 
+- **Waiting room:** the candidate checks camera and microphone (preview,
+  level meter, device choice), ticks a notice ("not recorded, a written
+  transcript is kept") and joins the waiting room. They get a call ticket
+  only after the interviewer clicks **Let in** (checked by the backend,
+  not only on the page). Each open page sends a heartbeat every few
+  seconds, so the candidate sees whether the interviewer is there, and the
+  interviewer gets a banner, a soft chime and "● Waiting" in the tab title.
+  Once let in, a dropped connection or a reload goes straight back in.
 - The backend gives each person a **ticket** (a signed LiveKit token) for
-  their interview's room only: the interviewer after signing in, the
-  candidate after opening their private link. Camera and microphone only.
+  their interview's room only. Browsers cannot send data into the room;
+  chat goes through the backend.
 - **Join any time** once the invitation email was sent, until the
-  interviewer clicks **End session** (or the interview is cancelled). The
-  email is the only way the candidate gets their link; before it is sent
-  nobody can join. Ending closes the call for everyone and the candidate's
-  link stops working.
-- **Reconnect:** LiveKit reconnects a dropped connection by itself (the
-  bar shows "Reconnecting…"); a reloaded candidate tab goes straight back
-  into the call.
-- The candidate sees only the call: no transcript, scores or assistant.
-- Video and audio are not recorded or stored (N16).
+  interviewer clicks **End interview** (or the interview is cancelled).
+  The email is the only way the candidate gets their link. Ending closes
+  the call for everyone and the candidate's link stops working. Leaving
+  the room page without ending keeps the interview live.
+- **The call:** the stage fills its column (16:9 when there is room, wider
+  on short screens); the other person's video stays whole and sharp, with
+  a blurred copy of it filling the sides; the controls float over its
+  bottom edge (under it on phones); full screen from the icon in its
+  top-right corner; a ring shows who is speaking; mute, camera,
+  **screen sharing** (both sides; desktop browsers) and End/Leave. A shared
+  screen fills the stage and the cameras move to a strip.
+- **Interviewer's room:** the candidate's CV on the left (rank, overall
+  and four scores, each requirement with the CV line that showed it,
+  roles, degree, certificates, skills, the PDF inside the page), the call
+  with the live transcript under it, and on the right the Hiring Assistant
+  (only the interviewer sees it) and the chat with the candidate.
+- **Chat:** plain text, at most 1,000 characters, 20 messages a minute per
+  side; saved (table `interview_messages`, deleted with the interview) and
+  pushed to both pages by LiveKit, with a check every few seconds as a
+  fallback. Links open in a new tab.
+- **Hiring Assistant in the room (§4B-10):** LangGraph 1 with its own
+  thread per interview (`assistant-interview-<id>`), so a job chat waiting
+  for a confirmation never blocks it and it can be prepared before the
+  call. Quick actions: from the CV, from the question bank, check gaps,
+  warm-up. Questions from the CV are made once per interview and saved
+  (asking again costs no AI request; "Make a new set" makes another).
+  Without a question bank (knowledge base, Question bank collection) the
+  assistant says so and suggests its own questions. The AI model can be
+  switched under its chat.
+- The candidate sees only the call, the chat and the interview details:
+  never the transcript, scores, CV panel, identity check or assistant
+  (N9, checked by the backend).
+- **Edge cases handled:** opened in a second tab ("Use this tab"), camera or
+  microphone blocked or busy, screen sharing cancelled or not supported
+  (phones), interviewer leaves without ending, interview ended or
+  cancelled while waiting, reconnecting, long interviews (timer h:mm:ss,
+  "+2 h 05 min over" the planned length, and a hint to end an interview
+  left live for over 3 hours).
+- Video, audio and shared screens are not recorded or stored (N16).
 
 Setup: `LIVEKIT_API_SECRET` in `.env` (32+ random characters, see
 `.env.example`); it signs the tickets and LiveKit's webhooks.
@@ -365,7 +412,8 @@ Setup: `LIVEKIT_API_SECRET` in `.env` (32+ random characters, see
 **Try it on one computer:** sign in, open **Interviews → Join now**; open the
 candidate's link from the invitation email (with `EMAIL_TEST_RECIPIENT` it
 comes to you) in a second window of the **same browser** (a private window
-works), so both tabs can use the camera. Use a headset,
+works), so both tabs can use the camera. Join the waiting room as the
+candidate, then click **Let in** in the interviewer's tab. Use a headset,
 or mute the tab that is not speaking, to avoid echo.
 
 **From a phone or a second computer on the same network:** set
@@ -753,11 +801,14 @@ HTTP stays on localhost even then.
 **Other protections in nginx** (all responses, including `/api`):
 
 - `Content-Security-Policy`: only CandiVue's own scripts, fonts and API
-  may load; no other site may frame the app.
+  may load; no other site may frame the app. Frames may only show
+  CandiVue's own pages and files it loaded itself (`blob:`, the CV preview
+  in the interview room).
 - `Referrer-Policy: no-referrer`: addresses such as interview links are
   never sent to other sites.
 - `X-Content-Type-Options`, `X-Frame-Options`, and a `Permissions-Policy`
-  that allows camera and microphone only for CandiVue itself.
+  that allows camera, microphone and screen sharing (`display-capture`)
+  only for CandiVue itself.
 - `Strict-Transport-Security` when HTTPS is used.
 - The access log hides interview link tokens (`/join/[hidden]`), and nginx
   does not reveal its version.
