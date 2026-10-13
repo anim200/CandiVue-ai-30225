@@ -114,6 +114,30 @@ def thread_items(db: Session, messages: list) -> list[dict]:
                         "text": f"Looked at {count} passages in the knowledge base",
                     }
                 )
+            elif kind == "question_bank":
+                count = len(artifact.get("passages", []))
+                text = (
+                    "The question bank is empty"
+                    if artifact.get("empty")
+                    else f"Searched the question bank ({count} passages)"
+                )
+                items.append({"kind": "step", "text": text})
+            elif kind == "questions":
+                questions = artifact.get("questions", [])
+                if not questions:
+                    items.append(
+                        {"kind": "step", "text": "The CV has not been read yet"}
+                    )
+                    continue
+                text = (
+                    "Showed the questions saved for this interview"
+                    if artifact.get("saved")
+                    else f"Made {len(questions)} questions from the CV"
+                )
+                items.append({"kind": "step", "text": text})
+                items.append(artifact)
+            elif kind == "candidate_summary":
+                items.append({"kind": "step", "text": "Read the CV summary"})
             elif kind == "jd":
                 jd = db.get(JobDescription, artifact["jd_id"])
                 if jd is not None:

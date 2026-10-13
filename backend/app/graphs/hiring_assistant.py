@@ -23,6 +23,11 @@ shortlist and invite candidates.
   cancel interviews); nothing is saved until the interviewer confirms
   (§4B-7b), and everything is checked again at that moment.
 - One thread per job: thread_id "assistant-job-<id>".
+- Interview room mode (§4B-10): the same graph helps during a live interview
+  with its own thread per interview, "assistant-interview-<session id>"
+  (session_id in the state). It then gets only the room tools (question
+  bank, CV questions, CV summary, rag_search) and the room instructions; a
+  job chat waiting for a confirmation never blocks it. No interrupts here.
 - Retry path (§8.2): a tool call with invalid arguments is sent back to the
   LLM as an error message so it can correct itself.
 """
@@ -40,12 +45,13 @@ from sqlalchemy import select
 
 from app.ai.llm import invoke_llm
 from app.assistant import posting
-from app.assistant.prompts import ASSISTANT_PROMPT
+from app.assistant.prompts import ASSISTANT_PROMPT, ROOM_PROMPT
+from app.assistant.room_tools import ROOM_TOOLS, question_bank_size
 from app.assistant.schemas import JobDescriptionContent
-from app.assistant.tools import TOOLS
+from app.assistant.tools import TOOLS, rag_search
 from app.core import clock
 from app.db.database import SessionLocal
-from app.db.models import Job, JobDescription
+from app.db.models import InterviewSession, Job, JobDescription
 from app.db.models.job import JobBoardStatus, JobDescriptionStatus, JobStatus
 from app.interviews import planning
 from app.runs.runner import graph_config
@@ -53,7 +59,11 @@ from app.runs.runner import graph_config
 logger = logging.getLogger(__name__)
 
 THREAD_KIND = "assistant-job"
+ROOM_THREAD_KIND = "assistant-interview"
 MAX_STEPS = 30  # safety limit for one chat turn (stops endless tool loops)
+ROOM_TOOLSET = [*ROOM_TOOLS, rag_search]  # what the LLM may call in the room
+# Every tool the graph can run (each once, by name).
+ALL_TOOLS = list({t.name: t for t in [*TOOLS, *ROOM_TOOLSET]}.values())
 
 
 class AssistantState(MessagesState):
@@ -63,6 +73,7 @@ class AssistantState(MessagesState):
 
     job_id: int
     interviewer_id: int
+    session_id: int | None  # set in the interview room
     context: str
     review_action: str | None
 
@@ -74,8 +85,17 @@ def thread_config(job_id: int) -> dict:
     return config
 
 
+def room_thread_config(session_id: int) -> dict:
+    """LangGraph config for an interview's assistant thread (the room)."""
+    config = graph_config(ROOM_THREAD_KIND, session_id)
+    config["recursion_limit"] = MAX_STEPS
+    return config
+
+
 def load_context(state: AssistantState) -> dict:
     """Read the job, its saved profile and latest JD, as a summary for the LLM."""
+    if state.get("session_id"):
+        return {"context": room_context(state["session_id"]), "review_action": None}
     with SessionLocal() as db:
         job = db.get(Job, state["job_id"])
         latest = db.scalar(
@@ -102,13 +122,40 @@ def load_context(state: AssistantState) -> dict:
         }
 
 
+def room_context(session_id: int) -> str:
+    """What the LLM knows about the interview in the room. The candidate's
+    name is left out; CV facts come only through the tools (reduced)."""
+    with SessionLocal() as db:
+        session = db.get(InterviewSession, session_id)
+        job = db.get(Job, session.job_id)
+        requirements = "; ".join(
+            f"{r['text']} ({r['level']})"
+            for r in (job.profile or {}).get("requirements", [])
+        )
+        bank = question_bank_size(db)
+        return (
+            f"Now: {clock.local_text(clock.now())} ({clock.local_zone().key})\n"
+            f"Interview for the job: {job.title}\n"
+            f"Job requirements: {requirements or 'none saved'}\n"
+            f"Scheduled: {clock.local_text(session.scheduled_at)}, "
+            f"{session.duration_minutes} minutes\n"
+            f"Question bank documents: {bank}{' (empty)' if bank == 0 else ''}\n"
+            "CV questions already made for this interview: "
+            + ("yes" if session.cv_questions else "no")
+        )
+
+
 def assistant(state: AssistantState) -> dict:
-    """The LLM reads the chat and decides: reply, or call a tool."""
+    """The LLM reads the chat and decides: reply, or call a tool. In the
+    interview room it gets the room instructions and tools only."""
+    room = bool(state.get("session_id"))
+    instructions = ROOM_PROMPT if room else ASSISTANT_PROMPT
+    tools = ROOM_TOOLSET if room else TOOLS
     prompt = [
-        SystemMessage(f"{ASSISTANT_PROMPT}\n\n{state['context']}"),
+        SystemMessage(f"{instructions}\n\n{state['context']}"),
         *state["messages"],
     ]
-    answer = invoke_llm(prompt, prepare=lambda model: model.bind_tools(TOOLS))
+    answer = invoke_llm(prompt, prepare=lambda model: model.bind_tools(tools))
     return {"messages": [answer]}
 
 
@@ -333,7 +380,8 @@ def build_hiring_assistant(checkpointer):
     graph.add_node(
         "tools",
         ToolNode(
-            TOOLS, handle_tool_errors=(ToolInvocationError, ValidationError, ValueError)
+            ALL_TOOLS,
+            handle_tool_errors=(ToolInvocationError, ValidationError, ValueError),
         ),
     )
     graph.add_node("human_review", human_review)

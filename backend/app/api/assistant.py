@@ -1,5 +1,6 @@
 """Hiring Assistant API: read a job's chat, send a message, review the JD,
-confirm posting it, confirm interview invitations.
+confirm posting it, confirm interview invitations; and the assistant in the
+interview room (its own thread per interview, §4B-10).
 
 Interviewers only (N9); the candidate never sees the assistant (§4B-10).
 Every request runs the graph until it answers or pauses for review; the
@@ -18,15 +19,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.assistant import posting
+from app.assistant.room_tools import question_bank_size
 from app.assistant.schemas import JobDescriptionContent
 from app.assistant.thread_view import thread_items
 from app.auth.dependencies import CurrentUser, require_interviewer
 from app.db.database import get_db
-from app.db.models import Job, JobDescription
+from app.db.models import InterviewSession, Job, JobDescription
 from app.db.models.job import JobDescriptionStatus
 from app.graphs.hiring_assistant import (
     build_hiring_assistant,
     posting_message,
+    room_thread_config,
     thread_config,
 )
 
@@ -98,6 +101,15 @@ class InvitationDecisionRequest(BaseModel):
     items: list[InvitationItem] = Field(default=[], max_length=20)
 
 
+class RoomThreadOut(BaseModel):
+    """The interview room's assistant chat."""
+
+    session_id: int
+    items: list[dict]
+    question_bank_documents: int  # 0: the assistant suggests its own questions
+    cv_questions_saved: bool
+
+
 class ThreadOut(BaseModel):
     """The chat as the screen shows it, plus the review waiting (if any)."""
 
@@ -135,12 +147,19 @@ def _pending_kind(graph, db: Session, job_id: int) -> str | None:
 
 
 def _run(graph, graph_input, job_id: int) -> None:
+    """Run one turn of a job's chat (see _run_config)."""
+    _run_config(graph, graph_input, thread_config(job_id))
+
+
+def _run_config(graph, graph_input, config: dict) -> None:
     """Run one turn of the graph; a turn that never ends (the LLM keeps
     calling tools) is stopped by the step limit and gets a clear message."""
     try:
-        graph.invoke(graph_input, thread_config(job_id))
+        graph.invoke(graph_input, config)
     except GraphRecursionError:
-        logger.warning("Assistant turn hit the step limit: job %d", job_id)
+        logger.warning(
+            "Assistant turn hit the step limit: %s", config["configurable"]["thread_id"]
+        )
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, STUCK) from None
 
 
@@ -263,3 +282,74 @@ def post_again(
     result = posting.post_job(job_id)
     graph.update_state(thread_config(job_id), {"messages": [posting_message(result)]})
     return _thread(graph, db, job_id)
+
+
+# ---------- the assistant in the interview room ----------
+
+
+def _session(db: Session, session_id: int) -> InterviewSession:
+    """The interview, or 404."""
+    session = db.get(InterviewSession, session_id)
+    if session is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, "This interview no longer exists."
+        )
+    return session
+
+
+def _room_thread(graph, db: Session, session: InterviewSession) -> RoomThreadOut:
+    """Read the interview's assistant thread."""
+    snapshot = graph.get_state(room_thread_config(session.id))
+    messages = snapshot.values.get("messages", []) if snapshot.values else []
+    return RoomThreadOut(
+        session_id=session.id,
+        items=thread_items(db, messages),
+        question_bank_documents=question_bank_size(db),
+        cv_questions_saved=session.cv_questions is not None,
+    )
+
+
+@router.get("/interviews/{session_id}/thread", response_model=RoomThreadOut)
+def get_room_thread(
+    session_id: int, request: Request, db: Annotated[Session, Depends(get_db)]
+) -> RoomThreadOut:
+    """The assistant chat of one interview (prepared before or used during
+    the call)."""
+    return _room_thread(_graph(request), db, _session(db, session_id))
+
+
+@router.post("/interviews/{session_id}/messages", response_model=RoomThreadOut)
+def send_room_message(
+    session_id: int,
+    body: MessageRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_interviewer)],
+) -> RoomThreadOut:
+    """Ask the assistant during the interview, e.g. for questions."""
+    session = _session(db, session_id)
+    graph = _graph(request)
+    graph_input = {
+        "messages": [HumanMessage(body.text)],
+        "job_id": session.job_id,
+        "interviewer_id": user.id,
+        "session_id": session.id,
+    }
+    _run_config(graph, graph_input, room_thread_config(session.id))
+    db.refresh(session)  # CV questions may have been saved meanwhile
+    return _room_thread(graph, db, session)
+
+
+@router.post("/interviews/{session_id}/retry", response_model=RoomThreadOut)
+def retry_room_turn(
+    session_id: int, request: Request, db: Annotated[Session, Depends(get_db)]
+) -> RoomThreadOut:
+    """Continue a room turn that stopped because the AI failed (the message
+    was saved; it is not sent again)."""
+    session = _session(db, session_id)
+    graph = _graph(request)
+    config = room_thread_config(session.id)
+    if graph.get_state(config).next:
+        _run_config(graph, None, config)
+    db.refresh(session)
+    return _room_thread(graph, db, session)
