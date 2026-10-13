@@ -206,6 +206,7 @@ Other external services (N18):
 
 | Service | What it receives |
 |---|---|
+| Deepgram, through the `transcriber` | The interview audio of both people while the interview is live (streamed, not stored by CandiVue; `mip_opt_out=true` asks Deepgram not to use it for training). It returns the text. |
 | Blogger (Google), through `jobboard-mcp` | The approved job description (title, text, requirements) and the Google Form link. No candidate data. |
 | Gmail (Google), through `email-mcp` | Interview invitations and cancellations: the candidate's name and email address, the job title, the interview date and time, and the private interview link (also in the attached calendar invite). While `EMAIL_TEST_RECIPIENT` is set, every email goes to that test address instead. |
 | Google Calendar, through `calendar-mcp` | The interviewer's own calendar: one event per interview with the candidate's name, the job title, the time and the interviewer's room link (no email address, no scores). To find busy times only the start and end of events are read, never their titles. |
@@ -420,6 +421,66 @@ or mute the tab that is not speaking, to avoid echo.
 `LIVEKIT_NODE_IP` and `LIVEKIT_BIND_ADDRESS` in `.env` to this computer's
 network address (e.g. `192.168.1.20`) and use HTTPS for the app (see
 *Transport security*: phones only allow the camera on HTTPS).
+
+## Live transcript (speech-to-text, F4)
+
+While an interview is live, the **transcriber** container listens to the
+call and writes a speaker-attributed, timestamped transcript. Speech-to-text
+is done by **Deepgram** (Nova-3, English), streamed over a WebSocket.
+
+```
+browser ⇄ LiveKit ⇄ transcriber (hidden, listen-only participant)
+                       │ one audio stream per person (16 kHz)
+                       ▼
+                   Deepgram ──► final pieces of speech ──► transcript_turns
+                                                              │ every 1.5 s
+                         interviewer's room: Live transcript ◄┘
+```
+
+- **Speaker attribution:** each person's microphone is its own stream, so
+  the speaker is known from the track (interviewer or candidate); no
+  guessing from mixed audio. Both talking at once gives two overlapping
+  turns.
+- **Turns:** what one person says until they pause (1.2 s or more between
+  words, from Deepgram's word times, or Deepgram's "utterance end"). A turn
+  is saved with its first words and grows while the person speaks, so a
+  long answer appears live; times are milliseconds from the start of the
+  interview. Very long answers are split every 45 s. A choppy connection
+  does not chop a sentence into one-word lines.
+- **Where to read it:** a compact card under the call, and a full-height
+  **Transcript** tab beside it (larger text, the speaker and time once per
+  run of their lines, Copy the whole transcript). The card's expand icon
+  opens the tab; while the tab is open the card hides, so the video is
+  larger.
+- **Nothing is lost:** each turn is saved at once. If Deepgram or the
+  network drops, the stream reconnects (a few seconds may be missing); a
+  person who reconnects gets a new stream; a restarted transcriber joins
+  the live interviews again. When the interview ends, the last words are
+  fetched and saved before it leaves.
+- **Status in the room:** Listening, Starting…, Not running (the
+  transcriber is down), or the problem (e.g. "Deepgram refused the API
+  key", "no credit left"), and "paused while the call reconnects".
+- **Technical words:** the job's requirement names (e.g. Laravel, Docker)
+  are sent to Deepgram as key terms (Nova-3 "keyterm prompting"), so they
+  are recognised more reliably. Only job words, nothing about the candidate.
+- The transcriber checks every 2 s for live calls and joins only while the
+  interviewer or the candidate is in the call (the first 2-3 seconds of a
+  call can be missed); it leaves a room nobody has been in for 2 minutes.
+- **Measured** (two browsers, synthetic speech, this laptop): words appear
+  about 1-2 s after they are spoken; speakers always right; a 15 s mute
+  keeps the stream open; a reload continues with the new microphone; all
+  turns kept after the end. Times are accurate to about a second.
+- **Privacy:** audio is streamed to Deepgram and kept in memory only, never
+  stored (N16); Deepgram is asked not to use it for training
+  (`mip_opt_out=true`). The transcript is interviewer-only: candidates
+  get 403 (N9).
+- API: `GET /api/interviews/{id}/transcript?since=<time>` (turns new or
+  changed since then, plus the status).
+
+Setup: create an API key at deepgram.com and put it in `.env` as
+`DEEPGRAM_API_KEY`; `docker compose up -d`. Only the `transcriber`
+container receives it. It shares LiveKit's network (`network_mode`), because
+LiveKit tells participants to send media to 127.0.0.1.
 
 ## Email (interview invitations)
 
