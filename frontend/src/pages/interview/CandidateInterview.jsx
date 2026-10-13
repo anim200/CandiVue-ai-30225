@@ -38,7 +38,7 @@ import { apiGet, apiPost } from '../../api/client';
 import { HELP_EMAIL } from '../../config';
 import { whenText } from '../../utils/dates';
 import { formatElapsed, startsIn, useElapsed, useNow } from './callTime';
-import CallView, { CallConnection } from './CallView';
+import CallView, { CallConnection, onDeviceFailure } from './CallView';
 import classes from './CandidateInterview.module.css';
 import { liveKitUrl } from './liveKit';
 import RoomChat from './RoomChat';
@@ -488,6 +488,7 @@ export default function CandidateInterview({ onEnded }) {
         audio={devices.micOn ? (devices.micId ? { deviceId: devices.micId } : true) : false}
         video={devices.cameraOn ? (devices.cameraId ? { deviceId: devices.cameraId } : true) : false}
         className={classes.callWrap}
+        onMediaDeviceFailure={onDeviceFailure}
         onDisconnected={(reason) => {
           if (reason === DisconnectReason.ROOM_DELETED) finished(); // the interviewer ended it
           if (reason === DisconnectReason.DUPLICATE_IDENTITY) {

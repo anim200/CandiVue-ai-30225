@@ -60,6 +60,38 @@ function useFullScreen(ref) {
   return [isFull, toggle];
 }
 
+// What to do when the browser cannot use a device, in plain words.
+// what: "microphone", "camera" or "screen".
+export function deviceProblem(error, what) {
+  switch (error?.name) {
+    case 'NotAllowedError':
+    case 'SecurityError':
+      return `The browser blocked the ${what}. Click the icon left of the address bar, set ${
+        what === 'camera' ? 'Camera' : 'Microphone'
+      } to Allow, then reload the page. On Windows also check Settings → Privacy & security → ${
+        what === 'camera' ? 'Camera' : 'Microphone'
+      }.`;
+    case 'NotFoundError':
+    case 'OverconstrainedError':
+      return `No ${what} was found. Plug one in (or choose another in the browser settings), then try again.`;
+    case 'NotReadableError':
+    case 'AbortError':
+      return `Another app (e.g. Teams or Zoom) or another browser window is using the ${what}. Close it, then try again.`;
+    default:
+      return `Try again. If it keeps failing, reload the page; you rejoin the same interview.`;
+  }
+}
+
+// For <LiveKitRoom onMediaDeviceFailure>: the microphone or camera could
+// not be turned on when joining (e.g. blocked by the browser).
+const FAILURE_NAMES = { PermissionDenied: 'NotAllowedError', NotFound: 'NotFoundError', DeviceInUse: 'NotReadableError' };
+export function onDeviceFailure(failure, kind) {
+  const what = kind === 'videoinput' ? 'camera' : 'microphone';
+  notifyError(`Your ${what} couldn’t be turned on.`, {
+    message: deviceProblem({ name: FAILURE_NAMES[failure] }, what),
+  });
+}
+
 // Initials for a camera-off tile, e.g. "Alex Strong" → "AS".
 function initials(name) {
   return (name || '?')
@@ -155,10 +187,9 @@ export default function CallView({ role, otherName, waiting, banner, extraContro
     try {
       await action();
     } catch (error) {
-      if (error?.name === 'NotAllowedError') return; // e.g. the share picker was closed
-      notifyError(`Your ${what} couldn’t be switched.`, {
-        message: 'Another app may be using it, or the browser blocked it (see the icon in the address bar).',
-      });
+      // Closing the screen-share picker is a choice, not an error.
+      if (what === 'screen' && error?.name === 'NotAllowedError') return;
+      notifyError(`Your ${what} couldn’t be turned on.`, { message: deviceProblem(error, what) });
     }
   }
 

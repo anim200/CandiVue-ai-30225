@@ -1,8 +1,9 @@
 // The interviewer's live interview. Changes from the design (Live Interview,
 // option 1a), on the user's request (13-10-2026): the candidate's CV in the
-// left column instead of the app menu; the call (16:9) with the live
-// transcript under it; on the right the Hiring Assistant and a chat with the
-// candidate as tabs. The identity check (F7) sits in the CV column until it
+// left column instead of the app menu; the call with the live transcript
+// under it; on the right the Hiring Assistant, a chat with the candidate and
+// the full transcript as tabs (the transcript tab hides the small card under
+// the call, so the video gets the room). The identity check (F7) sits in the CV column until it
 // is built.
 // Waiting room: the candidate waits until "Let in" (the backend refuses
 // their ticket before that). This page sends a heartbeat every few seconds,
@@ -13,13 +14,7 @@
 
 import { Button, Drawer } from '@mantine/core';
 import { useDocumentTitle, useMediaQuery } from '@mantine/hooks';
-import {
-  IconArrowLeft,
-  IconFileText,
-  IconMessageCircle,
-  IconSparkles,
-  IconTextCaption,
-} from '@tabler/icons-react';
+import { IconArrowLeft, IconFileText, IconMessageCircle, IconSparkles, IconTextCaption } from '@tabler/icons-react';
 import { LiveKitRoom } from '@livekit/components-react';
 import { DisconnectReason } from 'livekit-client';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -30,12 +25,13 @@ import ConfirmModal from '../../components/ConfirmModal';
 import { ErrorBanner, Skeleton } from '../../components/Feedback';
 import { notifyDone, notifyError } from '../../components/notify';
 import { formatElapsed, overText, useElapsed } from './callTime';
-import CallView, { CallConnection } from './CallView';
+import CallView, { CallConnection, onDeviceFailure } from './CallView';
 import CvPanel from './CvPanel';
 import classes from './InterviewRoom.module.css';
 import { liveKitUrl } from './liveKit';
 import RoomAssistant from './RoomAssistant';
 import RoomChat from './RoomChat';
+import { TranscriptView, useTranscript } from './TranscriptPanel';
 
 const HEARTBEAT_MS = 4000;
 
@@ -128,6 +124,7 @@ function Room({ interview, interviewId, onInterview, onEnd, ending }) {
     if (!interview.started_at) apiGet(`/interviews/${interviewId}`).then(onInterview).catch(() => {});
   }, [interview.started_at, interviewId, onInterview]);
   const [lobby, admit] = useLobby(interviewId, refreshStart);
+  const transcript = useTranscript(interviewId); // one poll for both views
   const [tab, setTab] = useState('assistant');
   const [unread, setUnread] = useState(0);
   const [cvOpen, setCvOpen] = useState(true);
@@ -200,17 +197,14 @@ function Room({ interview, interviewId, onInterview, onEnd, ending }) {
             onFinish={onEnd}
             finishing={ending}
           />
-          <section className={classes.transcript}>
-            <div className={classes.panelHead}>
-              <IconTextCaption size={16} />
-              Live transcript
-              <span className={classes.panelNote}>Saved as you go</span>
-            </div>
-            <div className={classes.transcriptEmpty}>
-              The transcript appears here as soon as someone speaks.
-              <span className={classes.soon}>Speech-to-text isn’t switched on yet.</span>
-            </div>
-          </section>
+          {tab !== 'transcript' && (
+            <TranscriptView
+              data={transcript}
+              candidateName={name}
+              onExpand={() => setTab('transcript')}
+              className={classes.transcript}
+            />
+          )}
         </main>
 
         <aside className={classes.side}>
@@ -221,9 +215,9 @@ function Room({ interview, interviewId, onInterview, onEnd, ending }) {
               aria-selected={tab === 'assistant'}
               className={`${classes.tab} ${tab === 'assistant' ? classes.tabActive : ''}`}
               onClick={() => setTab('assistant')}
+              title="Only you see the assistant; the candidate never does"
             >
               <IconSparkles size={16} /> Assistant
-              <span className={classes.private}>Only you</span>
             </button>
             <button
               type="button"
@@ -234,6 +228,17 @@ function Room({ interview, interviewId, onInterview, onEnd, ending }) {
             >
               <IconMessageCircle size={16} /> Chat
               {unread > 0 && <span className={classes.unread}>{unread}</span>}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'transcript'}
+              className={`${classes.tab} ${tab === 'transcript' ? classes.tabActive : ''}`}
+              onClick={() => setTab('transcript')}
+              title="Only you see the transcript; the candidate never does"
+            >
+              <IconTextCaption size={16} /> Transcript
+              {transcript.status === 'listening' && <span className={classes.liveDot} title="Listening" />}
             </button>
           </div>
           {/* Both stay mounted, so neither loses its messages when hidden. */}
@@ -248,6 +253,9 @@ function Room({ interview, interviewId, onInterview, onEnd, ending }) {
               active={tab === 'chat'}
               onUnread={setUnread}
             />
+          </div>
+          <div className={classes.tabPanel} hidden={tab !== 'transcript'}>
+            <TranscriptView data={transcript} candidateName={name} variant="full" />
           </div>
         </aside>
       </div>
@@ -350,6 +358,7 @@ export default function InterviewRoomPage() {
       audio
       video
       className={classes.roomWrap}
+      onMediaDeviceFailure={onDeviceFailure}
       onDisconnected={(reason) => {
         if (reason === DisconnectReason.ROOM_DELETED) navigate('/interviews'); // ended elsewhere
         if (reason === DisconnectReason.DUPLICATE_IDENTITY) setElsewhere(true);

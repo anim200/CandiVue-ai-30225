@@ -140,48 +140,11 @@
   gap: 12px;
 }
 
-/* A slim card under the call; it takes any height left over (later: the
-   transcript lines). */
+/* The live transcript card under the call (TranscriptPanel); it takes any
+   height left over and scrolls inside. */
 .transcript {
-  flex: 1 0 92px;
-  display: flex;
-  flex-direction: column;
+  flex: 1 0 130px;
   width: 100%;
-  background: #fff;
-  border: 1px solid #e3e7ea;
-  border-radius: 12px;
-}
-
-.panelHead {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border-bottom: 1px solid #e9ecee;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.panelNote {
-  margin-left: auto;
-  font-size: 12px;
-  font-weight: 500;
-  color: #66717a;
-}
-
-.transcriptEmpty {
-  padding: 10px 14px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 2px 8px;
-  font-size: 14px;
-  color: #48535b;
-}
-
-.soon {
-  font-size: 12.5px;
-  color: #8a959c;
 }
 
 /* Assistant and chat tabs. */
@@ -243,10 +206,13 @@
   transform: scaleX(1);
 }
 
-.private {
-  font-size: 11px;
-  font-weight: 500;
-  color: #8a959c;
+/* Green dot on the Transcript tab while speech-to-text listens. */
+.liveDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2d7a4e;
+  animation: pulse 1.6s ease-in-out infinite;
 }
 
 .unread {
@@ -401,6 +367,7 @@
 
   .transcript {
     flex: none;
+    height: 280px; /* the page scrolls on phones and tablets */
   }
 
   .side {
@@ -420,6 +387,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .live::before,
+  .liveDot,
   .pulse,
   .unread,
   .cvColumn {
