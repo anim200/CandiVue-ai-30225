@@ -95,14 +95,19 @@ services:
 
   # Downloads the local models once: the embedding model (about 640 MB) and
   # the screening model (about 2.5 GB). Afterwards they are already in the
-  # volume and this finishes at once.
+  # volume and this finishes at once. If Ollama's online registry cannot be
+  # reached (offline, or an outage on their side) a model that is already
+  # downloaded is used as it is ("ollama show" finds it), so the app still
+  # starts; it only fails when a model is really missing.
   ollama-pull:
     image: ollama/ollama:0.35.1
     environment:
       OLLAMA_HOST: http://ollama:11434
     entrypoint: ["/bin/sh", "-c"]
     command:
-      - ollama pull "${EMBEDDING_MODEL:-qwen3-embedding:0.6b}" && ollama pull "${SCREENING_MODEL:-qwen3:4b-instruct}"
+      - >-
+        for model in "${EMBEDDING_MODEL:-qwen3-embedding:0.6b}" "${SCREENING_MODEL:-qwen3:4b-instruct}";
+        do ollama pull "$$model" || ollama show "$$model" > /dev/null || exit 1; done
     restart: "no"
     depends_on:
       ollama:
@@ -220,6 +225,38 @@ services:
     depends_on:
       backend:
         condition: service_healthy  # the backend has applied the migrations
+
+  # Live transcript (F4): joins every live interview as a hidden, listen-only
+  # participant, streams each speaker's audio to Deepgram and saves the
+  # transcript turns. Same image as the backend, other command. Only this
+  # container gets DEEPGRAM_API_KEY. It shares LiveKit's network: LiveKit
+  # tells every participant to send media to 127.0.0.1 (right for the
+  # browsers on this computer), and here 127.0.0.1 is LiveKit itself. The
+  # database is still reached by its name (db) on Docker's network.
+  transcriber:
+    build:
+      context: ./backend
+      target: runtime
+    restart: unless-stopped
+    command: ["python", "-m", "app.transcriber"]
+    network_mode: "service:livekit"
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Dhaka}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # Required by the shared settings; the transcriber never signs logins.
+      JWT_SECRET: not-used-by-the-transcriber-00000000
+      LIVEKIT_URL: http://127.0.0.1:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-candivue}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET in .env}
+      DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
+      DEEPGRAM_MODEL: ${DEEPGRAM_MODEL:-nova-3}
+      DEEPGRAM_LANGUAGE: ${DEEPGRAM_LANGUAGE:-en}
+    depends_on:
+      backend:
+        condition: service_healthy  # the backend has applied the migrations
+      livekit:
+        condition: service_started
 
   # Tests for the job board MCP server (no real Blogger calls).
   # Run: docker compose run --rm --build jobboard-tests

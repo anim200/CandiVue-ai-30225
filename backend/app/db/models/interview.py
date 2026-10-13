@@ -71,6 +71,12 @@ class InterviewSession(TimestampMixin, Base):
     # Interview questions made from the CV, kept so they are made once per
     # interview: {"model", "made_at", "questions": [...]}.
     cv_questions: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    # Live transcript (F4): the transcriber's heartbeat while it listens, and
+    # why it cannot transcribe (safe to show), e.g. a refused Deepgram key.
+    transcriber_seen_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    transcript_problem: Mapped[str | None] = mapped_column(String(200))
 
 
 class Speaker(StrEnum):

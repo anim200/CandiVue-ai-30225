@@ -2,7 +2,7 @@
 
 from functools import lru_cache
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -61,6 +61,13 @@ class Settings(BaseSettings):
     livekit_api_key: str = "candivue"
     livekit_api_secret: SecretStr | None = None
 
+    # Live transcript (F4): the transcriber container streams each speaker's
+    # audio to Deepgram. Only that container gets the key. Empty: the room
+    # says "speech-to-text is not set up".
+    deepgram_api_key: SecretStr | None = None
+    deepgram_model: str = "nova-3"
+    deepgram_language: str = "en"
+
     # CV Collector (app/collector, cv-collector container). The Google key is
     # given only to that container (read-only service account, N7).
     google_service_account_key: SecretStr | None = None  # JSON or base64 JSON
@@ -84,6 +91,20 @@ class Settings(BaseSettings):
     demo_interviewer_email: str | None = None
     demo_interviewer_name: str = "Interviewer A"
     demo_interviewer_password: SecretStr | None = None
+
+    @field_validator(
+        "llm_api_key",
+        "livekit_api_secret",
+        "deepgram_api_key",
+        "google_service_account_key",
+        "demo_interviewer_password",
+        mode="before",
+    )
+    @classmethod
+    def empty_secret_is_unset(cls, value):
+        """An empty value (e.g. "DEEPGRAM_API_KEY=" in .env, which Docker
+        passes as "") means the secret is not set."""
+        return None if isinstance(value, str) and not value.strip() else value
 
     @property
     def llm_model_list(self) -> list[str]:

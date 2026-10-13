@@ -11,12 +11,12 @@ makes a new link; the previous one stops working.
 
 In the room: the interviewer's page sends a heartbeat (presence) and sees
 whether the candidate waits; "Let in" admits them (the candidate's ticket
-needs it). The chat with the candidate and the candidate's CV panel are
-here too.
+needs it). The chat with the candidate, the candidate's CV panel and the
+live transcript (F4, written by the transcriber service) are here too.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import CurrentUser, require_interviewer
 from app.core import clock
 from app.db.database import get_db
-from app.db.models import Candidate, InterviewSession, Job, User
+from app.db.models import Candidate, InterviewSession, Job, TranscriptTurn, User
 from app.db.models.interview import InvitationStatus, SessionStatus, Speaker
 from app.interviews import calendar_sync, chat, cv_view, emails, planning, room
 
@@ -40,6 +40,11 @@ router = APIRouter(
 )
 
 NOT_FOUND = "This interview no longer exists."
+# A live interview without the transcriber for this long: it is not running.
+TRANSCRIBER_GRACE_SECONDS = 30
+# Turns changed shortly before `since` are sent again (clocks and slow
+# saves); the page merges them by id.
+SINCE_OVERLAP = timedelta(seconds=3)
 NOT_ACTIVE = "This interview has ended or was cancelled."
 NOT_INVITED = (
     "The candidate has not been emailed the invitation yet: send it first "
@@ -71,6 +76,26 @@ class LobbyOut(BaseModel):
     candidate_waiting: bool
     admitted: bool
     status: SessionStatus
+
+
+class TurnOut(BaseModel):
+    """One transcript turn: who, what, and when (ms from the start)."""
+
+    id: int
+    speaker: Speaker
+    text: str
+    start_ms: int
+    end_ms: int
+
+
+class TranscriptOut(BaseModel):
+    """The live transcript: turns new or changed since `since`, the time to
+    ask from next, and whether speech-to-text is working."""
+
+    turns: list[TurnOut]
+    server_time: datetime
+    status: Literal["waiting", "starting", "listening", "off", "problem", "ended"]
+    problem: str | None
 
 
 class MessageIn(BaseModel):
@@ -181,6 +206,30 @@ def candidate_cv(interview_id: int, db: Annotated[Session, Depends(get_db)]) -> 
     return cv_view.overview(db, _found(db, interview_id))
 
 
+@router.get("/{interview_id}/transcript", response_model=TranscriptOut)
+def transcript(
+    interview_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    since: datetime | None = None,
+) -> TranscriptOut:
+    """The live transcript (interviewers only; candidates never see it, N9):
+    every turn, or only those new or changed since `since` (a growing turn
+    changes while the person speaks)."""
+    session = _found(db, interview_id)
+    now = clock.now()
+    query = select(TranscriptTurn).where(TranscriptTurn.session_id == session.id)
+    if since is not None:
+        query = query.where(TranscriptTurn.updated_at > since - SINCE_OVERLAP)
+    turns = db.scalars(query.order_by(TranscriptTurn.start_ms, TranscriptTurn.id))
+    state, problem = _transcript_status(session, now)
+    return TranscriptOut(
+        turns=[TurnOut.model_validate(t, from_attributes=True) for t in turns],
+        server_time=now,
+        status=state,
+        problem=problem,
+    )
+
+
 @router.get("/{interview_id}/messages")
 def list_messages(
     interview_id: int,
@@ -249,6 +298,24 @@ def cancel(interview_id: int, db: Annotated[Session, Depends(get_db)]) -> Cancel
     calendar = calendar_sync.sync(db, session)
     db.commit()
     return CancelOut(email=email, calendar=calendar)
+
+
+def _transcript_status(
+    session: InterviewSession, now: datetime
+) -> tuple[str, str | None]:
+    """Whether speech-to-text works for this interview, and why not."""
+    if session.status in (SessionStatus.ENDED, SessionStatus.CANCELLED):
+        return "ended", None
+    if session.status == SessionStatus.SCHEDULED:
+        return "waiting", None
+    if session.transcript_problem:
+        return "problem", session.transcript_problem
+    if room.is_present(session.transcriber_seen_at):
+        return "listening", None
+    started = session.started_at
+    if started and now - started > timedelta(seconds=TRANSCRIBER_GRACE_SECONDS):
+        return "off", None
+    return "starting", None
 
 
 def _out(db: Session, session: InterviewSession) -> InterviewOut:
