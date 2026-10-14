@@ -239,6 +239,9 @@ services:
       target: runtime
     restart: unless-stopped
     command: ["python", "-m", "app.transcriber"]
+    # On stop/restart it first sends the audio still waiting and saves the
+    # last words (up to ~12 s on a slow network); Docker's default is 10 s.
+    stop_grace_period: 15s
     network_mode: "service:livekit"
     environment:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}

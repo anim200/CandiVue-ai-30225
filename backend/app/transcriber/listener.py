@@ -14,29 +14,43 @@ words still being recognised ("interim") appear while they are spoken, and
 every saved turn at once; the page also asks the backend every few seconds,
 so nothing depends on the push.
 
+No speech is lost on a slow or unreliable network: every audio piece is
+taken from LiveKit at once and kept ("waiting") until a final result from
+Deepgram covers it. A connection that stops answering is noticed within
+about PING_TIMEOUT_SECONDS; the next connection sends the waiting audio
+first, so the words come back late but complete, and nothing is repeated
+(audio Deepgram has finished is never sent again). Turn times come from
+when each piece was heard (Timeline), so they stay right after a muted
+microphone or a reconnect.
+
 Edge cases:
 - Deepgram drops or cannot be reached: reconnect with a growing pause; the
-  open turn is closed and the transcript continues. At most
-  MAX_BACKLOG_SECONDS of audio waits meanwhile (older audio is dropped, so
-  a long outage does not end in a burst of stale speech). A refused key or
-  an empty account stops it with a clear problem shown in the room.
+  open turn is closed and the transcript continues where Deepgram left off.
+  Up to MAX_WAITING_SECONDS of audio waits meanwhile (after that the oldest
+  is dropped, with a warning in the log). A refused key or an empty account
+  stops it with a clear problem shown in the room.
 - A muted microphone sends no audio: KeepAlive keeps the stream open.
 - A person reconnects: their old track ends (its last words are saved),
   the new track gets a new stream. Both talking at once: two streams, so
   two overlapping turns.
 - The interview ends (room closed), nobody is left in the call for
-  EMPTY_LEAVE_SECONDS, or the transcriber itself is stopped: CloseStream
-  makes Deepgram return the last words and close; they are saved first.
+  EMPTY_LEAVE_SECONDS, or the transcriber itself is stopped: the audio heard
+  until then is sent, and CloseStream makes Deepgram return the last words
+  and close; they are saved first. If Deepgram does not answer within
+  FINAL_WAIT_SECONDS, the last live (interim) words are saved instead.
 - While listening it writes a heartbeat (transcriber_seen_at), so the room
   shows "Listening"; any problem goes to transcript_problem.
 """
 
 import asyncio
+import bisect
 import contextlib
 import json
 import logging
 import time
+from collections import deque
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import timedelta
 
 import websockets
@@ -59,10 +73,14 @@ TOPIC = "transcript"  # data-channel topic the interviewer's page listens to
 HEARTBEAT_SECONDS = 5
 EMPTY_LEAVE_SECONDS = 120  # leave a room nobody has been in for 2 minutes
 KEEP_ALIVE_SECONDS = 4  # Deepgram closes after ~10 s without data
-FINAL_WAIT_SECONDS = 3  # how long to wait for the last words at the end
+PING_SECONDS = 5  # check the Deepgram connection this often ...
+PING_TIMEOUT_SECONDS = 10  # ... and give it up after this long without answer
+FINAL_WAIT_SECONDS = 6  # how long to wait for the last words at the end
 RETRY_WAIT = (1, 2, 4, 8, 15)  # seconds between reconnects (then 15 s)
 FRAME_MS = 50  # audio sent to Deepgram in 50 ms pieces (20 messages a second)
-MAX_BACKLOG_SECONDS = 5  # audio kept while Deepgram is out of reach
+BYTES_PER_MS = deepgram.SAMPLE_RATE * 2 // 1000  # 16-bit mono: 32 bytes per ms
+MAX_WAITING_SECONDS = 120  # audio kept while Deepgram is slow or out of reach
+MAX_WAITING_PIECES = MAX_WAITING_SECONDS * 1000 // FRAME_MS
 INTERIM_EVERY_SECONDS = 0.15  # at most ~7 live updates a second per speaker
 SPEAKERS = {"interviewer": Speaker.INTERVIEWER, "candidate": Speaker.CANDIDATE}
 
@@ -145,8 +163,57 @@ def turn_message(row_id: int, speaker: Speaker, turn: TurnState) -> dict:
     }
 
 
+@dataclass
+class Piece:
+    """One piece of a person's audio (usually 50 ms).
+    number: counts up from 1, so a piece can be found after older ones are
+    forgotten. heard_ms: when it was heard (ms from the interview start).
+    stream_end: where it ends in Deepgram's time on the connection that
+    last sent it."""
+
+    number: int
+    data: bytes
+    heard_ms: int
+    stream_end: int = 0
+
+
+class Timeline:
+    """Deepgram's times on one connection → interview times.
+
+    Deepgram counts from the first audio byte of a connection. That is not a
+    fixed offset from the interview start: a muted microphone sends nothing
+    for a while, and after a reconnect older audio is sent first. So each
+    piece sent records where it starts in Deepgram's time and when it was
+    heard."""
+
+    def __init__(self):
+        self.starts: list[int] = []  # ms in Deepgram's time
+        self.heard: list[int] = []  # ms from the interview start
+        self.end = 0
+
+    def add(self, piece: Piece) -> None:
+        """A piece goes out on this connection."""
+        self.starts.append(self.end)
+        self.heard.append(piece.heard_ms)
+        self.end += len(piece.data) // BYTES_PER_MS
+        piece.stream_end = self.end
+
+    def to_ms(self, seconds: float) -> int:
+        """Deepgram seconds → ms from the interview start."""
+        if not self.starts:
+            return 0
+        stream_ms = round(seconds * 1000)
+        i = max(bisect.bisect_right(self.starts, stream_ms) - 1, 0)
+        return self.heard[i] + stream_ms - self.starts[i]
+
+
 class SpeakerStream:
-    """One person's microphone → Deepgram → saved turns (and live pushes)."""
+    """One person's microphone → Deepgram → saved turns (and live pushes).
+
+    A reader takes every audio piece from LiveKit at once and keeps it in
+    `waiting` until Deepgram has finished it; each connection sends from
+    there. last_sent: number of the last piece the current connection
+    sent."""
 
     def __init__(
         self,
@@ -167,51 +234,118 @@ class SpeakerStream:
             sample_rate=deepgram.SAMPLE_RATE,
             num_channels=1,
             frame_size_ms=FRAME_MS,
-            capacity=MAX_BACKLOG_SECONDS * 1000 // FRAME_MS,
         )
+        self.waiting: deque[Piece] = deque()
+        self.count = 0  # pieces read so far
+        self.last_sent = 0
+        self.new_audio = asyncio.Event()  # audio arrived, the track ended or stop
+        self.track_ended = False
         self.stopping = asyncio.Event()
+        self.stopped_ms: int | None = None  # audio heard after this is not sent
+        self.unsaved: deepgram.Interim | None = None  # live words, not final yet
+        self.failures = 0
         self._last_interim = 0.0
+        self._warned = False
 
     async def run(self) -> None:
-        """Stream until stopped; reconnect to Deepgram when it drops."""
-        failures = 0
-        while not self.stopping.is_set():
-            try:
-                await self._stream_once()
-                failures = 0
-            except deepgram.DeepgramError as error:
-                failures += 1
-                await asyncio.to_thread(set_problem, self.session_id, str(error))
-                logger.warning(
-                    "Deepgram problem: session %d, %s", self.session_id, error
-                )
-                if not error.retry:
-                    break  # e.g. a refused key: retrying cannot help
-            except Exception as error:  # noqa: BLE001 - network drop: try again
-                failures += 1
-                logger.warning(
-                    "Transcript stream dropped (%s): session %d",
-                    type(error).__name__,
-                    self.session_id,
-                )
-                if failures >= 3:
-                    await asyncio.to_thread(
-                        set_problem,
-                        self.session_id,
-                        "Deepgram can't be reached right now: retrying.",
+        """Stream until the person leaves or we stop; reconnect to Deepgram
+        when it drops (the next connection sends the waiting audio first)."""
+        reader = asyncio.create_task(self._read_audio())
+        try:
+            while True:
+                try:
+                    await self._stream_once()
+                    break  # all audio sent and the last words saved
+                except deepgram.DeepgramError as error:
+                    self.failures += 1
+                    await asyncio.to_thread(set_problem, self.session_id, str(error))
+                    logger.warning(
+                        "Deepgram problem: session %d, %s", self.session_id, error
                     )
-            if not self.stopping.is_set():
-                wait = RETRY_WAIT[min(failures, len(RETRY_WAIT)) - 1] if failures else 1
+                    if not error.retry:
+                        break  # e.g. a refused key: retrying cannot help
+                except Exception as error:  # noqa: BLE001 - network drop: try again
+                    self.failures += 1
+                    logger.warning(
+                        "Transcript stream dropped (%s): session %d",
+                        type(error).__name__,
+                        self.session_id,
+                    )
+                    if self.failures >= 3:
+                        await asyncio.to_thread(
+                            set_problem,
+                            self.session_id,
+                            "Deepgram can't be reached right now: retrying.",
+                        )
+                if self.stopping.is_set():
+                    break  # shutting down: no time for another connection
+                wait = RETRY_WAIT[min(self.failures, len(RETRY_WAIT)) - 1]
                 with contextlib.suppress(TimeoutError):
                     await asyncio.wait_for(self.stopping.wait(), timeout=wait)
-        await self._send_live(
-            {"kind": "interim", "speaker": self.speaker.value, "text": ""}
-        )
-        await self.audio.aclose()
+        finally:
+            reader.cancel()
+            await self._send_live(
+                {"kind": "interim", "speaker": self.speaker.value, "text": ""}
+            )
+            await self.audio.aclose()
 
     async def stop(self) -> None:
-        """Finish: the stream asks Deepgram for the last words and saves them."""
-        self.stopping.set()
+        """Finish: send the audio heard until now, then save the last words."""
+        if not self.stopping.is_set():
+            self.stopped_ms = self._now_ms()
+            self.stopping.set()
+            self.new_audio.set()
+
+    def _now_ms(self) -> int:
+        """Milliseconds since the interview started."""
+        return max(round((clock.now() - self.started_at).total_seconds() * 1000), 0)
+
+    async def _read_audio(self) -> None:
+        """Take every audio piece as soon as LiveKit has it (so a slow
+        connection never makes LiveKit drop audio) and keep it waiting."""
+        async for event in self.audio:
+            data = bytes(event.frame.data)
+            self.count += 1
+            heard = max(self._now_ms() - len(data) // BYTES_PER_MS, 0)
+            self.waiting.append(Piece(self.count, data, heard))
+            if len(self.waiting) > MAX_WAITING_PIECES:
+                self._drop_oldest()
+            self.new_audio.set()
+        self.track_ended = True  # the person left (or reconnected)
+        self.new_audio.set()
+
+    def _drop_oldest(self) -> None:
+        """Deepgram has been away too long: forget the oldest audio."""
+        piece = self.waiting.popleft()
+        if piece.number > self.last_sent and not self._warned:
+            self._warned = True  # this audio never reached Deepgram
+            logger.warning(
+                "Deepgram away for over %d s, oldest audio dropped: session %d",
+                MAX_WAITING_SECONDS,
+                self.session_id,
+            )
+
+    def _next_piece(self) -> Piece | None:
+        """The first waiting piece this connection has not sent yet (never
+        audio heard after a stop)."""
+        if not self.waiting:
+            return None
+        index = max(self.last_sent - self.waiting[0].number + 1, 0)
+        if index >= len(self.waiting):
+            return None
+        piece = self.waiting[index]
+        if self.stopped_ms is not None and piece.heard_ms > self.stopped_ms:
+            return None
+        return piece
+
+    def _finished_up_to(self, stream_ms: int) -> None:
+        """Deepgram has finished the audio up to stream_ms: forget it."""
+        while (
+            self.waiting
+            and self.waiting[0].number <= self.last_sent
+            and self.waiting[0].stream_end <= stream_ms
+        ):
+            self.waiting.popleft()
 
     async def _send_live(self, message: dict, reliable: bool = False) -> None:
         """Push to the interviewer's page; a failed push never stops the
@@ -224,6 +358,7 @@ class SpeakerStream:
     async def _on_event(self, event, builder: TurnBuilder) -> None:
         """Handle one Deepgram message: live words, a saved turn, a pause."""
         if isinstance(event, deepgram.Interim):
+            self.unsaved = event
             now = time.monotonic()
             if now - self._last_interim >= INTERIM_EVERY_SECONDS:
                 self._last_interim = now
@@ -235,6 +370,8 @@ class SpeakerStream:
                     }
                 )
             return
+        if isinstance(event, deepgram.Segment):
+            self.unsaved = None  # Deepgram has decided on these words
         turn = builder.feed(event)
         if turn is not None:
             turn.row_id = await asyncio.to_thread(
@@ -243,8 +380,21 @@ class SpeakerStream:
             # The page replaces this speaker's live words with the saved turn.
             await self._send_live(turn_message(turn.row_id, self.speaker, turn), True)
 
+    async def _keep_last_words(self, builder: TurnBuilder) -> None:
+        """Deepgram did not confirm the last words in time (e.g. a slow
+        network at the end): save what it showed live rather than lose them."""
+        words, self.unsaved = self.unsaved, None
+        if words is not None:
+            logger.info(
+                "Last words kept from the live text: session %d", self.session_id
+            )
+            last = deepgram.Segment(words.text, words.start, words.end, True)
+            await self._on_event(last, builder)
+
     async def _stream_once(self) -> None:
-        """One Deepgram connection: send audio, save turns, until stopped."""
+        """One Deepgram connection: send the waiting audio and save turns.
+        Returns once all audio is sent and the last words are saved; raises
+        when the connection fails (run() then connects again)."""
         settings = get_settings()
         url = deepgram.listen_url(
             settings.deepgram_model, settings.deepgram_language, self.keyterms
@@ -254,65 +404,80 @@ class SpeakerStream:
         }
         try:
             connection = await websockets.connect(
-                url, additional_headers=headers, open_timeout=10
+                url,
+                additional_headers=headers,
+                open_timeout=10,
+                ping_interval=PING_SECONDS,
+                ping_timeout=PING_TIMEOUT_SECONDS,
             )
         except InvalidStatus as error:
             raise deepgram.error_for(error.response.status_code) from None
         except OSError:
             raise deepgram.error_for(None) from None
         async with connection as ws:
+            self.failures = 0
             await asyncio.to_thread(set_problem, self.session_id, None)
-            # Deepgram's times count from the first audio sent on this stream.
-            zero = clock.now()
-            offset_ms = round((zero - self.started_at).total_seconds() * 1000)
-            builder = TurnBuilder(max(offset_ms, 0))
-            last_sent = time.monotonic()
+            # Start from the oldest audio Deepgram has not finished yet.
+            self.last_sent = self.waiting[0].number - 1 if self.waiting else self.count
+            self.unsaved = None
+            timeline = Timeline()
+            builder = TurnBuilder(timeline.to_ms)
+            last_sent_at = time.monotonic()
 
             async def send_audio() -> None:
-                """Forward every audio piece; stop when asked."""
-                nonlocal last_sent
-                async for event in self.audio:
-                    if self.stopping.is_set():
-                        break
-                    await ws.send(bytes(event.frame.data))
-                    last_sent = time.monotonic()
+                """Send the waiting audio in order; return once all of it is
+                out and no more will come (the person left, or stopping)."""
+                nonlocal last_sent_at
+                while True:
+                    piece = self._next_piece()
+                    if piece is not None:
+                        timeline.add(piece)
+                        await ws.send(piece.data)
+                        self.last_sent = piece.number
+                        last_sent_at = time.monotonic()
+                    elif self.track_ended or self.stopping.is_set():
+                        return
+                    else:
+                        self.new_audio.clear()
+                        await self.new_audio.wait()
 
             async def keep_alive() -> None:
                 """Keep the stream open while the microphone is muted."""
-                while not self.stopping.is_set():
+                while True:
                     await asyncio.sleep(KEEP_ALIVE_SECONDS)
-                    if time.monotonic() - last_sent >= KEEP_ALIVE_SECONDS:
+                    if time.monotonic() - last_sent_at >= KEEP_ALIVE_SECONDS:
                         await ws.send(deepgram.KEEP_ALIVE)
 
             async def receive() -> None:
                 """Handle every message from Deepgram as it arrives."""
                 async for raw in ws:
                     event = deepgram.parse(raw)
+                    if isinstance(event, deepgram.Segment):
+                        self._finished_up_to(round(event.done_until * 1000))
                     if event is not None:
                         await self._on_event(event, builder)
 
             receiver = asyncio.create_task(receive())
             sender = asyncio.create_task(send_audio())
             pinger = asyncio.create_task(keep_alive())
-            stopper = asyncio.create_task(self.stopping.wait())
-            done, _ = await asyncio.wait(
-                {receiver, sender, stopper}, return_when=asyncio.FIRST_COMPLETED
-            )
-            pinger.cancel()
-            sender.cancel()
-            stopper.cancel()
-            if receiver not in done:
-                # Stopping, or the track ended: CloseStream makes Deepgram
-                # send the last words and close; wait a moment for them.
+            try:
+                done, _ = await asyncio.wait(
+                    {receiver, sender}, return_when=asyncio.FIRST_COMPLETED
+                )
+                if receiver in done:  # broke (or closed) before all audio was sent
+                    raise receiver.exception() or ConnectionError("stream closed")
+                if sender.exception():
+                    raise sender.exception()
+                # All audio is out: CloseStream makes Deepgram send the last
+                # words and close; wait a moment for them.
                 with contextlib.suppress(Exception):
                     await ws.send(deepgram.CLOSE_STREAM)
                     await asyncio.wait_for(receiver, FINAL_WAIT_SECONDS)
-                receiver.cancel()
-            builder.close()
-            if receiver in done and not receiver.cancelled() and receiver.exception():
-                raise receiver.exception()
-            if sender in done and not self.stopping.is_set():
-                self.stopping.set()  # the track ended: this person left
+                await self._keep_last_words(builder)
+            finally:
+                for task in (receiver, sender, pinger):
+                    task.cancel()
+                builder.close()
 
 
 class RoomListener:
@@ -410,7 +575,7 @@ class RoomListener:
             await stream.stop()
         tasks = [task for _stream, task in entries]
         if tasks:
-            await asyncio.wait(tasks, timeout=FINAL_WAIT_SECONDS + 2)
+            await asyncio.wait(tasks, timeout=FINAL_WAIT_SECONDS + 4)
 
 
 async def humans_in_room(session_id: int) -> bool:

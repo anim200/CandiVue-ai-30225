@@ -12,9 +12,12 @@ turn: on a choppy connection they can come after almost every word. A
 very long turn (MAX_TURN_SECONDS) and the end of the stream close it too.
 
 Times are milliseconds from the start of the interview (started_at):
-offset_ms is where this audio stream started, plus Deepgram's own times.
+to_ms turns Deepgram's times (seconds from the first audio of one
+connection) into them, using when each piece of audio was heard (see
+listener.Timeline).
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.db.database import SessionLocal
@@ -40,8 +43,8 @@ class TurnBuilder:
     """Joins the pieces of one speaker's stream into turns. feed() returns
     the turn to save (new or changed), or None."""
 
-    def __init__(self, offset_ms: int):
-        self.offset_ms = offset_ms
+    def __init__(self, to_ms: Callable[[float], int]):
+        self.to_ms = to_ms
         self.current: TurnState | None = None
         self._start_s = 0.0
         self._end_s = 0.0
@@ -59,12 +62,12 @@ class TurnBuilder:
             self._start_s = event.start
             self.current = TurnState(
                 text=event.text,
-                start_ms=self._ms(event.start),
-                end_ms=self._ms(event.end),
+                start_ms=self.to_ms(event.start),
+                end_ms=self.to_ms(event.end),
             )
         else:
             self.current.text = f"{self.current.text} {event.text}"
-            self.current.end_ms = self._ms(event.end)
+            self.current.end_ms = self.to_ms(event.end)
         self._end_s = event.end
         changed = self.current
         if event.end - self._start_s >= MAX_TURN_SECONDS:
@@ -74,10 +77,6 @@ class TurnBuilder:
     def close(self) -> None:
         """The speaker paused: the next piece starts a new turn."""
         self.current = None
-
-    def _ms(self, seconds: float) -> int:
-        """Stream seconds → milliseconds from the start of the interview."""
-        return self.offset_ms + round(seconds * 1000)
 
 
 def save_turn(session_id: int, speaker: Speaker, turn: TurnState) -> int:

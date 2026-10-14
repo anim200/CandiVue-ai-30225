@@ -7,7 +7,12 @@ word (seconds from the start of that stream; Deepgram's word timestamps,
 so silence around the words does not count). An UtteranceEnd message (a
 longer pause without words) means the speaker finished a turn. Interim
 results (words still being recognised) are only shown live to the
-interviewer, never saved.
+interviewer; they are saved only as a last resort, when the interview ends
+and Deepgram does not confirm them in time.
+
+Every final result also says up to where Deepgram has finished the audio
+(its start + duration): audio before that point never has to be sent again
+after a reconnect.
 
 - mip_opt_out=true: Deepgram may not use the audio to improve its models.
 - keyterm (Nova-3): the job's requirement names (e.g. Laravel, Docker) are
@@ -22,7 +27,7 @@ Only this module knows Deepgram's address and message format.
 """
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from urllib.parse import urlencode
 
 LISTEN_URL = "wss://api.deepgram.com/v1/listen"
@@ -36,19 +41,24 @@ CLOSE_STREAM = json.dumps({"type": "CloseStream"})
 @dataclass
 class Segment:
     """A final piece of speech: text and times (seconds from stream start).
-    speech_final: Deepgram heard a pause after it (end of a sentence)."""
+    speech_final: Deepgram heard a pause after it (end of a sentence).
+    done_until: Deepgram has finished all audio up to here."""
 
     text: str
     start: float
     end: float
     speech_final: bool
+    done_until: float = field(default=0.0, compare=False)
 
 
 @dataclass
 class Interim:
-    """Words still being recognised (may still change): shown live only."""
+    """Words still being recognised (may still change): shown live only.
+    start/end: their times, used if they must be kept at the very end."""
 
     text: str
+    start: float = field(default=0.0, compare=False)
+    end: float = field(default=0.0, compare=False)
 
 
 @dataclass
@@ -99,20 +109,22 @@ def parse(raw: str | bytes) -> Segment | Interim | UtteranceEnd | None:
     if kind != "Results":
         return None
     best = (data.get("channel", {}).get("alternatives") or [{}])[0]
-    if not data.get("is_final"):
-        text = (best.get("transcript") or "").strip()
-        return Interim(text) if text else None
+    text = (best.get("transcript") or "").strip()
+    window_start = float(data.get("start", 0.0))
+    window_end = window_start + float(data.get("duration", 0.0))
     words = best.get("words") or []
     if words:  # the first and last word: exact speech times
         start, end = float(words[0]["start"]), float(words[-1]["end"])
     else:
-        start = float(data.get("start", 0.0))
-        end = start + float(data.get("duration", 0.0))
+        start, end = window_start, window_end
+    if not data.get("is_final"):
+        return Interim(text, start, end) if text else None
     return Segment(
-        text=(best.get("transcript") or "").strip(),
+        text=text,
         start=start,
         end=end,
         speech_final=bool(data.get("speech_final")),
+        done_until=window_end,
     )
 
 

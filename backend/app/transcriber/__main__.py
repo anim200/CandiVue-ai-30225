@@ -97,7 +97,7 @@ async def run() -> None:
         await listener.leave()
     tasks = [task for _listener, task in listeners.values()]
     if tasks:
-        await asyncio.wait(tasks, timeout=8)  # Docker waits 10 s by default
+        await asyncio.wait(tasks, timeout=12)  # Compose waits 15 s (stop_grace_period)
 
 
 if __name__ == "__main__":

@@ -78,6 +78,11 @@ def test_only_final_results_and_pauses_are_used():
         "I bui"
     )
     assert deepgram.parse(results("", 2.0, is_final=False)) is None
+    # Up to where Deepgram has finished the audio (start + duration), and
+    # the times of live words (kept only if Deepgram never confirms them).
+    assert final.done_until == 3.5
+    live_words = deepgram.parse(json.dumps({**timed, "is_final": False}))
+    assert (live_words.start, live_words.end) == (2.4, 3.3)
     assert isinstance(deepgram.parse('{"type": "UtteranceEnd"}'), deepgram.UtteranceEnd)
     assert deepgram.parse('{"type": "Metadata"}') is None
     assert deepgram.parse("not json") is None
@@ -98,7 +103,7 @@ def test_refusals_become_plain_problems():
 
 
 def test_pieces_grow_one_turn_until_a_real_pause():
-    builder = TurnBuilder(offset_ms=10_000)
+    builder = TurnBuilder(lambda seconds: 10_000 + round(seconds * 1000))
     segment = deepgram.Segment
 
     first = builder.feed(segment("I have five years", 1.0, 2.0, False))
@@ -117,7 +122,7 @@ def test_pieces_grow_one_turn_until_a_real_pause():
 
 
 def test_silence_and_very_long_answers():
-    builder = TurnBuilder(offset_ms=0)
+    builder = TurnBuilder(lambda seconds: round(seconds * 1000))
 
     assert builder.feed(deepgram.Segment("", 0.0, 1.0, False)) is None
     long = builder.feed(deepgram.Segment("a", 0.0, 1.0, False))
@@ -293,6 +298,8 @@ def test_a_whole_stream_saves_the_turns_and_the_last_words(live, monkeypatch):
     async def connect(url, **kwargs):
         """Hand out the fake connection (and check the key is sent)."""
         assert kwargs["additional_headers"]["Authorization"] == "Token test-key"
+        # A connection that stops answering is given up within seconds.
+        assert kwargs["ping_timeout"] == listener.PING_TIMEOUT_SECONDS <= 10
         return fake
 
     opened = fake_stream(monkeypatch, connect)
@@ -315,8 +322,7 @@ def test_a_whole_stream_saves_the_turns_and_the_last_words(live, monkeypatch):
     assert {t["id"] for t in turns} == {r.id for r in rows}  # every save pushed
     assert turns[-1]["text"] == "Mostly with Docker. Thank you."
     assert live_words[0] == "I bui" and live_words[-1] == ""  # cleared at the end
-    # 50 ms pieces; at most 5 s of audio waits while Deepgram is away.
-    assert opened["frame_size_ms"] == 50 and opened["capacity"] == 100
+    assert opened["frame_size_ms"] == 50  # 50 ms pieces
     assert [r.text for r in rows] == [
         "I built payment APIs in Laravel.",
         "Mostly with Docker. Thank you.",  # the last words after the end
@@ -457,6 +463,128 @@ def test_the_stream_recovers_when_deepgram_drops(live, monkeypatch):
     assert [r.text for r in turns_of(live["id"])] == ["Back again."]
     with SessionLocal() as db:  # recovered: no problem left on screen
         assert db.get(InterviewSession, live["id"]).transcript_problem is None
+
+
+def test_turn_times_follow_when_the_audio_was_heard():
+    timeline = listener.Timeline()
+    # Two 50 ms pieces, the microphone muted for 30 s, then two more.
+    for number, heard in [(1, 1000), (2, 1050), (3, 31_000), (4, 31_050)]:
+        timeline.add(listener.Piece(number, b"\0" * 1600, heard))
+
+    assert timeline.to_ms(0.02) == 1020
+    # Deepgram's 120 ms is 20 ms into the third piece, heard after the pause.
+    assert timeline.to_ms(0.12) == 31_020
+
+
+class NumberedAudio(FakeAudio):
+    """Like FakeAudio, but every 10 ms frame says which one it is."""
+
+    async def _frames(self):
+        """Frame n is n repeated (320 bytes)."""
+        for number in range(1, self.frames + 1):
+            await asyncio.sleep(0.005)
+            yield SimpleNamespace(frame=SimpleNamespace(data=bytes([number]) * 320))
+
+
+class LineToDeepgram(FakeDeepgram):
+    """A Deepgram connection over a bad line: every send takes `slow`
+    seconds; Deepgram confirms the first `confirm` frames, and the line
+    breaks after `breaks_after` frames (None: it stays up)."""
+
+    def __init__(self, confirm, breaks_after=None, slow=0.0, words="Hello there."):
+        super().__init__(during=[], at_close=[results("Last words.", 0.5, 0.5)])
+        self.confirm, self.breaks_after, self.slow = confirm, breaks_after, slow
+        self.words = words
+        self.broken = asyncio.Event()
+
+    def frames(self):
+        """The numbers of the audio frames this connection received."""
+        return [data[0] for data in self.sent if isinstance(data, bytes)]
+
+    async def send(self, data):
+        """Slow; refuses audio once the line is broken."""
+        await asyncio.sleep(self.slow)
+        if self.broken.is_set():
+            raise ConnectionError("line broken")
+        await super().send(data)
+        if self.breaks_after and len(self.frames()) >= self.breaks_after:
+            self.broken.set()
+
+    async def _messages(self):
+        """Confirm the first frames, then break or answer CloseStream."""
+        while len(self.frames()) < self.confirm:
+            await asyncio.sleep(0.001)
+        yield results(self.words, 0.0, self.confirm * 0.01)  # 10 ms per frame
+        if self.breaks_after:
+            await self.broken.wait()
+            raise ConnectionError("line broken")
+        await self.closed.wait()
+        for message in self.at_close:
+            yield message
+
+
+def test_a_broken_line_loses_no_audio_and_repeats_none(live, monkeypatch):
+    lines = [
+        LineToDeepgram(confirm=5, breaks_after=12),  # breaks mid-answer
+        LineToDeepgram(confirm=3, slow=0.01, words="Back again."),  # slower than speech
+    ]
+
+    waiting_lines = list(lines)
+
+    async def connect(url, **kwargs):
+        """The next connection."""
+        return waiting_lines.pop(0)
+
+    fake_stream(monkeypatch, connect)
+    monkeypatch.setattr(listener.rtc, "AudioStream", lambda *a, **k: NumberedAudio(30))
+    stream = listener.SpeakerStream(live["id"], clock.now(), Speaker.CANDIDATE, None)
+
+    asyncio.run(asyncio.wait_for(stream.run(), timeout=10))
+
+    first, second = lines[0].frames(), lines[1].frames()
+    # The second connection starts with the first frame Deepgram had not
+    # finished (6): frames 6-12 went out on the broken line, so again.
+    assert first == list(range(1, 13))
+    assert second == list(range(6, 31))  # every later frame, in order, once
+    assert [r.text for r in turns_of(live["id"])] == [
+        "Hello there.",
+        "Back again. Last words.",
+    ]
+
+
+class SilentAtTheEnd(FakeDeepgram):
+    """Shows live words, then never answers CloseStream (slow network)."""
+
+    async def _messages(self):
+        """Live words only, then nothing."""
+        for message in self.during:
+            await asyncio.sleep(0.005)
+            yield message
+        await asyncio.Event().wait()  # never comes
+
+
+def test_the_last_live_words_are_kept_when_deepgram_is_too_slow(live, monkeypatch):
+    fake = SilentAtTheEnd(
+        during=[
+            results("Teamwork matters.", 0.0, 1.0),
+            results("I believe that clear", 1.2, 1.0, is_final=False),
+        ],
+        at_close=[],
+    )
+
+    async def connect(url, **kwargs):
+        """The fake connection."""
+        return fake
+
+    fake_stream(monkeypatch, connect)
+    monkeypatch.setattr(listener, "FINAL_WAIT_SECONDS", 0.2)
+    stream = listener.SpeakerStream(live["id"], clock.now(), Speaker.CANDIDATE, None)
+
+    asyncio.run(asyncio.wait_for(stream.run(), timeout=10))
+
+    assert [r.text for r in turns_of(live["id"])] == [
+        "Teamwork matters. I believe that clear"
+    ]
 
 
 class FakeRoom:
