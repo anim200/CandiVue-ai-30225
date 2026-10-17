@@ -68,12 +68,13 @@ def test_successful_run_is_completed(job_id):
 def test_ai_failure_gives_clear_message(job_id):
     def work(run_id):
         """Fake work function for this test."""
-        raise AIServiceError("The AI service is unavailable.")
+        raise AIServiceError("The AI model test-model has reached its usage limit.")
 
     run = run_with(work, job_id)
 
     assert run.status == RunStatus.FAILED
-    assert run.error == runner.AI_FAILURE_MESSAGE
+    # Our own message is shown as it is: it says what happened and what to do.
+    assert run.error == "The AI model test-model has reached its usage limit."
 
 
 def test_unexpected_error_hides_technical_details(job_id):

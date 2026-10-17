@@ -20,7 +20,7 @@ from app.ai import llm
 from app.auth.security import Role, create_access_token, hash_password
 from app.db.database import SessionLocal, check_database
 from app.db.models import Job, User
-from app.graphs import hiring_assistant
+from app.graphs import final_assessment, hiring_assistant, qa_analysis
 from app.graphs.checkpointer import open_checkpointer
 from app.integrations.calendar import CalendarError
 from app.interviews import calendar_sync
@@ -34,6 +34,22 @@ def no_real_usage_counting(monkeypatch):
     monkeypatch.setattr(llm, "record_request", lambda name: None)
     monkeypatch.setattr(llm, "record_rate_limit", lambda name, error: 99999)
     monkeypatch.setattr(llm, "current_model", lambda: "test-model")
+
+
+@pytest.fixture(autouse=True)
+def background_runs(monkeypatch):
+    """Ending an interview starts its Q&A analysis (and later its report) in
+    a background thread. Tests record the starts instead; the ones that need
+    a run call its work function themselves."""
+    started = []
+
+    def record(kind, run_id):
+        """Remember which run would have started."""
+        started.append((kind, run_id))
+
+    monkeypatch.setattr(qa_analysis, "start_run", record)
+    monkeypatch.setattr(final_assessment, "start_run", record)
+    return started
 
 
 @pytest.fixture(autouse=True)

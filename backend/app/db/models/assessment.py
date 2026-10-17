@@ -21,6 +21,8 @@ class QAAnalysis(RunStateMixin, TimestampMixin, Base):
     session_id: Mapped[int] = mapped_column(
         ForeignKey("interview_sessions.id", ondelete="CASCADE"), unique=True
     )
+    processed: Mapped[int] = mapped_column(default=0)  # Q&A units evaluated
+    total: Mapped[int | None]  # Q&A units found (known after segmenting)
     results: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
 
@@ -54,4 +56,7 @@ class AssessmentReport(RunStateMixin, TimestampMixin, Base):
         status_column(ReviewStatus), default=ReviewStatus.PENDING_REVIEW
     )
     reviewer_feedback: Mapped[str | None] = mapped_column(Text)
+    reviewed_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

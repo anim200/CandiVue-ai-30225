@@ -77,9 +77,10 @@ def execute_run(kind: str, run_id: int) -> None:
 
     try:
         result = run_kind.work(run_id)
-    except AIServiceError:
-        # invoke_llm() already logged the cause.
-        _fail(run_kind.model, run_id, AI_FAILURE_MESSAGE)
+    except AIServiceError as exc:
+        # Its message is ours and safe to show (e.g. which model reached its
+        # daily limit); invoke_llm() already logged the cause.
+        _fail(run_kind.model, run_id, str(exc) or AI_FAILURE_MESSAGE)
         logger.warning("Run failed (AI service): %s %d", kind, run_id)
         return
     except Exception:
