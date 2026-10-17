@@ -16,6 +16,7 @@ from app.api import (
     jobs,
     knowledge,
     livekit,
+    rediscovery,
     screening,
 )
 from app.auth.seed import create_first_interviewer
@@ -72,3 +73,4 @@ app.include_router(interviews.router)
 app.include_router(candidate.router)
 app.include_router(livekit.router)
 app.include_router(analysis.router)
+app.include_router(rediscovery.router)

@@ -19,6 +19,8 @@ EXPECTED_TABLES = {
     "knowledge_chunks",
     "llm_models",
     "cv_passages",
+    "rediscovery_runs",
+    "rediscovery_matches",
 }
 
 # N20: these must never be stored as candidate data.
@@ -43,8 +45,16 @@ def test_no_protected_attribute_columns():
 
 
 def test_candidate_data_is_deleted_with_the_candidate():
-    """Every link to candidates (directly) uses ON DELETE CASCADE (N19)."""
+    """Every link to candidates (directly) uses ON DELETE CASCADE (N19).
+    One exception: an application added from the talent pool only forgets
+    where it came from, since it is the person's own application now."""
     for table in Base.metadata.tables.values():
         for key in table.foreign_keys:
             if key.column.table.name == "candidates":
-                assert key.ondelete == "CASCADE", f"{table.name}.{key.parent.name}"
+                name = f"{table.name}.{key.parent.name}"
+                expected = (
+                    "SET NULL"
+                    if name == "candidates.rediscovered_from_id"
+                    else "CASCADE"
+                )
+                assert key.ondelete == expected, name

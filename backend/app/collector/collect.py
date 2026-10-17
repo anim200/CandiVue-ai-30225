@@ -5,7 +5,8 @@ For every answer (row) in the response Sheet:
 2. skip it without consent, without a CV, if the CV was collected before, or
    if it was sent after the job's closing date (nothing is stored then),
 3. check the CV's size and type, then save it in the intake folder,
-4. record the candidate as "received", or "rejected" with the reason.
+4. record the candidate as "received", or "rejected" with the reason, and
+   whether they ticked the optional talent-pool question (F11).
 One bad row never stops the others. Logs never contain names or emails.
 """
 
@@ -38,6 +39,10 @@ COLUMNS = {
     "cv": ("cv", "resume", "résumé"),
     "consent": ("consent", "agree"),
 }
+# Questions an older form may not have yet (no error when missing).
+OPTIONAL_COLUMNS = {
+    "talent_pool": ("talent pool",),  # F11: "may we consider you for other vacancies?"
+}
 
 
 class CollectorSetupError(Exception):
@@ -61,17 +66,21 @@ def job_reference(job_id: int, title: str) -> str:
 
 
 def find_columns(header: list[str]) -> dict[str, int]:
-    """Find which column holds each question; raise if one is missing."""
+    """Find which column holds each question; raise if a required one is
+    missing (an optional one is just left out)."""
     lowered = [cell.strip().lower() for cell in header]
     columns = {}
-    for key, words in COLUMNS.items():
+    for key, words in (COLUMNS | OPTIONAL_COLUMNS).items():
         for word in words:
             index = next((i for i, cell in enumerate(lowered) if word in cell), None)
             if index is not None and index not in columns.values():
                 columns[key] = index
                 break
         else:
-            raise CollectorSetupError(f"The response Sheet has no '{key}' question.")
+            if key in COLUMNS:
+                raise CollectorSetupError(
+                    f"The response Sheet has no '{key}' question."
+                )
     return columns
 
 
@@ -108,8 +117,9 @@ def _collect_row(source, columns: dict[str, int], row: list, zone: ZoneInfo) -> 
     or "known"."""
 
     def cell(key: str) -> str:
-        """The answer to one question ("" when Google left the cell out)."""
-        index = columns[key]
+        """The answer to one question ("" when Google left the cell out, or
+        the form does not have that optional question)."""
+        index = columns.get(key, len(row))
         return str(row[index]).strip() if index < len(row) else ""
 
     reference = JOB_REFERENCE.search(cell("position"))
@@ -140,6 +150,7 @@ def _collect_row(source, columns: dict[str, int], row: list, zone: ZoneInfo) -> 
             email=cell("email")[:255] or None,
             cv_filename=clean_filename(info.get("name", "")),
             drive_file_id=file_id,
+            open_to_other_roles=bool(cell("talent_pool")),  # ticked: opted in (F11)
         )
         try:
             check_cv_size(int(info.get("size") or 0))  # before downloading
