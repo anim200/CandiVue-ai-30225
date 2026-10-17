@@ -3,7 +3,11 @@ which Alembic compares with the database."""
 
 from app.db.models.assessment import AssessmentReport, QAAnalysis
 from app.db.models.candidate import Candidate
-from app.db.models.interview import InterviewSession, TranscriptTurn
+from app.db.models.interview import (
+    InterviewMessage,
+    InterviewSession,
+    TranscriptTurn,
+)
 from app.db.models.job import Job, JobDescription
 from app.db.models.knowledge import KnowledgeChunk, KnowledgeDocument
 from app.db.models.llm_model import LlmModel
@@ -15,6 +19,7 @@ __all__ = [
     "Candidate",
     "CandidateScore",
     "CvPassage",
+    "InterviewMessage",
     "InterviewSession",
     "Job",
     "JobDescription",

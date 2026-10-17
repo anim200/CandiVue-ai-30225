@@ -287,6 +287,29 @@
   animation: fade 0.2s ease-out;
 }
 
+/* Screening finished on the job page (design: ScreeningNotice). */
+.screeningNotice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #f5f7f8;
+  font-size: 13px;
+  color: #48535b;
+}
+
+.screeningText {
+  flex: 1;
+  min-width: 200px;
+}
+
+.screeningText b {
+  font-weight: 600;
+  color: #1a2227;
+}
+
 /* ---- Cards ---- */
 
 .profileCard {
@@ -439,6 +462,127 @@
 .postConfirm {
   border-color: #f0d9a6;
   background: #fffaef;
+}
+
+/* ---- Shortlist and interview cards ---- */
+
+.people {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.person {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 10px;
+  padding: 9px 16px;
+  border-bottom: 1px solid #f0f2f4;
+  font-size: 15px;
+}
+
+.person:last-child {
+  border-bottom: 0;
+}
+
+.skipped {
+  opacity: 0.5;
+}
+
+.personRank {
+  color: #66717a;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.personName {
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.personScore,
+.personTime {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.personScore {
+  font-weight: 600;
+}
+
+.personMeta {
+  grid-column: 2 / -1;
+  font-size: 13px;
+  color: #66717a;
+}
+
+.timeInput {
+  width: 200px;
+}
+
+.cardNotes {
+  padding: 10px 16px;
+  border-top: 1px solid #e9ecee;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  color: #48535b;
+}
+
+.noteLine {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.noteLine svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.warningText {
+  color: #7a5000;
+}
+
+.problemText {
+  color: #932e24;
+}
+
+.previewToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: #1c5d65;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+/* The email exactly as sent: plain text, line breaks kept. */
+.preview {
+  white-space: pre-wrap;
+  background: #f5f7f8;
+  border: 1px solid #e9ecee;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #1a2227;
+  animation: fade 0.2s ease-out;
+}
+
+/* "Nothing is booked until you confirm" sits left of the buttons and wraps
+   before the buttons do. */
+.actionsHint {
+  flex: 1 1 120px;
+  align-self: center;
 }
 
 /* ---- Example openers (empty chat) ---- */

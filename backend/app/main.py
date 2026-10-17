@@ -5,7 +5,18 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import ai_models, assistant, auth, health, jobs, knowledge, screening
+from app.api import (
+    ai_models,
+    assistant,
+    auth,
+    candidate,
+    health,
+    interviews,
+    jobs,
+    knowledge,
+    livekit,
+    screening,
+)
 from app.auth.seed import create_first_interviewer
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
@@ -56,3 +67,6 @@ app.include_router(jobs.router)
 app.include_router(assistant.router)
 app.include_router(ai_models.router)
 app.include_router(screening.router)
+app.include_router(interviews.router)
+app.include_router(candidate.router)
+app.include_router(livekit.router)

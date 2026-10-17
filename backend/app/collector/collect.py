@@ -2,7 +2,8 @@
 
 For every answer (row) in the response Sheet:
 1. find the job from "Position applied for" (pre-filled as "JOB-12 · title"),
-2. skip it without consent, without a CV, or if the CV was collected before,
+2. skip it without consent, without a CV, if the CV was collected before, or
+   if it was sent after the job's closing date (nothing is stored then),
 3. check the CV's size and type, then save it in the intake folder,
 4. record the candidate as "received", or "rejected" with the reason.
 One bad row never stops the others. Logs never contain names or emails.
@@ -11,6 +12,8 @@ One bad row never stops the others. Logs never contain names or emails.
 import logging
 import re
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 
@@ -28,6 +31,7 @@ DRIVE_FILE_ID = re.compile(r"(?:[?&]id=|/d/)([\w-]{10,})")
 
 # Words that identify each question's column in the Sheet (first match wins).
 COLUMNS = {
+    "submitted": ("timestamp",),  # added by Google Forms
     "name": ("full name", "name"),
     "email": ("email",),
     "position": ("position", "role", "job"),
@@ -47,6 +51,7 @@ class RoundResult:
     collected: int = 0
     rejected: int = 0
     skipped: int = 0  # no job reference, no consent or no CV
+    late: int = 0  # sent after the job's closing date: not collected
     failed: int = 0  # will be tried again next round
 
 
@@ -77,9 +82,10 @@ def collect_round(source) -> RoundResult:
     if len(rows) < 2:
         return result  # no answers yet
     columns = find_columns(rows[0])
+    zone = ZoneInfo(source.time_zone())
     for number, row in enumerate(rows[1:], start=2):
         try:
-            outcome = _collect_row(source, columns, row)
+            outcome = _collect_row(source, columns, row, zone)
         except Exception as exc:  # noqa: BLE001 - one bad row must not stop the others
             # Only the row number and error type: no personal data in logs.
             logger.warning("CV row %d failed: %s", number, type(exc).__name__)
@@ -90,13 +96,21 @@ def collect_round(source) -> RoundResult:
     return result
 
 
-def _collect_row(source, columns: dict[str, int], row: list[str]) -> str:
-    """Handle one answer; return "collected", "rejected", "skipped" or "known"."""
+def sheet_time(serial: str, zone: ZoneInfo) -> datetime:
+    """A Sheets date-time number (days since 30 Dec 1899, in the Sheet's time
+    zone) as a UTC time."""
+    day_zero = datetime(1899, 12, 30, tzinfo=zone)  # Sheets counts days from here
+    return (day_zero + timedelta(days=float(serial))).astimezone(UTC)
+
+
+def _collect_row(source, columns: dict[str, int], row: list, zone: ZoneInfo) -> str:
+    """Handle one answer; return "collected", "rejected", "skipped", "late"
+    or "known"."""
 
     def cell(key: str) -> str:
         """The answer to one question ("" when Google left the cell out)."""
         index = columns[key]
-        return row[index].strip() if index < len(row) else ""
+        return str(row[index]).strip() if index < len(row) else ""
 
     reference = JOB_REFERENCE.search(cell("position"))
     file_ids = DRIVE_FILE_ID.findall(cell("cv"))
@@ -105,8 +119,12 @@ def _collect_row(source, columns: dict[str, int], row: list[str]) -> str:
     job_id, file_id = int(reference.group(1)), file_ids[0]
 
     with SessionLocal() as db:
-        if db.get(Job, job_id) is None:
+        job = db.get(Job, job_id)
+        if job is None:
             return "skipped"  # the reference was changed by hand
+        closes = job.applications_close_at
+        if closes and sheet_time(cell("submitted"), zone) > closes:
+            return "late"  # the form's own time, not when we collect it
         known = db.scalar(
             select(Candidate.id).where(
                 Candidate.job_id == job_id, Candidate.drive_file_id == file_id

@@ -24,3 +24,9 @@ requests==2.34.2
 pypdfium2==5.14.0
 pytesseract==0.3.13
 pillow==12.3.0
+# Video calls (F3): LiveKit room tickets, webhooks and closing a room
+livekit-api==1.2.1
+# Live transcript (F4): the transcriber joins the call as a hidden listener
+# (LiveKit real-time SDK) and streams each speaker's audio to Deepgram
+livekit==1.1.20
+websockets==16.1.1

@@ -91,6 +91,20 @@
   color: #1c5d65;
 }
 
+/* Icon rail (live interview): icons centred, no titles or reminder card. */
+.rail {
+  padding: 12px 8px;
+}
+
+.rail .navLink {
+  justify-content: center;
+  padding: 0;
+}
+
+.rail .navIcon {
+  margin-right: 0;
+}
+
 /* Jobs waiting for the interviewer (amber, like "needs you" elsewhere). */
 .count {
   min-width: 21px;

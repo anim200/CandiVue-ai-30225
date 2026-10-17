@@ -1,8 +1,8 @@
 """Job board MCP server: posts an approved job description to a Blogger blog.
 
-The Hiring Assistant (LangGraph 1) calls this server's single tool,
-create_job_post, through MCP after the interviewer approved the JD (§4B-2,
-§4B-6). Only this container holds the Blogger credentials, so the backend
+The Hiring Assistant (LangGraph 1) calls this server's tool create_job_post
+through MCP after the interviewer approved the JD (§4B-2, §4B-6), and
+update_job_post when the post must change (a new closing date). Only this container holds the Blogger credentials, so the backend
 never sees them (least privilege). It has no port on the host: only other
 containers in Docker's network can reach it.
 
@@ -79,13 +79,34 @@ def create_job_post(
 ) -> JobPost:
     """Publish a job post (title + HTML body) on the job board blog and
     return its address. The HTML is prepared and escaped by the backend."""
-    session = blogger_session()
-    url = POSTS_URL.format(blog_id=os.environ["BLOGGER_BLOG_ID"])
     body = {"kind": "blogger#post", "title": title, "content": html, "labels": labels}
+    data = send_to_blogger("post", "", body)
+    logger.info("Job post published: %s", data.get("id"))
+    return JobPost(post_id=str(data["id"]), url=data["url"])
+
+
+@server.tool()
+def update_job_post(
+    post_id: Annotated[str, Field(pattern=r"^\d{1,30}$")],
+    title: Annotated[str, Field(min_length=2, max_length=200)],
+    html: Annotated[str, Field(min_length=20, max_length=100_000)],
+) -> JobPost:
+    """Replace the title and HTML body of an existing job post (e.g. after the
+    closing date changed). Its address stays the same."""
+    data = send_to_blogger("patch", post_id, {"title": title, "content": html})
+    logger.info("Job post updated: %s", post_id)
+    return JobPost(post_id=str(data["id"]), url=data["url"])
+
+
+def send_to_blogger(method: str, post_id: str, body: dict) -> dict:
+    """Send one request to Blogger ("post" = new post, "patch" = change
+    post_id) and return its answer; any failure becomes a safe ToolError."""
+    session = blogger_session()
+    url = POSTS_URL.format(blog_id=os.environ["BLOGGER_BLOG_ID"]) + post_id
     # ToolError = an expected failure whose message the caller may see; any
     # other error is hidden by MCP (no internal details leak).
     try:
-        response = session.post(url, json=body, timeout=30)
+        response = getattr(session, method)(url, json=body, timeout=30)
     except GoogleAuthError as exc:
         logger.warning("Blogger sign-in failed: %s", type(exc).__name__)
         raise ToolError(
@@ -100,9 +121,7 @@ def create_job_post(
         raise ToolError(
             f"The job board refused the post (HTTP {response.status_code})."
         )
-    data = response.json()
-    logger.info("Job post published: %s", data.get("id"))
-    return JobPost(post_id=str(data["id"]), url=data["url"])
+    return response.json()
 
 
 # Only accept requests addressed to this service's Docker name (or local

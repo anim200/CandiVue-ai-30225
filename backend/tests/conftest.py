@@ -9,8 +9,22 @@ os.environ.setdefault(
 )
 os.environ.setdefault("JWT_SECRET", "test-only-secret-that-is-long-enough-0123456789")
 
+import uuid
+from types import SimpleNamespace
+
+from fastapi.testclient import TestClient
+from helpers import ScriptedModel
+from sqlalchemy import select
+
 from app.ai import llm
-from app.db.database import check_database
+from app.auth.security import Role, create_access_token, hash_password
+from app.db.database import SessionLocal, check_database
+from app.db.models import Job, User
+from app.graphs import hiring_assistant
+from app.graphs.checkpointer import open_checkpointer
+from app.integrations.calendar import CalendarError
+from app.interviews import calendar_sync
+from app.main import app
 
 
 @pytest.fixture(autouse=True)
@@ -22,8 +36,86 @@ def no_real_usage_counting(monkeypatch):
     monkeypatch.setattr(llm, "current_model", lambda: "test-model")
 
 
+@pytest.fixture(autouse=True)
+def calendar(monkeypatch):
+    """No real Google Calendar: events are kept in .events {id: (start, end)};
+    .busy holds busy periods to report, .fail makes every call fail."""
+    box = SimpleNamespace(events={}, busy=[], fail=None)
+
+    def check():
+        """Fail like the calendar server would, if asked to."""
+        if box.fail:
+            raise CalendarError(box.fail)
+
+    def add_event(summary, start, end, description):
+        """Keep the event; return a new id."""
+        check()
+        event_id = uuid.uuid4().hex
+        box.events[event_id] = (start, end)
+        return event_id
+
+    def move_event(event_id, start, end):
+        """Move a kept event."""
+        check()
+        box.events[event_id] = (start, end)
+
+    def delete_event(event_id):
+        """Forget a kept event."""
+        check()
+        box.events.pop(event_id, None)
+
+    def busy(start, end):
+        """The busy periods the test set."""
+        check()
+        return box.busy
+
+    fake = SimpleNamespace(
+        busy=busy, add_event=add_event, move_event=move_event, delete_event=delete_event
+    )
+    monkeypatch.setattr(calendar_sync, "calendar", fake)
+    return box
+
+
 @pytest.fixture(scope="session")
 def database_available() -> None:
     """Skip a test when there is no database (e.g. plain local pytest)."""
     if not check_database():
         pytest.skip("needs the database: run 'docker compose run --rm tests'")
+
+
+@pytest.fixture
+def scripted(monkeypatch):
+    """Install a scripted LLM; tests fill its list of replies."""
+    model = ScriptedModel(replies=[])
+    monkeypatch.setattr(llm, "get_chat_model", lambda name: model)
+    monkeypatch.setattr(llm, "WAIT_BETWEEN_RETRIES", False)
+    return model.replies
+
+
+@pytest.fixture
+def client():
+    """App client with the real checkpointer (normally opened at startup)."""
+    with open_checkpointer() as checkpointer:
+        app.state.checkpointer = checkpointer
+        yield TestClient(app)
+
+
+@pytest.fixture
+def headers():
+    """A test interviewer's Authorization header; their jobs are removed afterwards."""
+    with SessionLocal() as db:
+        user = User(
+            email="ha.tester@example.com",
+            full_name="HA Tester",
+            password_hash=hash_password("x" * 10),
+        )
+        db.add(user)
+        db.commit()
+        user_id = user.id
+    yield {"Authorization": f"Bearer {create_access_token(user_id, Role.INTERVIEWER)}"}
+    with open_checkpointer() as checkpointer, SessionLocal() as db:
+        for job in db.scalars(select(Job).where(Job.created_by_id == user_id)):
+            checkpointer.delete_thread(f"{hiring_assistant.THREAD_KIND}-{job.id}")
+            db.delete(job)
+        db.delete(db.get(User, user_id))
+        db.commit()

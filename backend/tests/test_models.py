@@ -10,6 +10,7 @@ EXPECTED_TABLES = {
     "candidates",
     "screening_runs",
     "candidate_scores",
+    "interview_messages",
     "interview_sessions",
     "transcript_turns",
     "qa_analyses",

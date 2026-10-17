@@ -2,17 +2,20 @@
 // the interviewer describes the role, the assistant saves the profile,
 // may search the knowledge base, writes the JD and waits for review.
 // After approval it asks "Post this job to the job board?" (Post / Don't
-// post); the job board result appears as a card. The AI model can be
-// switched under the chat box.
+// post); the job board result appears as a card. After screening it keeps
+// the shortlist and plans interviews, which wait for the interviewer's
+// Confirm on a card. The AI model can be switched under the chat box.
 // Interviewers only (route guard + backend, N9).
 
 import { Button } from '@mantine/core';
+import { useDocumentTitle } from '@mantine/hooks';
 import { IconPlus, IconSparkles } from '@tabler/icons-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 
 import { apiGet, apiPost, apiPostAi, apiPut } from '../../api/client';
 import { EmptyState, ErrorBanner } from '../../components/Feedback';
+import { notifyError } from '../../components/notify';
 import classes from './Assistant.module.css';
 import ChatComposer from './ChatComposer';
 import {
@@ -24,12 +27,20 @@ import {
   UserBubble,
   WorkingLine,
 } from './ChatItems';
+import { InvitationConfirmCard, InvitationResultsCard, ScreeningNotice, ShortlistCard } from './InterviewCards';
 import JdCard from './JdCard';
 import JobProgressBar from './JobProgressBar';
 import ModelPicker from './ModelPicker';
 import PostingCard, { PostConfirmCard } from './PostingCard';
 import { JdEditModal, RejectModal } from './ReviewModals';
 import ThreadList from './ThreadList';
+
+// What to do first while the graph waits for the interviewer.
+const LOCKED_HINTS = {
+  jd_approval: 'Approve, edit or reject the job description to continue the chat.',
+  post_confirmation: 'Choose Post or Don’t post to continue the chat.',
+  invitation_confirmation: 'Confirm, change or cancel the interviews to continue the chat.',
+};
 
 // Example openers for an empty chat (design frame 2b).
 const STARTERS = ['Start from a previous job', 'Backend developer, 3+ years'];
@@ -53,10 +64,19 @@ function feedbackBefore(items, jd) {
 }
 
 // Turn the thread items into chat rows; consecutive tool steps share one row.
-function ChatRows({ items, profile, pending, reviewBusy, onApprove, onEdit, onReject, onPost, postBusy }) {
+// The screening notice goes after the last job board card (CVs come after
+// posting), or at the end when the job was never posted.
+function ChatRows({ items, job, pending, reviewBusy, onApprove, onEdit, onReject, onPost, postBusy }) {
   const rows = [];
+  const profile = job?.profile;
   const approvedJd = items.find((item) => item.kind === 'jd' && item.jd.status === 'approved')?.jd;
   const lastPosting = items.findLastIndex((item) => item.kind === 'posting');
+  const screened = job?.screening_status === 'completed' && job.screened_at;
+  const notice = (
+    <AssistantRow key="screening">
+      <ScreeningNotice job={job} />
+    </AssistantRow>
+  );
   let steps = [];
   const flushSteps = () => {
     if (steps.length) rows.push(<AssistantRow key={`s${rows.length}`}><StepLines steps={steps} /></AssistantRow>);
@@ -98,6 +118,18 @@ function ChatRows({ items, profile, pending, reviewBusy, onApprove, onEdit, onRe
           />
         </AssistantRow>,
       );
+    if (item.kind === 'shortlist')
+      rows.push(
+        <AssistantRow key={index}>
+          <ShortlistCard card={item} />
+        </AssistantRow>,
+      );
+    if (item.kind === 'invitations')
+      rows.push(
+        <AssistantRow key={index}>
+          <InvitationResultsCard result={item} />
+        </AssistantRow>,
+      );
     if (item.kind === 'posting')
       rows.push(
         <AssistantRow key={index}>
@@ -110,8 +142,10 @@ function ChatRows({ items, profile, pending, reviewBusy, onApprove, onEdit, onRe
           />
         </AssistantRow>,
       );
+    if (index === lastPosting && screened) rows.push(notice);
   });
   flushSteps();
+  if (lastPosting === -1 && screened) rows.push(notice);
   return rows;
 }
 
@@ -136,6 +170,8 @@ export default function HiringAssistantPage() {
   const [models, setModels] = useState(null); // { models, usage_url } for the picker
   const [modelBusy, setModelBusy] = useState(false);
   const endRef = useRef(null);
+  const job = jobs?.find((j) => j.id === id);
+  useDocumentTitle(`${job?.title ?? 'Hiring Assistant'} · CandiVue AI`);
 
   // Load all jobs for the thread list (also refreshes their stage lines).
   const loadJobs = useCallback(async () => {
@@ -201,6 +237,8 @@ export default function HiringAssistantPage() {
       const job = await apiPost('/jobs');
       await loadJobs();
       navigate(`/assistant/${job.id}`);
+    } catch (error) {
+      notifyError('The job wasn’t created.', error);
     } finally {
       setCreating(false);
     }
@@ -271,7 +309,8 @@ export default function HiringAssistantPage() {
   }
 
   // Send a decision the paused graph waits for: the JD review (approve,
-  // edit, reject) or the posting question (post, skip).
+  // edit, reject), the posting question (post, skip) or the interviews
+  // (confirm, cancel).
   async function decide(path, decision) {
     setReviewBusy(true);
     setReviewError(null);
@@ -308,16 +347,11 @@ export default function HiringAssistantPage() {
     );
   }
 
-  const job = jobs?.find((j) => j.id === id);
   const pending = thread?.pending_review ?? null;
   const pendingJd = thread?.items.find((item) => item.kind === 'jd' && item.jd.id === pending?.jd_id)?.jd;
   const isEmpty = thread && thread.items.length === 0 && !sentText;
   // What locks the chat box (and the hint shown above it), if anything.
-  const lockedHint = !pending
-    ? null
-    : pending.kind === 'post_confirmation'
-      ? 'Choose Post or Don’t post to continue the chat.'
-      : 'Approve, edit or reject the job description to continue the chat.';
+  const lockedHint = pending && LOCKED_HINTS[pending.kind];
 
   return (
     <div className={classes.layout}>
@@ -374,7 +408,7 @@ export default function HiringAssistantPage() {
               {thread && (
                 <ChatRows
                   items={thread.items}
-                  profile={job?.profile}
+                  job={job}
                   pending={pending}
                   reviewBusy={reviewBusy}
                   onApprove={() => review({ action: 'approve' })}
@@ -390,6 +424,16 @@ export default function HiringAssistantPage() {
                     question={pending}
                     busy={reviewBusy}
                     onDecide={(action) => decide('post-decision', { action })}
+                  />
+                </AssistantRow>
+              )}
+              {pending?.kind === 'invitation_confirmation' && (
+                <AssistantRow>
+                  <InvitationConfirmCard
+                    key={JSON.stringify(pending.items)} // a new plan starts a fresh card
+                    plan={pending}
+                    busy={reviewBusy}
+                    onDecide={(decision) => decide('invitation-decision', decision)}
                   />
                 </AssistantRow>
               )}

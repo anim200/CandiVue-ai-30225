@@ -46,6 +46,13 @@ class Job(TimestampMixin, Base):
         status_column(JobBoardStatus), default=JobBoardStatus.NOT_POSTED
     )
     job_board_post_url: Mapped[str | None] = mapped_column(String(500))
+    # The job board's id for the post, so it can be updated (new closing date).
+    job_board_post_id: Mapped[str | None] = mapped_column(String(200))
+    # CVs sent after this are not collected; invitations wait until it has
+    # passed, so every applicant is screened first. Empty = not set yet.
+    applications_close_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
     created_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
     )

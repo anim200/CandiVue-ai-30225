@@ -161,6 +161,11 @@ width.
 | `ollama-pull` | `ollama/ollama:0.35.1` | One-time job: downloads the embedding model on the first start, then exits. |
 | `jobboard-mcp` | built from `jobboard-mcp/Dockerfile` (target `runtime`) | Our small MCP server that posts approved JDs to Blogger. The only service that holds the Blogger credentials. Not exposed to the host. |
 | `jobboard-tests` | built from `jobboard-mcp/Dockerfile` (target `test`) | Only runs on demand (see below). |
+| `email-mcp` | built from `email-mcp/Dockerfile` (target `runtime`) | Our small MCP server that emails interview invitations (Gmail SMTP). The only service that holds the email login. Not exposed to the host. |
+| `email-tests` | built from `email-mcp/Dockerfile` (target `test`) | Only runs on demand (see below). |
+| `calendar-mcp` | built from `calendar-mcp/Dockerfile` (target `runtime`) | Our small MCP server for the interviewer's Google Calendar (busy times, interview events). The only service that holds the calendar sign-in. Not exposed to the host. |
+| `calendar-tests` | built from `calendar-mcp/Dockerfile` (target `test`) | Only runs on demand (see below). |
+| `livekit` | `livekit/livekit-server:v1.13.9` | Open-source video server for the interviews. Signalling through nginx (`/rtc`); video and audio on ports 7881/tcp and 7882/udp, bound to `127.0.0.1`. Nothing is recorded. |
 | `cv-collector` | built from `backend/Dockerfile` (target `runtime`), command `python -m app.collector` | Copies new CVs from the Google Form into the `cv_intake` volume every few minutes. The only service that holds the Google key (read-only). No ports. |
 | `frontend` | built from `frontend/Dockerfile` | React app served by nginx 1.31 (HTTP, and HTTPS when `certs/` has a certificate); forwards `/api` to the backend. |
 
@@ -187,14 +192,24 @@ width.
     model, so document text and search questions stay on this machine.
     Only passages that the Hiring Assistant chooses to use are sent, as
     part of the chat.
-  - Later steps: CV text, interview transcripts and the instructions
-    (prompts) needed to screen and assess candidates.
+  - Hiring Assistant in the interview room: the interviewer's messages,
+    the job's requirements, question-bank passages found by search, and,
+    only when the interviewer asks for questions from the CV, a **reduced
+    CV summary**: job titles with dates, years, skills, degree level,
+    certificates and how each requirement was met in screening. No name,
+    email, phone number, address or links (they are removed first).
+  - CV screening: nothing (it runs locally, see "CV screening").
+  - Later steps: interview transcripts and the instructions (prompts)
+    needed to assess candidates.
 
 Other external services (N18):
 
 | Service | What it receives |
 |---|---|
+| Deepgram, through the `transcriber` | The interview audio of both people while the interview is live (streamed, not stored by CandiVue; `mip_opt_out=true` asks Deepgram not to use it for training). It returns the text. |
 | Blogger (Google), through `jobboard-mcp` | The approved job description (title, text, requirements) and the Google Form link. No candidate data. |
+| Gmail (Google), through `email-mcp` | Interview invitations and cancellations: the candidate's name and email address, the job title, the interview date and time, and the private interview link (also in the attached calendar invite). While `EMAIL_TEST_RECIPIENT` is set, every email goes to that test address instead. |
+| Google Calendar, through `calendar-mcp` | The interviewer's own calendar: one event per interview with the candidate's name, the job title, the time and the interviewer's room link (no email address, no scores). To find busy times only the start and end of events are read, never their titles. |
 | Google Forms, Google Drive and Google Sheets | Applicants send their name, email address, the job they apply for and their CV file through the form; Google stores the file in Drive and the answers in the response Sheet. The `cv-collector` only **reads** them. |
 
 - **Free-tier notice:** on Gemini's free tier, Google may use the data it
@@ -322,6 +337,237 @@ failed"; run step 5 again and replace the token (do it before a demo).
 
 The token only allows managing your Blogger blogs. To revoke it, remove
 CandiVue at <https://myaccount.google.com/permissions>.
+
+## Video calls (interviews)
+
+Interviews are 1-on-1 video calls in the browser, using **LiveKit**, an
+open-source video server that runs here in Docker (no cloud, no account).
+
+```
+Interviewer (signed in): Interviews → "Join now" ──────────────┐
+Candidate: private link → waiting room (preview, devices) ─────┤
+           heartbeat "I'm waiting" ──► interviewer sees        │
+           "… is waiting · Let in" ──► Let in ──► ticket ──────┤ (this room only)
+                                                               ▼
+                     browser ⇄ LiveKit (Docker) ⇄ browser   video, audio, screen
+                                 │ signed webhooks
+                                 ▼
+             backend: Live + start time, who joined; End interview → Ended
+```
+
+- **Waiting room:** the candidate checks camera and microphone (preview,
+  level meter, device choice), ticks a notice ("not recorded, a written
+  transcript is kept") and joins the waiting room. They get a call ticket
+  only after the interviewer clicks **Let in** (checked by the backend,
+  not only on the page). Each open page sends a heartbeat every few
+  seconds, so the candidate sees whether the interviewer is there, and the
+  interviewer gets a banner, a soft chime and "● Waiting" in the tab title.
+  Once let in, a dropped connection or a reload goes straight back in.
+- The backend gives each person a **ticket** (a signed LiveKit token) for
+  their interview's room only. Browsers cannot send data into the room;
+  chat goes through the backend.
+- **Join any time** once the invitation email was sent, until the
+  interviewer clicks **End interview** (or the interview is cancelled).
+  The email is the only way the candidate gets their link. Ending closes
+  the call for everyone and the candidate's link stops working. Leaving
+  the room page without ending keeps the interview live.
+- **The call:** the stage fills its column (16:9 when there is room, wider
+  on short screens); the other person's video stays whole and sharp, with
+  a blurred copy of it filling the sides; the controls float over its
+  bottom edge (under it on phones); full screen from the icon in its
+  top-right corner; a ring shows who is speaking; mute, camera,
+  **screen sharing** (both sides; desktop browsers) and End/Leave. A shared
+  screen fills the stage and the cameras move to a strip.
+- **Interviewer's room:** the candidate's CV on the left (rank, overall
+  and four scores, each requirement with the CV line that showed it,
+  roles, degree, certificates, skills, the PDF inside the page), the call
+  with the live transcript under it, and on the right the Hiring Assistant
+  (only the interviewer sees it) and the chat with the candidate.
+- **Chat:** plain text, at most 1,000 characters, 20 messages a minute per
+  side; saved (table `interview_messages`, deleted with the interview) and
+  pushed to both pages by LiveKit, with a check every few seconds as a
+  fallback. Links open in a new tab.
+- **Hiring Assistant in the room (§4B-10):** LangGraph 1 with its own
+  thread per interview (`assistant-interview-<id>`), so a job chat waiting
+  for a confirmation never blocks it and it can be prepared before the
+  call. Quick actions: from the CV, from the question bank, check gaps,
+  warm-up. Questions from the CV are made once per interview and saved
+  (asking again costs no AI request; "Make a new set" makes another).
+  Without a question bank (knowledge base, Question bank collection) the
+  assistant says so and suggests its own questions. The AI model can be
+  switched under its chat.
+- The candidate sees only the call, the chat and the interview details:
+  never the transcript, scores, CV panel, identity check or assistant
+  (N9, checked by the backend).
+- **Edge cases handled:** opened in a second tab ("Use this tab"), camera or
+  microphone blocked or busy, screen sharing cancelled or not supported
+  (phones), interviewer leaves without ending, interview ended or
+  cancelled while waiting, reconnecting, long interviews (timer h:mm:ss,
+  "+2 h 05 min over" the planned length, and a hint to end an interview
+  left live for over 3 hours).
+- Video, audio and shared screens are not recorded or stored (N16).
+
+Setup: `LIVEKIT_API_SECRET` in `.env` (32+ random characters, see
+`.env.example`); it signs the tickets and LiveKit's webhooks.
+
+**Try it on one computer:** sign in, open **Interviews → Join now**; open the
+candidate's link from the invitation email (with `EMAIL_TEST_RECIPIENT` it
+comes to you) in a second window of the **same browser** (a private window
+works), so both tabs can use the camera. Join the waiting room as the
+candidate, then click **Let in** in the interviewer's tab. Use a headset,
+or mute the tab that is not speaking, to avoid echo.
+
+**From a phone or a second computer on the same network:** set
+`LIVEKIT_NODE_IP` and `LIVEKIT_BIND_ADDRESS` in `.env` to this computer's
+network address (e.g. `192.168.1.20`) and use HTTPS for the app (see
+*Transport security*: phones only allow the camera on HTTPS).
+
+## Live transcript (speech-to-text, F4)
+
+While an interview is live, the **transcriber** container listens to the
+call and writes a speaker-attributed, timestamped transcript. Speech-to-text
+is done by **Deepgram** (Nova-3, English), streamed over a WebSocket.
+
+```
+browser ⇄ LiveKit ⇄ transcriber (hidden, listen-only participant)
+                       │ one audio stream per person (16 kHz)
+                       ▼
+                   Deepgram ──► final pieces of speech ──► transcript_turns
+                                                              │ every 1.5 s
+                         interviewer's room: Live transcript ◄┘
+```
+
+- **Speaker attribution:** each person's microphone is its own stream, so
+  the speaker is known from the track (interviewer or candidate); no
+  guessing from mixed audio. Both talking at once gives two overlapping
+  turns.
+- **Turns:** what one person says until they pause (1.2 s or more between
+  words, from Deepgram's word times, or Deepgram's "utterance end"). A turn
+  is saved with its first words and grows while the person speaks, so a
+  long answer appears live; times are milliseconds from the start of the
+  interview. Very long answers are split every 45 s. A choppy connection
+  does not chop a sentence into one-word lines.
+- **Where to read it:** a compact card under the call, and a full-height
+  **Transcript** tab beside it (larger text, the speaker and time once per
+  run of their lines, Copy the whole transcript). The card's expand icon
+  opens the tab; while the tab is open the card hides, so the video is
+  larger.
+- **Nothing is lost:** each turn is saved at once. If Deepgram or the
+  network drops, the stream reconnects (a few seconds may be missing); a
+  person who reconnects gets a new stream; a restarted transcriber joins
+  the live interviews again. When the interview ends, the last words are
+  fetched and saved before it leaves.
+- **Status in the room:** Listening, Starting…, Not running (the
+  transcriber is down), or the problem (e.g. "Deepgram refused the API
+  key", "no credit left"), and "paused while the call reconnects".
+- **Technical words:** the job's requirement names (e.g. Laravel, Docker)
+  are sent to Deepgram as key terms (Nova-3 "keyterm prompting"), so they
+  are recognised more reliably. Only job words, nothing about the candidate.
+- The transcriber checks every 2 s for live calls and joins only while the
+  interviewer or the candidate is in the call (the first 2-3 seconds of a
+  call can be missed); it leaves a room nobody has been in for 2 minutes.
+- **Measured** (two browsers, synthetic speech, this laptop): words appear
+  about 1-2 s after they are spoken; speakers always right; a 15 s mute
+  keeps the stream open; a reload continues with the new microphone; all
+  turns kept after the end. Times are accurate to about a second.
+- **Privacy:** audio is streamed to Deepgram and kept in memory only, never
+  stored (N16); Deepgram is asked not to use it for training
+  (`mip_opt_out=true`). The transcript is interviewer-only: candidates
+  get 403 (N9).
+- API: `GET /api/interviews/{id}/transcript?since=<time>` (turns new or
+  changed since then, plus the status).
+
+Setup: create an API key at deepgram.com and put it in `.env` as
+`DEEPGRAM_API_KEY`; `docker compose up -d`. Only the `transcriber`
+container receives it. It shares LiveKit's network (`network_mode`), because
+LiveKit tells participants to send media to 127.0.0.1.
+
+## Email (interview invitations)
+
+When the interviewer confirms interviews in the Hiring Assistant, each
+candidate is emailed a private link (moved interviews get a new one). The
+text comes from the knowledge base's **Email templates** collection (RAG):
+a template needs a `Subject:` line and may use `{candidate_name}`,
+`{job_title}`, `{date}`, `{time}`, `{time_zone}`, `{duration}` and
+`{interview_link}`; `- **Label:** value` lines become a details table and
+the link a "Join your interview" button (see
+`test-data/knowledge-base/email-templates/`). Each email has an HTML and a
+plain-text part, and an **invite.ics** calendar invite, so the interview
+appears in the candidate's calendar app; a moved interview updates the
+same event. A cancelled interview sends a short fixed "Interview
+cancelled" email whose invite removes the event (only to candidates who
+were sent the invitation). Without a template, a short standard text is
+used. The confirmation card shows a preview first.
+
+```
+backend --MCP (send_email)--> email-mcp --SMTP over TLS--> Gmail
+```
+
+Setup (once):
+
+1. Use a Gmail account with **2-Step Verification** on
+   (<https://myaccount.google.com/security>).
+2. Create an **app password** at <https://myaccount.google.com/apppasswords>
+   (name it "CandiVue"); Google shows 16 letters once.
+3. In `.env`: `SMTP_USER` = that Gmail address, `SMTP_PASSWORD` = the app
+   password (no spaces), and `EMAIL_TEST_RECIPIENT` = your own address.
+4. `docker compose up -d --build`
+
+Keep `EMAIL_TEST_RECIPIENT` set: every email then goes to you, with
+"[Test for <candidate address>]" in the subject, so no real person is
+mailed (N13). An email that fails never loses the interview: it shows
+"Invitation failed" and can be sent again on the Interviews page. To
+revoke access, delete the app password.
+
+## Calendar (Google Calendar)
+
+The interviewer's Google Calendar is used in two ways (§4B-8), through our
+own small MCP server in `calendar-mcp/`:
+
+```
+backend --MCP (list_busy, create_event, move_event, delete_event)--> calendar-mcp --HTTPS--> Google Calendar API
+```
+
+- **Before:** free times (`find_free_slots`) and proposed times skip the
+  interviewer's busy events as well as their CandiVue interviews. A clash
+  is a problem the assistant must fix; all-day events and events marked
+  "free" do not count. The confirmation card says "Free in your calendar".
+- **After Confirm:** each interview is added to the calendar as an event
+  (no guests, so Google never emails the candidate), moved when it is
+  rescheduled and deleted when it is cancelled. Resend on the Interviews
+  page adds it if it is still missing.
+
+If the calendar is not set up or not reachable, nothing is blocked:
+times are checked against CandiVue interviews only, with a warning, and
+the results card says "Calendar not updated: <reason>".
+
+**One-time setup** (reuses the Google Cloud project and OAuth client from
+"Job board (Blogger)"):
+
+1. In that project, enable **Google Calendar API** (*APIs & Services →
+   Library*). If the calendar belongs to another Google account, add it as
+   a test user on the OAuth consent screen.
+2. Refresh token (on your computer, not in Docker):
+
+   ```bash
+   cd calendar-mcp
+   python -m venv .venv
+   .venv\Scripts\activate            # Windows (source .venv/bin/activate on macOS/Linux)
+   pip install -r requirements-dev.txt
+   python get_refresh_token.py <client ID> <client secret>
+   ```
+
+   Sign in with the interviewer's Google account and allow access. The
+   script prints `CALENDAR_REFRESH_TOKEN=...`.
+3. Put `CALENDAR_CLIENT_ID`, `CALENDAR_CLIENT_SECRET` (the same client as
+   Blogger is fine) and `CALENDAR_REFRESH_TOKEN` in `.env`;
+   `CALENDAR_ID=primary` is the account's main calendar. Then
+   `docker compose up -d --build`.
+
+The token only allows managing calendar events (scope
+`calendar.events`). As with Blogger, a consent screen in *Testing* ends
+the token after 7 days: run step 2 again before a demo. To revoke it,
+remove CandiVue at <https://myaccount.google.com/permissions>.
 
 ## CV Collector (Google Drive)
 
@@ -540,8 +786,9 @@ Security is built into each part instead of added at the end:
   checked by content and size before they are saved; logs never contain
   applicants' names or emails.
 - **Least privilege for integrations:** only `jobboard-mcp` holds the
-  Blogger credentials (one OAuth scope: Blogger); the backend cannot use
-  them directly. The posted page escapes all JD text, and only Google
+  Blogger credentials (one OAuth scope: Blogger) and only `email-mcp` the
+  email login; the backend cannot use them directly. Emails are plain
+  text to one checked address. The posted page escapes all JD text, and only Google
   Forms links (HTTPS) are accepted as the application link.
 - **No secrets or personal data in logs or error messages**, pinned and
   audited dependencies, localhost-only ports (see the sections above).
@@ -583,7 +830,7 @@ How each connection is protected (N10):
 | Browser → backend directly (`/docs`, port 8000) | Plain HTTP, bound to `127.0.0.1` only (local-development exception, for the API documentation). |
 | nginx → backend, backend → database | Inside Docker's private network only; never leaves the machine. The database has no published port. |
 | Backend → AI provider (Google Gemini) and other external services | HTTPS (TLS), handled by the providers' client libraries. |
-| Interview audio and video (WebRTC, built with F3) | Always encrypted by the browsers (DTLS-SRTP). |
+| Interview audio and video (WebRTC through LiveKit) | Always encrypted (DTLS-SRTP) between each browser and the LiveKit container. Its ports are bound to `127.0.0.1` unless `LIVEKIT_BIND_ADDRESS` is set for another device. |
 
 **Local-development exceptions.** Plain HTTP is used only on `127.0.0.1`,
 so nothing is reachable from other machines. Never open the HTTP ports to a
@@ -615,11 +862,14 @@ HTTP stays on localhost even then.
 **Other protections in nginx** (all responses, including `/api`):
 
 - `Content-Security-Policy`: only CandiVue's own scripts, fonts and API
-  may load; no other site may frame the app.
+  may load; no other site may frame the app. Frames may only show
+  CandiVue's own pages and files it loaded itself (`blob:`, the CV preview
+  in the interview room).
 - `Referrer-Policy: no-referrer`: addresses such as interview links are
   never sent to other sites.
 - `X-Content-Type-Options`, `X-Frame-Options`, and a `Permissions-Policy`
-  that allows camera and microphone only for CandiVue itself.
+  that allows camera, microphone and screen sharing (`display-capture`)
+  only for CandiVue itself.
 - `Strict-Transport-Security` when HTTPS is used.
 - The access log hides interview link tokens (`/join/[hidden]`), and nginx
   does not reveal its version.
@@ -647,6 +897,18 @@ credentials needed):
 
 ```bash
 docker compose run --rm --build jobboard-tests
+```
+
+Email MCP server tests (a fake SMTP server, no email is sent):
+
+```bash
+docker compose run --rm --build email-tests
+```
+
+Calendar MCP server tests (a fake Google Calendar, no event is made):
+
+```bash
+docker compose run --rm --build calendar-tests
 ```
 
 Frontend tests (no backend needed; requires Node.js 22.22 or later):

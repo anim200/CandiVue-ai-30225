@@ -1,0 +1,10 @@
+# Keep the image small and free of secrets.
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.env
+.env.*
+Dockerfile
+.dockerignore
+get_refresh_token.py

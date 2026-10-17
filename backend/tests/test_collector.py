@@ -8,6 +8,7 @@ import base64
 import io
 import json
 import zipfile
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -34,6 +35,8 @@ HEADER = [
     "Consent",
 ]
 PDF = b"%PDF-1.4 synthetic test CV"
+SENT = 46302.5  # 7 Oct 2026, 12:00 in the Sheet's time zone (days since 30 Dec 1899)
+SENT_UTC = datetime(2026, 10, 7, 6, 0, tzinfo=UTC)  # the same moment (Dhaka is +6)
 CONSENT = "I agree that my CV and details are used to assess this application."
 
 
@@ -59,6 +62,10 @@ class FakeGoogle:
         """Return the Sheet with its header row."""
         return self.rows
 
+    def time_zone(self):
+        """The Sheet's time zone (the submission times are local to it)."""
+        return "Asia/Dhaka"
+
     def file_info(self, file_id):
         """Return a file's name and size (as Drive reports them)."""
         name, data = self.files[file_id]
@@ -75,7 +82,7 @@ class FakeGoogle:
 def answer(job_id, file_id, name="Candidate A", consent=CONSENT, position=None):
     """One form answer as a Sheet row."""
     return [
-        "07/10/2026 10:00:00",
+        SENT,  # Sheets sends the submission time as a number
         name,
         "candidate.a@example.com",
         position or f"JOB-{job_id} · Python Developer",
@@ -344,3 +351,47 @@ def test_candidates_cannot_upload_cvs(job_id):
     response = client.post(f"/api/jobs/{job_id}/cvs", headers=candidate, files=files)
 
     assert response.status_code == 403
+
+
+def set_deadline(job_id, closes_at):
+    """Set the job's closing date."""
+    with SessionLocal() as db:
+        db.get(Job, job_id).applications_close_at = closes_at
+        db.commit()
+
+
+def test_a_cv_sent_after_the_closing_date_is_not_collected(intake_dir, job_id):
+    set_deadline(job_id, SENT_UTC - timedelta(minutes=1))
+    google = FakeGoogle(
+        [answer(job_id, "file-0000020")], {"file-0000020": ("cv.pdf", PDF)}
+    )
+
+    result = collect_round(google)
+
+    assert result.late == 1 and result.collected == 0
+    assert candidates(job_id) == [] and google.downloads == []  # nothing stored
+
+
+def test_a_cv_sent_in_time_is_collected_even_after_the_close(intake_dir, job_id):
+    # Sent one minute before the close, collected later: the form's time counts.
+    set_deadline(job_id, SENT_UTC + timedelta(minutes=1))
+    google = FakeGoogle(
+        [answer(job_id, "file-0000021")], {"file-0000021": ("cv.pdf", PDF)}
+    )
+
+    assert collect_round(google).collected == 1
+
+
+def test_no_cvs_by_hand_after_the_closing_date(intake_dir, job_id):
+    set_deadline(job_id, datetime.now(UTC) - timedelta(hours=1))
+    client = TestClient(app)
+    interviewer = {
+        "Authorization": f"Bearer {create_access_token(1, Role.INTERVIEWER)}"
+    }
+    files = [("files", ("cv.pdf", PDF, "application/pdf"))]
+
+    response = client.post(f"/api/jobs/{job_id}/cvs", headers=interviewer, files=files)
+
+    assert response.status_code == 409
+    assert "Applications closed" in response.json()["detail"]
+    assert candidates(job_id) == []

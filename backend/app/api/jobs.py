@@ -27,11 +27,21 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import CurrentUser, require_interviewer
 from app.collector.intake import CvRejected, check_cv, find_cv, remove_cv, save_cv
+from app.core import clock
 from app.core.config import get_settings
 from app.db.database import get_db
-from app.db.models import Candidate, Job, JobDescription
+from app.db.models import (
+    Candidate,
+    CandidateScore,
+    InterviewSession,
+    Job,
+    JobDescription,
+    ScreeningRun,
+)
 from app.db.models.candidate import CandidateStatus
 from app.db.models.job import JobBoardStatus, JobDescriptionStatus, JobStatus
+from app.db.models.run import RunStatus
+from app.interviews import planning
 from app.knowledge.files import clean_filename
 from app.screening.weights import ScoringWeights, effective_weights
 
@@ -50,6 +60,9 @@ CV_MEDIA_TYPES = {
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
 NEW_JOB_TITLE = "New job"
+CLOSED = (
+    "Applications closed on {when}. To add CVs, change the closing date in the chat."
+)
 
 
 class JobOut(BaseModel):
@@ -66,6 +79,15 @@ class JobOut(BaseModel):
     # The weights screening will use, with "source": interviewer / ai / default.
     weights: dict[str, Any]
     ai_weights: dict[str, Any] | None = None  # the AI suggestion, if any
+    applications_close_at: datetime | None = None  # CVs after it are not taken
+    # The latest screening run: its status, when it finished and how many
+    # passed the gate (ranked) or not (excluded).
+    screening_status: RunStatus | None = None
+    screened_at: datetime | None = None
+    ranked_count: int = 0
+    excluded_count: int = 0
+    shortlisted_count: int = 0
+    interview_count: int = 0  # scheduled (or live) interviews
     updated_at: datetime
 
 
@@ -107,12 +129,28 @@ def job_stage(job: Job, latest_jd: JobDescription | None) -> str:
     return "jd_rejected"
 
 
+def gate_count(db: Session, run_id: int, passed: bool) -> int:
+    """How many candidates passed (or did not pass) the gate in a run."""
+    return db.scalar(
+        select(func.count(CandidateScore.id)).where(
+            CandidateScore.screening_run_id == run_id,
+            CandidateScore.passed_gate.is_(passed),
+        )
+    )
+
+
 def to_job_out(db: Session, job: Job) -> JobOut:
     """Build the job's summary with its current stage."""
     latest = db.scalar(
         select(JobDescription)
         .where(JobDescription.job_id == job.id)
         .order_by(JobDescription.version.desc())
+        .limit(1)
+    )
+    run = db.scalar(
+        select(ScreeningRun)
+        .where(ScreeningRun.job_id == job.id)
+        .order_by(ScreeningRun.id.desc())
         .limit(1)
     )
     return JobOut(
@@ -131,6 +169,22 @@ def to_job_out(db: Session, job: Job) -> JobOut:
         ),
         weights=effective_weights(job),
         ai_weights=job.ai_weights,
+        applications_close_at=job.applications_close_at,
+        screening_status=run.status if run else None,
+        screened_at=run.finished_at if run else None,
+        ranked_count=gate_count(db, run.id, True) if run else 0,
+        excluded_count=gate_count(db, run.id, False) if run else 0,
+        shortlisted_count=db.scalar(
+            select(func.count(Candidate.id)).where(
+                Candidate.job_id == job.id, Candidate.shortlisted_at.is_not(None)
+            )
+        ),
+        interview_count=db.scalar(
+            select(func.count(InterviewSession.id)).where(
+                InterviewSession.job_id == job.id,
+                InterviewSession.status.in_(planning.ACTIVE),
+            )
+        ),
         updated_at=max(job.updated_at, latest.updated_at) if latest else job.updated_at,
     )
 
@@ -209,10 +263,14 @@ def upload_cvs(
     files: Annotated[list[UploadFile], File()],
 ) -> list[UploadResult]:
     """Add CVs by hand (fallback when the Google Form route is not available).
-    Same checks as the collector; each file gets its own result, and one
-    refused file does not stop the others."""
-    if db.get(Job, job_id) is None:
+    Same checks as the collector, and none after the closing date; each file
+    gets its own result, and one refused file does not stop the others."""
+    job = db.get(Job, job_id)
+    if job is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, NOT_FOUND)
+    if job.applications_close_at and job.applications_close_at <= clock.now():
+        closed = clock.local_text(job.applications_close_at)
+        raise HTTPException(status.HTTP_409_CONFLICT, CLOSED.format(when=closed))
     if len(files) > MAX_FILES_PER_UPLOAD:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,

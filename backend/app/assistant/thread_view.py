@@ -1,9 +1,10 @@
 """Turns a saved chat thread into simple items for the screen.
 
 LangGraph stores LangChain messages; the screen needs plain items such as
-"user message", "assistant message", "profile card", "JD card", "step" or
-"review note". JD cards are read fresh from the database, so they always
-show the current status (e.g. a rejected version says so).
+"user message", "assistant message", "profile card", "JD card", "step",
+"review note", "shortlist card" or "interview results". JD cards are read
+fresh from the database, so they always show the current status (e.g. a
+rejected version says so).
 """
 
 import json
@@ -52,6 +53,12 @@ def thread_items(db: Session, messages: list) -> list[dict]:
         ):
             items.append({"kind": "posting", **message.additional_kwargs["posting"]})
             continue
+        if isinstance(message, HumanMessage) and message.additional_kwargs.get(
+            "invitations"
+        ):
+            done = message.additional_kwargs["invitations"]
+            items.append({"kind": "invitations", **done})
+            continue
         if isinstance(message, HumanMessage):
             review = message.additional_kwargs.get("review")
             kind = "review" if review else "user"
@@ -85,6 +92,20 @@ def thread_items(db: Session, messages: list) -> list[dict]:
                 items.append(
                     {"kind": "step", "text": "Saved the application form link"}
                 )
+            elif kind == "deadline":
+                text = f"Applications close on {artifact['when']}"
+                items.append({"kind": "step", "text": text})
+            elif kind == "shortlist":
+                items.append({"kind": "step", "text": "Updated the shortlist"})
+                items.append(artifact)
+            elif kind == "slots":
+                text = f"Found {len(artifact['times'])} free interview times"
+                if artifact.get("warnings"):
+                    text += " (your calendar could not be checked)"
+                items.append({"kind": "step", "text": text})
+            elif kind == "interview_plan":
+                text = "Prepared the interviews for your confirmation"
+                items.append({"kind": "step", "text": text})
             elif kind == "rag":
                 count = len(artifact.get("passages", []))
                 items.append(
@@ -93,6 +114,30 @@ def thread_items(db: Session, messages: list) -> list[dict]:
                         "text": f"Looked at {count} passages in the knowledge base",
                     }
                 )
+            elif kind == "question_bank":
+                count = len(artifact.get("passages", []))
+                text = (
+                    "The question bank is empty"
+                    if artifact.get("empty")
+                    else f"Searched the question bank ({count} passages)"
+                )
+                items.append({"kind": "step", "text": text})
+            elif kind == "questions":
+                questions = artifact.get("questions", [])
+                if not questions:
+                    items.append(
+                        {"kind": "step", "text": "The CV has not been read yet"}
+                    )
+                    continue
+                text = (
+                    "Showed the questions saved for this interview"
+                    if artifact.get("saved")
+                    else f"Made {len(questions)} questions from the CV"
+                )
+                items.append({"kind": "step", "text": text})
+                items.append(artifact)
+            elif kind == "candidate_summary":
+                items.append({"kind": "step", "text": "Read the CV summary"})
             elif kind == "jd":
                 jd = db.get(JobDescription, artifact["jd_id"])
                 if jd is not None:

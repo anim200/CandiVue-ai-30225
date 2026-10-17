@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest==9.1.1
+# Only for the one-time sign-in script (get_refresh_token.py), run locally.
+google-auth-oauthlib==1.5.0

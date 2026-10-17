@@ -5,25 +5,20 @@ real graph, database and checkpointer are used without any AI provider.
 Runs inside Docker; everything created is deleted afterwards.
 """
 
+from datetime import UTC, datetime
+
 import pytest
-from fastapi.testclient import TestClient
-from langchain_core.language_models.chat_models import BaseChatModel
+from helpers import call
 from langchain_core.messages import AIMessage
-from langchain_core.outputs import ChatGeneration, ChatResult
 from sqlalchemy import select
 
-from app.ai import llm
 from app.assistant import drafting, tools
 from app.assistant.schemas import JobDescriptionContent
-from app.auth.security import Role, create_access_token, hash_password
 from app.db.database import SessionLocal
-from app.db.models import Job, JobDescription, User
+from app.db.models import Job, JobDescription
 from app.db.models.job import JobDescriptionStatus, JobStatus
 from app.db.models.knowledge import KnowledgeCollection
-from app.graphs import hiring_assistant
-from app.graphs.checkpointer import open_checkpointer
 from app.knowledge.search import Passage
-from app.main import app
 
 pytestmark = pytest.mark.usefixtures("database_available")
 
@@ -43,35 +38,6 @@ JD = {
 }
 
 
-class ScriptedModel(BaseChatModel):
-    """Fake chat model: returns the next prepared message on every call."""
-
-    replies: list
-
-    @property
-    def _llm_type(self) -> str:
-        """Name of this fake model type."""
-        return "scripted"
-
-    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
-        """Return the next prepared reply (or raise it, to fake an outage)."""
-        reply = self.replies.pop(0)
-        if isinstance(reply, Exception):
-            raise reply
-        return ChatResult(generations=[ChatGeneration(message=reply)])
-
-    def bind_tools(self, tools, **kwargs):
-        """Tools are 'bound' by simply returning the same fake model."""
-        return self
-
-
-def call(name: str, args: dict, call_id: str = "c1") -> AIMessage:
-    """A fake LLM answer that asks for one tool call."""
-    return AIMessage(
-        content="", tool_calls=[{"name": name, "args": args, "id": call_id}]
-    )
-
-
 @pytest.fixture
 def drafts(monkeypatch):
     """Fake JD writer: records the feedback it was given, returns a fixed JD."""
@@ -84,44 +50,6 @@ def drafts(monkeypatch):
 
     monkeypatch.setattr(drafting, "draft_job_description", fake_draft)
     return calls
-
-
-@pytest.fixture
-def scripted(monkeypatch):
-    """Install a scripted LLM; tests fill its list of replies."""
-    model = ScriptedModel(replies=[])
-    monkeypatch.setattr(llm, "get_chat_model", lambda name: model)
-    monkeypatch.setattr(llm, "WAIT_BETWEEN_RETRIES", False)
-    return model.replies
-
-
-@pytest.fixture
-def client():
-    """App client with the real checkpointer (normally opened at startup)."""
-    with open_checkpointer() as checkpointer:
-        app.state.checkpointer = checkpointer
-        yield TestClient(app)
-
-
-@pytest.fixture
-def headers():
-    """A test interviewer's Authorization header; their jobs are removed afterwards."""
-    with SessionLocal() as db:
-        user = User(
-            email="ha.tester@example.com",
-            full_name="HA Tester",
-            password_hash=hash_password("x" * 10),
-        )
-        db.add(user)
-        db.commit()
-        user_id = user.id
-    yield {"Authorization": f"Bearer {create_access_token(user_id, Role.INTERVIEWER)}"}
-    with open_checkpointer() as checkpointer, SessionLocal() as db:
-        for job in db.scalars(select(Job).where(Job.created_by_id == user_id)):
-            checkpointer.delete_thread(f"{hiring_assistant.THREAD_KIND}-{job.id}")
-            db.delete(job)
-        db.delete(db.get(User, user_id))
-        db.commit()
 
 
 def new_job(client, headers) -> int:
@@ -421,7 +349,7 @@ def job_board(monkeypatch):
     from app.assistant import posting
     from app.integrations.job_board import JobBoardError
 
-    board = type("Board", (), {"posts": [], "fail": False})()
+    board = type("Board", (), {"posts": [], "updates": [], "fail": False})()
 
     def publish(title, html, labels):
         """Accept the post (or refuse it when .fail is set)."""
@@ -430,7 +358,13 @@ def job_board(monkeypatch):
         board.posts.append((title, html))
         return {"post_id": "1", "url": "https://example.blogspot.com/p/job.html"}
 
+    def update(post_id, title, html):
+        """Record an update of an existing post."""
+        board.updates.append((post_id, html))
+        return {"post_id": post_id, "url": "https://example.blogspot.com/p/job.html"}
+
     monkeypatch.setattr(posting, "publish_job_post", publish)
+    monkeypatch.setattr(posting, "update_job_post", update)
     return board
 
 
@@ -623,3 +557,52 @@ def test_profile_weights_are_a_suggestion_unless_the_interviewer_gave_them(
         assert (
             db.get(Job, job_id).weights["reason"] == "Skills matter most for this role."
         )
+
+
+def test_the_deadline_is_read_as_local_time(client, headers, scripted):
+    job_id = new_job(client, headers)
+    scripted += [
+        call("set_application_deadline", {"closes_at": "2030-01-15T17:00"}),
+        AIMessage(content="Applications close on 15 January 2030."),
+    ]
+
+    thread = say(
+        client, headers, job_id, "Close applications 15 Jan 2030, 5 pm."
+    ).json()
+
+    with SessionLocal() as db:
+        closes = db.get(Job, job_id).applications_close_at
+    assert closes == datetime(2030, 1, 15, 11, 0, tzinfo=UTC)  # 17:00 in Dhaka
+    steps = [item["text"] for item in thread["items"] if item["kind"] == "step"]
+    assert steps == ["Applications close on Tue 15 Jan 2030, 17:00"]
+
+
+def test_a_deadline_in_the_past_goes_back_to_the_llm(client, headers, scripted):
+    job_id = new_job(client, headers)
+    scripted += [
+        call("set_application_deadline", {"closes_at": "2020-01-15T17:00"}),
+        AIMessage(content="That date has passed. Which date do you mean?"),
+    ]
+
+    say(client, headers, job_id, "Close applications on 15 Jan 2020.")
+
+    with SessionLocal() as db:
+        assert db.get(Job, job_id).applications_close_at is None
+
+
+def test_a_new_deadline_updates_the_posted_job(
+    client, headers, scripted, drafts, job_board
+):
+    job_id = approved_flow(client, headers, scripted)
+    scripted += [AIMessage(content="Posted.")]
+    review(client, headers, job_id, action="approve")
+    decide(client, headers, job_id, "post")
+    scripted += [
+        call("set_application_deadline", {"closes_at": "2030-01-15T17:00"}),
+        AIMessage(content="Done: the post shows the new date."),
+    ]
+
+    say(client, headers, job_id, "Applications close 15 Jan 2030 at 5 pm.")
+
+    (post_id, html) = job_board.updates[0]
+    assert post_id == "1" and "Applications close on Tue 15 Jan 2030, 17:00" in html

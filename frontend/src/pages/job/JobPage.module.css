@@ -165,9 +165,16 @@
   animation: fadeUp 0.25s ease-out;
 }
 
-.staleNote span {
+/* A class, not "span": Mantine's buttons are built from spans too. */
+.staleText {
   flex: 1;
   min-width: 200px;
+}
+
+/* Why "Screen CVs" is disabled. */
+.hint {
+  font-size: 14px;
+  color: #7a5000;
 }
 
 @media (max-width: 47.99em) {
@@ -329,37 +336,36 @@
   margin-top: 2px;
 }
 
-.refresh {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 12px;
-  border: 1px solid #c9d0d4;
-  border-radius: 4px;
-  background: #fff;
-  color: #1a2227;
-  font-size: 14px;
-  font-weight: 600;
-  font-family: inherit;
+/* "Applicants" title: a button that folds and unfolds the list. */
+.collapseHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
+  min-width: 0;
+}
+
+.collapseHead > svg {
   flex: none;
-  transition: background 0.15s;
+  margin-top: 2px;
+  color: #66717a;
 }
 
-.refresh:hover {
-  background: #f1f4f5;
-}
-
-.refresh:active svg {
-  transform: rotate(-90deg);
-  transition: transform 0.2s;
+/* The title text wraps on phones; the Refresh button keeps its size. */
+.noShrink {
+  flex: none;
 }
 
 .head,
 .row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 130px minmax(0, 220px) 120px 150px;
+  grid-template-columns: minmax(0, 1fr) 130px minmax(0, 220px) 130px 150px;
   gap: 0 14px;
   align-items: center;
   padding: 0 20px;
@@ -468,7 +474,7 @@
 @container (max-width: 760px) {
   .head,
   .row {
-    grid-template-columns: minmax(0, 1fr) 120px 110px 140px;
+    grid-template-columns: minmax(0, 1fr) 120px 130px 140px;
   }
 
   .fileColumn {
@@ -516,10 +522,6 @@
 
   .problem {
     margin: -6px 16px 12px;
-  }
-
-  .refresh span {
-    display: none; /* icon only */
   }
 }
 

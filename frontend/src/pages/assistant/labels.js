@@ -13,6 +13,14 @@ export const STAGES = {
   posting_failed: { text: 'Posting failed', attention: true },
 };
 
+// Short names of the four scoring dimensions, e.g. "Skills 40 · Experience 30".
+export const DIMENSION_NAMES = [
+  ['skills', 'Skills'],
+  ['experience', 'Experience'],
+  ['qualifications', 'Qualifications'],
+  ['ats', 'ATS match'],
+];
+
 // Requirement levels, in the order the profile card lists them.
 export const LEVELS = [
   ['mandatory', 'Mandatory'],
@@ -33,4 +41,17 @@ export const COLLECTION_SHORT = {
 export function sourceLabel(source) {
   const name = source.filename.replace(/\.[^.]+$/, '');
   return `${COLLECTION_SHORT[source.collection] ?? 'Document'} · ${name}`;
+}
+
+// What happened in the interviewer's Google Calendar ("added", "moved",
+// "removed"); anything else is the reason it failed.
+export const CALENDAR_DONE = {
+  added: 'Added to your calendar',
+  moved: 'Moved in your calendar',
+  removed: 'Removed from your calendar',
+};
+
+// "Calendar not updated: <reason>" when it failed, null when all went well.
+export function calendarProblem(calendar) {
+  return calendar && !CALENDAR_DONE[calendar] ? `Calendar not updated: ${calendar}` : null;
 }

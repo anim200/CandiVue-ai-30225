@@ -2,7 +2,7 @@
 
 from functools import lru_cache
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -11,6 +11,8 @@ class Settings(BaseSettings):
 
     app_env: str = "development"
     log_level: str = "INFO"
+    # Local time zone for application deadlines and interview times.
+    app_timezone: str = "Asia/Dhaka"
     database_url: str  # required: the app will not start without it
     cors_origins: str = "http://localhost:5173"
 
@@ -42,6 +44,30 @@ class Settings(BaseSettings):
     # credentials live only in that container, never in the backend.
     jobboard_mcp_url: str = "http://jobboard-mcp:8001/mcp"
 
+    # Email MCP server (email-mcp container): interview invitations. The
+    # email login lives only in that container.
+    email_mcp_url: str = "http://email-mcp:8002/mcp"
+    # Where candidates open their private interview link (this app's address).
+    app_public_url: str = "http://localhost:5173"
+
+    # Calendar MCP server (calendar-mcp container): the interviewer's Google
+    # Calendar. The Google sign-in lives only in that container.
+    calendar_mcp_url: str = "http://calendar-mcp:8003/mcp"
+
+    # Video calls (F3): the LiveKit server in Docker. The key and secret sign
+    # each room "ticket" (only this backend can make them) and LiveKit's
+    # webhooks. Empty secret: calls show "not set up".
+    livekit_url: str = "http://livekit:7880"
+    livekit_api_key: str = "candivue"
+    livekit_api_secret: SecretStr | None = None
+
+    # Live transcript (F4): the transcriber container streams each speaker's
+    # audio to Deepgram. Only that container gets the key. Empty: the room
+    # says "speech-to-text is not set up".
+    deepgram_api_key: SecretStr | None = None
+    deepgram_model: str = "nova-3"
+    deepgram_language: str = "en"
+
     # CV Collector (app/collector, cv-collector container). The Google key is
     # given only to that container (read-only service account, N7).
     google_service_account_key: SecretStr | None = None  # JSON or base64 JSON
@@ -65,6 +91,20 @@ class Settings(BaseSettings):
     demo_interviewer_email: str | None = None
     demo_interviewer_name: str = "Interviewer A"
     demo_interviewer_password: SecretStr | None = None
+
+    @field_validator(
+        "llm_api_key",
+        "livekit_api_secret",
+        "deepgram_api_key",
+        "google_service_account_key",
+        "demo_interviewer_password",
+        mode="before",
+    )
+    @classmethod
+    def empty_secret_is_unset(cls, value):
+        """An empty value (e.g. "DEEPGRAM_API_KEY=" in .env, which Docker
+        passes as "") means the secret is not set."""
+        return None if isinstance(value, str) and not value.strip() else value
 
     @property
     def llm_model_list(self) -> list[str]:

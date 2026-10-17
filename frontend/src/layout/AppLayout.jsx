@@ -5,8 +5,11 @@
 // Menu style (deliberate change from the design, user 07-10-2026): section
 // titles, a teal bar on the active item, a count of jobs that need the
 // interviewer, and a reminder card at the bottom.
+// Pages may ask for an icon rail (64px) or no menu at all ("immersive": the
+// live interview, whose left column shows the CV; the burger still opens
+// the menu on phones and tablets).
 
-import { AppShell, Box, Burger, Group, NavLink } from '@mantine/core';
+import { AppShell, Box, Burger, Group, NavLink, Tooltip } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconShieldCheck } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
@@ -43,14 +46,18 @@ function useJobsNeedingAttention(pathname) {
 export default function AppLayout() {
   const { pathname } = useLocation();
   // Pages marked fullBleed (the Hiring Assistant) fill the area without padding.
-  const fullBleed = useMatches().some((match) => match.handle?.fullBleed);
+  const matches = useMatches();
+  const fullBleed = matches.some((match) => match.handle?.fullBleed);
   const [menuOpen, { toggle: toggleMenu, close: closeMenu }] = useDisclosure(false);
+  // Icons only (rail) on pages that ask for it, unless the phone menu is open.
+  const rail = matches.some((match) => match.handle?.rail) && !menuOpen;
+  const immersive = matches.some((match) => match.handle?.immersive);
   const waiting = useJobsNeedingAttention(pathname);
 
   return (
     <AppShell
       header={{ height: 56 }}
-      navbar={{ width: 240, breakpoint: 'md', collapsed: { mobile: !menuOpen } }}
+      navbar={{ width: rail ? 64 : 240, breakpoint: 'md', collapsed: { mobile: !menuOpen, desktop: immersive } }}
     >
       <AppShell.Header px={{ base: 12, sm: 20 }}>
         <Group h="100%" justify="space-between" wrap="nowrap">
@@ -71,45 +78,49 @@ export default function AppLayout() {
         </Group>
       </AppShell.Header>
 
-      <AppShell.Navbar className={classes.navbar}>
+      <AppShell.Navbar className={`${classes.navbar} ${rail ? classes.rail : ''}`}>
         <nav className={classes.menu} aria-label="Main menu">
           {GROUPS.map(([group, items]) => (
             <div key={group} className={classes.group}>
-              <div className={classes.sectionTitle}>{group}</div>
+              {!rail && <div className={classes.sectionTitle}>{group}</div>}
               {items.map(({ path, label, icon: Icon }) => {
-                const count = path === '/assistant' ? waiting : 0;
+                const count = path === '/assistant' && !rail ? waiting : 0;
                 return (
-                  <NavLink
-                    key={path}
-                    component={Link}
-                    to={path}
-                    label={label}
-                    leftSection={<Icon size={19} stroke={1.6} />}
-                    rightSection={
-                      count > 0 && (
-                        <span className={classes.count} title={`${count} job(s) need you`}>
-                          {count}
-                        </span>
-                      )
-                    }
-                    active={pathname.startsWith(path)}
-                    classNames={{ root: classes.navLink, section: classes.navIcon }}
-                    onClick={closeMenu} // on phones, close the menu after choosing
-                  />
+                  <Tooltip key={path} label={label} position="right" disabled={!rail}>
+                    <NavLink
+                      component={Link}
+                      to={path}
+                      label={rail ? null : label}
+                      aria-label={label}
+                      leftSection={<Icon size={19} stroke={1.6} />}
+                      rightSection={
+                        count > 0 && (
+                          <span className={classes.count} title={`${count} job(s) need you`}>
+                            {count}
+                          </span>
+                        )
+                      }
+                      active={pathname.startsWith(path)}
+                      classNames={{ root: classes.navLink, section: classes.navIcon }}
+                      onClick={closeMenu} // on phones, close the menu after choosing
+                    />
+                  </Tooltip>
                 );
               })}
             </div>
           ))}
         </nav>
 
-        <div className={classes.footerCard}>
-          <IconShieldCheck size={18} className={classes.footerIcon} />
-          <div>
-            <div className={classes.footerTitle}>You stay in control</div>
-            Nothing is posted or sent until you confirm. Candidates never see scores or
-            reports.
+        {!rail && (
+          <div className={classes.footerCard}>
+            <IconShieldCheck size={18} className={classes.footerIcon} />
+            <div>
+              <div className={classes.footerTitle}>You stay in control</div>
+              Nothing is posted or sent until you confirm. Candidates never see scores or
+              reports.
+            </div>
           </div>
-        </div>
+        )}
       </AppShell.Navbar>
 
       <AppShell.Main bg="#F5F7F8">

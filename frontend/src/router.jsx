@@ -9,6 +9,8 @@ import HiringAssistantPage from './pages/assistant/HiringAssistantPage';
 import CandidateJoinPage from './pages/CandidateJoinPage';
 import ComingSoonPage from './pages/ComingSoonPage';
 import ErrorPage from './pages/ErrorPage';
+import InterviewRoomPage from './pages/interview/InterviewRoomPage';
+import InterviewsPage from './pages/InterviewsPage';
 import JobPage from './pages/job/JobPage';
 import JobsPage from './pages/JobsPage';
 import KnowledgeBasePage from './pages/knowledge/KnowledgeBasePage';
@@ -18,11 +20,15 @@ import NotFoundPage from './pages/NotFoundPage';
 // Screens that are built; other menu items still show "coming soon".
 const BUILT_PAGES = {
   '/jobs': <JobsPage />,
+  '/interviews': <InterviewsPage />,
   '/knowledge-base': <KnowledgeBasePage />,
 };
 
-// The Hiring Assistant fills the whole area (no page padding).
+// The Hiring Assistant and the interview room fill the whole area (no page
+// padding); during an interview the menu is hidden: the left column shows
+// the candidate's CV instead (user request, 13-10-2026).
 const FULL_BLEED = { fullBleed: true };
+const LIVE_ROOM = { fullBleed: true, immersive: true };
 
 // errorElement: shown instead of a crashed page; never shows technical
 // details (N12).
@@ -45,6 +51,7 @@ export const router = createBrowserRouter([
       { path: 'assistant', element: <HiringAssistantPage />, handle: FULL_BLEED },
       { path: 'assistant/:jobId', element: <HiringAssistantPage />, handle: FULL_BLEED },
       { path: 'jobs/:jobId', element: <JobPage /> },
+      { path: 'interviews/:interviewId/room', element: <InterviewRoomPage />, handle: LIVE_ROOM },
       // Each module replaces its "coming soon" page with the real screen.
       ...NAV_ITEMS.filter((item) => item.path !== '/assistant').map((item) => ({
         path: item.path,

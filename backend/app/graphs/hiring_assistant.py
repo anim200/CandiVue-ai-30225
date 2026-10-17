@@ -1,4 +1,5 @@
-r"""LangGraph 1: the Hiring Assistant (Figure 3), part 1 "Prepare the job".
+r"""LangGraph 1: the Hiring Assistant (Figure 3): prepare the job, then
+shortlist and invite candidates.
 
     START -> load_context -> assistant --(tool call)--> tools --> assistant ...
                                        \--(reply)-----> END
@@ -9,6 +10,8 @@ r"""LangGraph 1: the Hiring Assistant (Figure 3), part 1 "Prepare the job".
              confirm_posting --post---> post_to_job_board --> assistant
              confirm_posting --skip---> assistant (job stays unposted)
              tools --(request_job_posting)--> confirm_posting (ask again later)
+             tools --(invitations planned)--> confirm_invitations (interrupt)
+             confirm_invitations --> assistant (saved, or nothing done)
 
 - The LLM ("assistant") decides which tool to call; RAG only if useful.
 - human_review PAUSES the graph (LangGraph interrupt) until the interviewer
@@ -16,7 +19,15 @@ r"""LangGraph 1: the Hiring Assistant (Figure 3), part 1 "Prepare the job".
   checkpointer, so it survives a restart (N26).
 - confirm_posting PAUSES again and asks "Post this job to the job board?".
   Only the interviewer's "Post" click publishes it.
+- confirm_invitations PAUSES with the checked plan (invite, reschedule or
+  cancel interviews); nothing is saved until the interviewer confirms
+  (§4B-7b), and everything is checked again at that moment.
 - One thread per job: thread_id "assistant-job-<id>".
+- Interview room mode (§4B-10): the same graph helps during a live interview
+  with its own thread per interview, "assistant-interview-<session id>"
+  (session_id in the state). It then gets only the room tools (question
+  bank, CV questions, CV summary, rag_search) and the room instructions; a
+  job chat waiting for a confirmation never blocks it. No interrupts here.
 - Retry path (§8.2): a tool call with invalid arguments is sent back to the
   LLM as an error message so it can correct itself.
 """
@@ -34,25 +45,35 @@ from sqlalchemy import select
 
 from app.ai.llm import invoke_llm
 from app.assistant import posting
-from app.assistant.prompts import ASSISTANT_PROMPT
+from app.assistant.prompts import ASSISTANT_PROMPT, ROOM_PROMPT
+from app.assistant.room_tools import ROOM_TOOLS, question_bank_size
 from app.assistant.schemas import JobDescriptionContent
-from app.assistant.tools import TOOLS
+from app.assistant.tools import TOOLS, rag_search
+from app.core import clock
 from app.db.database import SessionLocal
-from app.db.models import Job, JobDescription
+from app.db.models import InterviewSession, Job, JobDescription
 from app.db.models.job import JobBoardStatus, JobDescriptionStatus, JobStatus
+from app.interviews import planning
 from app.runs.runner import graph_config
 
 logger = logging.getLogger(__name__)
 
 THREAD_KIND = "assistant-job"
+ROOM_THREAD_KIND = "assistant-interview"
 MAX_STEPS = 30  # safety limit for one chat turn (stops endless tool loops)
+ROOM_TOOLSET = [*ROOM_TOOLS, rag_search]  # what the LLM may call in the room
+# Every tool the graph can run (each once, by name).
+ALL_TOOLS = list({t.name: t for t in [*TOOLS, *ROOM_TOOLSET]}.values())
 
 
 class AssistantState(MessagesState):
     """What the graph carries between steps: the chat messages (from
-    MessagesState), the job, a context summary and the last review action."""
+    MessagesState), the job and the interviewer chatting, a context summary
+    and the last review action."""
 
     job_id: int
+    interviewer_id: int
+    session_id: int | None  # set in the interview room
     context: str
     review_action: str | None
 
@@ -64,8 +85,17 @@ def thread_config(job_id: int) -> dict:
     return config
 
 
+def room_thread_config(session_id: int) -> dict:
+    """LangGraph config for an interview's assistant thread (the room)."""
+    config = graph_config(ROOM_THREAD_KIND, session_id)
+    config["recursion_limit"] = MAX_STEPS
+    return config
+
+
 def load_context(state: AssistantState) -> dict:
     """Read the job, its saved profile and latest JD, as a summary for the LLM."""
+    if state.get("session_id"):
+        return {"context": room_context(state["session_id"]), "review_action": None}
     with SessionLocal() as db:
         job = db.get(Job, state["job_id"])
         latest = db.scalar(
@@ -80,19 +110,52 @@ def load_context(state: AssistantState) -> dict:
             if latest
             else "none yet"
         )
+        closes = job.applications_close_at
+        deadline = clock.local_text(closes) if closes else "not set yet"
         return {
-            "context": f"Current job: {job.title}\nSaved profile: {profile}\nLatest JD: {jd}",
+            "context": (
+                f"Now: {clock.local_text(clock.now())} ({clock.local_zone().key})\n"
+                f"Current job: {job.title}\nSaved profile: {profile}\nLatest JD: {jd}\n"
+                f"Applications close: {deadline}"
+            ),
             "review_action": None,
         }
 
 
+def room_context(session_id: int) -> str:
+    """What the LLM knows about the interview in the room. The candidate's
+    name is left out; CV facts come only through the tools (reduced)."""
+    with SessionLocal() as db:
+        session = db.get(InterviewSession, session_id)
+        job = db.get(Job, session.job_id)
+        requirements = "; ".join(
+            f"{r['text']} ({r['level']})"
+            for r in (job.profile or {}).get("requirements", [])
+        )
+        bank = question_bank_size(db)
+        return (
+            f"Now: {clock.local_text(clock.now())} ({clock.local_zone().key})\n"
+            f"Interview for the job: {job.title}\n"
+            f"Job requirements: {requirements or 'none saved'}\n"
+            f"Scheduled: {clock.local_text(session.scheduled_at)}, "
+            f"{session.duration_minutes} minutes\n"
+            f"Question bank documents: {bank}{' (empty)' if bank == 0 else ''}\n"
+            "CV questions already made for this interview: "
+            + ("yes" if session.cv_questions else "no")
+        )
+
+
 def assistant(state: AssistantState) -> dict:
-    """The LLM reads the chat and decides: reply, or call a tool."""
+    """The LLM reads the chat and decides: reply, or call a tool. In the
+    interview room it gets the room instructions and tools only."""
+    room = bool(state.get("session_id"))
+    instructions = ROOM_PROMPT if room else ASSISTANT_PROMPT
+    tools = ROOM_TOOLSET if room else TOOLS
     prompt = [
-        SystemMessage(f"{ASSISTANT_PROMPT}\n\n{state['context']}"),
+        SystemMessage(f"{instructions}\n\n{state['context']}"),
         *state["messages"],
     ]
-    answer = invoke_llm(prompt, prepare=lambda model: model.bind_tools(TOOLS))
+    answer = invoke_llm(prompt, prepare=lambda model: model.bind_tools(tools))
     return {"messages": [answer]}
 
 
@@ -113,6 +176,8 @@ def after_tools(state: AssistantState) -> str:
             return "human_review"
         if kind == "post_request":
             return "confirm_posting"
+        if kind == "interview_plan":
+            return "confirm_invitations"
     return "assistant"
 
 
@@ -239,6 +304,55 @@ def after_confirm(state: AssistantState) -> str:
     return "post_to_job_board" if state["review_action"] == "post" else "assistant"
 
 
+def confirm_invitations(state: AssistantState) -> dict:
+    """Pause until the interviewer confirms (possibly after changing times or
+    leaving people out) or cancels the planned interviews; then save them."""
+    plan = next(
+        m.artifact
+        for m in reversed(state["messages"])
+        if isinstance(m, ToolMessage)
+        and (m.artifact or {}).get("kind") == "interview_plan"
+    )
+    # The graph stops here until the interviewer answers on the card.
+    decision = interrupt({**plan, "kind": "invitation_confirmation"})
+
+    if decision["action"] == "cancel":
+        note = "I cancelled this. Nothing was saved."
+        return {
+            "messages": [HumanMessage(note, additional_kwargs={"review": "cancel"})]
+        }
+    with SessionLocal() as db:
+        checked = planning.make_plan(
+            db,
+            state["job_id"],
+            state["interviewer_id"],
+            plan["action"],
+            decision["items"],
+            plan["duration"],
+            plan["invite_again"],
+        )
+        results = planning.apply(db, checked, state["job_id"], state["interviewer_id"])
+    done = sum(r["done"] for r in results)
+    skipped = "; ".join(f"{r['name']}: {r['reason']}" for r in results if not r["done"])
+    unsent = "; ".join(
+        f"{r['name']}: {r['email']}"
+        for r in results
+        if r["email"] not in (None, "sent")
+    )
+    no_calendar = "; ".join(
+        f"{r['name']}: {r['calendar']}"
+        for r in results
+        if r["calendar"] not in (None, "added", "moved", "removed")
+    )
+    note = f"I confirmed ({plan['action']}): {done} done."
+    note += f" Skipped: {skipped}." if skipped else ""
+    note += f" Emails not sent: {unsent}." if unsent else ""
+    note += f" Calendar not updated: {no_calendar}." if no_calendar else ""
+    logger.info("Interviews %s: job %d, %d done", plan["action"], state["job_id"], done)
+    marks = {"invitations": {"action": plan["action"], "results": results}}
+    return {"messages": [HumanMessage(note, additional_kwargs=marks)]}
+
+
 def posting_message(result: dict) -> HumanMessage:
     """A chat note with the job board result (marked so the screen shows a card)."""
     text = {
@@ -266,18 +380,22 @@ def build_hiring_assistant(checkpointer):
     graph.add_node(
         "tools",
         ToolNode(
-            TOOLS, handle_tool_errors=(ToolInvocationError, ValidationError, ValueError)
+            ALL_TOOLS,
+            handle_tool_errors=(ToolInvocationError, ValidationError, ValueError),
         ),
     )
     graph.add_node("human_review", human_review)
     graph.add_node("confirm_posting", confirm_posting)
     graph.add_node("post_to_job_board", post_to_job_board)
+    graph.add_node("confirm_invitations", confirm_invitations)
 
     graph.add_edge(START, "load_context")
     graph.add_edge("load_context", "assistant")
     graph.add_conditional_edges("assistant", after_assistant, ["tools", END])
     graph.add_conditional_edges(
-        "tools", after_tools, ["human_review", "confirm_posting", "assistant"]
+        "tools",
+        after_tools,
+        ["human_review", "confirm_posting", "confirm_invitations", "assistant"],
     )
     graph.add_conditional_edges(
         "human_review", after_review, ["human_review", "confirm_posting", "assistant"]
@@ -286,4 +404,5 @@ def build_hiring_assistant(checkpointer):
         "confirm_posting", after_confirm, ["post_to_job_board", "assistant"]
     )
     graph.add_edge("post_to_job_board", "assistant")
+    graph.add_edge("confirm_invitations", "assistant")
     return graph.compile(checkpointer=checkpointer)

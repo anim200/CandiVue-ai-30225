@@ -37,14 +37,16 @@ class FakeSession:
         self.sent.append((url, json))
         return self.response
 
+    patch = post  # an update is recorded and answered the same way
 
-def call_tool(arguments):
-    """Call create_job_post through an in-memory MCP client."""
+
+def call_tool(arguments, tool="create_job_post"):
+    """Call a tool through an in-memory MCP client."""
 
     async def run():
         """Connect, call and return the result."""
         async with Client(server.server) as client:
-            return await client.call_tool("create_job_post", arguments)
+            return await client.call_tool(tool, arguments)
 
     return asyncio.run(run())
 
@@ -75,6 +77,29 @@ def test_post_is_published_and_its_address_returned(blog):
     url, body = blog.sent[0]
     assert url.endswith("/blogs/123/posts/")
     assert body["title"] == "Python Backend Developer" and body["content"] == HTML
+
+
+def test_a_post_is_updated_in_place(blog):
+    result = call_tool(
+        {"post_id": "999", "title": "Python Backend Developer", "html": HTML},
+        tool="update_job_post",
+    )
+
+    assert not result.is_error
+    assert result.structured_content["post_id"] == "999"
+    url, body = blog.sent[0]
+    assert url.endswith("/blogs/123/posts/999")
+    assert body == {"title": "Python Backend Developer", "content": HTML}
+
+
+def test_an_update_needs_a_numeric_post_id(blog):
+    result = call_tool(
+        {"post_id": "../other", "title": "Python Backend Developer", "html": HTML},
+        tool="update_job_post",
+    )
+
+    assert result.is_error
+    assert blog.sent == []  # nothing reached Blogger
 
 
 def test_refused_post_gives_a_clear_error(blog):
