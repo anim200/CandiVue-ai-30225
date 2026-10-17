@@ -1,7 +1,8 @@
 """Question–answer units of an interview and how they cover the job (F5).
 
-The LLM proposes the units (segmentation) and evaluates each one; this
-module checks every answer against the transcript before anything is kept:
+The LLM proposes the units (segmentation) and evaluates them in batches;
+this module checks every answer against the transcript before anything is
+kept:
 line numbers must exist and come from the right person, a multi-part
 question becomes Q6a / Q6b, a follow-up is linked to the question it follows,
 and the requirements a unit explores must be the job's own. Coverage and the
@@ -24,6 +25,7 @@ MAX_UNITS = 60
 NOT_SCORED = {
     "other": "Small talk, logistics or not about the job: not scored.",
     "unanswered": "No answer from the candidate in the transcript.",
+    "missing": "No evaluation came back for this answer: use Analyse again.",
 }
 
 
@@ -58,6 +60,7 @@ class DimensionScore(BaseModel):
 class Evaluation(BaseModel):
     """The LLM's evaluation of one answer."""
 
+    unit: str = Field(description='The unit id, e.g. "Q2a"')
     relevance: DimensionScore
     accuracy: DimensionScore
     completeness: DimensionScore
@@ -70,8 +73,14 @@ class Evaluation(BaseModel):
         description="Numbers of the job requirements this answer explores"
     )
     sources: list[int] = Field(
-        description="Numbers of the reference passages used to judge accuracy"
+        description="Numbers of the unit's reference passages used to judge accuracy"
     )
+
+
+class Evaluations(BaseModel):
+    """The evaluations of one batch of answers (one per unit)."""
+
+    evaluations: list[Evaluation]
 
 
 def build_pairs(units: list[QAUnit], lines: list[Line]) -> list[dict]:
@@ -174,9 +183,10 @@ def is_scored(pair: dict) -> bool:
     return pair["kind"] != "other" and pair["answered"]
 
 
-def not_scored(pair: dict) -> dict:
-    """The pair marked as not scored, with the reason shown on screen."""
-    reason = "other" if pair["kind"] == "other" else "unanswered"
+def not_scored(pair: dict, reason: str | None = None) -> dict:
+    """The pair marked as not scored, with the reason shown on screen
+    (by default: small talk, or no answer)."""
+    reason = reason or ("other" if pair["kind"] == "other" else "unanswered")
     return pair | {"status": "not_scored", "reason": NOT_SCORED[reason]}
 
 

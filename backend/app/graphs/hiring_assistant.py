@@ -7,11 +7,11 @@ shortlist and invite candidates.
              human_review --approve--> confirm_posting (interrupt)
              human_review --reject---> assistant (writes a new version)
              human_review --edit-----> human_review (new version to approve)
-             confirm_posting --post---> post_to_job_board --> assistant
-             confirm_posting --skip---> assistant (job stays unposted)
+             confirm_posting --post---> post_to_job_board --> END
+             confirm_posting --skip---> END (job stays unposted)
              tools --(request_job_posting)--> confirm_posting (ask again later)
              tools --(invitations planned)--> confirm_invitations (interrupt)
-             confirm_invitations --> assistant (saved, or nothing done)
+             confirm_invitations --> END (saved, or nothing done)
 
 - The LLM ("assistant") decides which tool to call; RAG only if useful.
 - human_review PAUSES the graph (LangGraph interrupt) until the interviewer
@@ -30,6 +30,9 @@ shortlist and invite candidates.
   job chat waiting for a confirmation never blocks it. No interrupts here.
 - Retry path (§8.2): a tool call with invalid arguments is sent back to the
   LLM as an error message so it can correct itself.
+- After posting, skipping or confirming invitations the turn ends without
+  another AI request: the chat card already shows the result (fewer
+  requests on the free tier, README "AI usage").
 """
 
 import logging
@@ -300,8 +303,9 @@ def confirm_posting(state: AssistantState) -> dict:
 
 
 def after_confirm(state: AssistantState) -> str:
-    """Post only when the interviewer chose "Post"; otherwise back to the LLM."""
-    return "post_to_job_board" if state["review_action"] == "post" else "assistant"
+    """Post only when the interviewer chose "Post"; otherwise the turn ends
+    (the job stays unposted until they ask)."""
+    return "post_to_job_board" if state["review_action"] == "post" else END
 
 
 def confirm_invitations(state: AssistantState) -> dict:
@@ -401,8 +405,8 @@ def build_hiring_assistant(checkpointer):
         "human_review", after_review, ["human_review", "confirm_posting", "assistant"]
     )
     graph.add_conditional_edges(
-        "confirm_posting", after_confirm, ["post_to_job_board", "assistant"]
+        "confirm_posting", after_confirm, ["post_to_job_board", END]
     )
-    graph.add_edge("post_to_job_board", "assistant")
-    graph.add_edge("confirm_invitations", "assistant")
+    graph.add_edge("post_to_job_board", END)
+    graph.add_edge("confirm_invitations", END)
     return graph.compile(checkpointer=checkpointer)

@@ -6,8 +6,8 @@ numbers are repeatable and every conclusion stays traceable:
   explored) and transcript lines ("T12", "Transcript 02:47"), cleaned of
   names and contact details like everything sent to the LLM (N18).
 - component_scores() and suitability(): the CV screening score (F2) and the
-  four interview dimensions (F5) side by side, and the overall position on
-  a 4-step scale. The position is a summary for the interviewer, never a
+  interview score (F9) side by side, and the overall position on a 4-step
+  scale. The position is a summary for the interviewer, never a
   decision (B-goals: humans decide).
 - check_sources(): keeps only cited ids that exist, so a conclusion either
   rests on real evidence or is shown as unsupported.
@@ -17,7 +17,6 @@ from statistics import mean
 
 from sqlalchemy.orm import Session
 
-from app.analysis.qa_pairs import DIMENSIONS
 from app.analysis.transcript import Line, clock_text
 from app.db.models import Candidate, InterviewSession
 from app.interviews.cv_view import clean_text, name_parts
@@ -48,12 +47,37 @@ def evidence(
     matches: list[dict],
     requirements: list[dict],
 ) -> dict[str, dict]:
-    """Everything a conclusion may cite, by id: CV items (the parsed CV and
-    the CV lines screening matched to each requirement), each job
+    """Everything a conclusion may cite, by id: CV items, each job
     requirement's coverage record (what screening found, which Q&A units
     explored it: the evidence for "never discussed"), then the transcript
     lines."""
-    candidate = db.get(Candidate, session.candidate_id)
+    found = cv_items(db.get(Candidate, session.candidate_id), matches)
+    for number, r in enumerate(requirements, start=1):
+        interview = ", ".join(r["pair_ids"]) or "never explored"
+        found[f"R{number}"] = {
+            "kind": "requirement",
+            "label": f"Requirement · {r['requirement']}",
+            "text": (
+                f"{r['requirement']} ({r['level']}). CV screening: "
+                f"{r['cv'] or 'not checked'}. Interview: {interview}."
+            ),
+        }
+    for line in lines:
+        found[f"T{line.number}"] = {
+            "kind": "transcript",
+            "label": f"Transcript {clock_text(line.start_ms)}",
+            "turn_id": line.turn_id,
+            "start_ms": line.start_ms,
+            "speaker": line.speaker.value,
+            "text": line.text,
+        }
+    return found
+
+
+def cv_items(candidate: Candidate, matches: list[dict]) -> dict[str, dict]:
+    """The CV facts a conclusion or a claims check may cite ("CV1", ...):
+    roles with dates, skills, degree, certificates and the CV lines
+    screening matched to each requirement, without names or contacts."""
     names = name_parts(candidate.full_name)
     parsed = candidate.parsed_cv or {}
     items: list[tuple[str, str]] = [
@@ -84,34 +108,15 @@ def evidence(
                 "label": f"CV · {section}",
                 "text": text,
             }
-    for number, r in enumerate(requirements, start=1):
-        interview = ", ".join(r["pair_ids"]) or "never explored"
-        found[f"R{number}"] = {
-            "kind": "requirement",
-            "label": f"Requirement · {r['requirement']}",
-            "text": (
-                f"{r['requirement']} ({r['level']}). CV screening: "
-                f"{r['cv'] or 'not checked'}. Interview: {interview}."
-            ),
-        }
-    for line in lines:
-        found[f"T{line.number}"] = {
-            "kind": "transcript",
-            "label": f"Transcript {clock_text(line.start_ms)}",
-            "turn_id": line.turn_id,
-            "start_ms": line.start_ms,
-            "speaker": line.speaker.value,
-            "text": line.text,
-        }
     return found
 
 
 def component_scores(
-    screening: dict | None, pairs: list[dict], coverage: list[dict]
+    screening: dict | None, interview: dict | None, coverage: list[dict]
 ) -> dict:
-    """The parts the position rests on: CV screening (F2), the interview's
-    four dimensions averaged over the scored Q&A units (F5), and how many
-    job requirements the interview explored."""
+    """The parts the position rests on: CV screening (F2), the interview
+    score on six dimensions (F9) and how many job requirements the
+    interview explored."""
     cv = None
     if screening and screening.get("overall") is not None:
         cv = {
@@ -127,14 +132,6 @@ def component_scores(
                 for key, d in screening.get("dimensions", {}).items()
             },
         }
-    scored = [p for p in pairs if p.get("status") == "scored"]
-    interview = None
-    if scored:
-        interview = {
-            name: round(mean(p["scores"][name]["score"] for p in scored))
-            for name in DIMENSIONS
-        }
-        interview |= {"overall": round(mean(interview.values())), "scored": len(scored)}
     return {
         "cv": cv,
         "interview": interview,
