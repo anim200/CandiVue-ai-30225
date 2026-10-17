@@ -10,7 +10,9 @@ assumes identity:
   (MATCH_FROM) and none clearly does not (LOW_FROM);
 - low_confidence: somewhere in between (the profile stays hidden);
 - no_match: clearly not them, or clearly another applicant of the job;
-- no_face / several_faces / camera_off: nothing usable to compare;
+- no_face / too_small / several_faces / camera_off: nothing usable to
+  compare (too_small: the face has too few pixels, e.g. sitting far back,
+  poor light, or the browser lowering the video quality on a busy computer);
 - checking: not enough pictures yet; no_reference: no consent given.
 
 SFace's own same-person threshold is a cosine similarity of 0.363
@@ -37,6 +39,7 @@ TEXTS = {
     "low_confidence": "Low confidence: the face is not clear enough to confirm",
     "no_match": "No match with the invited candidate's reference",
     "no_face": "No face in view",
+    "too_small": "Face too small or unclear: ask the candidate to sit closer or improve the light",
     "several_faces": "More than one face in view",
     "camera_off": "Camera off or no picture",
     "checking": "Checking…",
@@ -63,8 +66,7 @@ def decide(samples: list[Sample]) -> dict:
     usable = [s for s in recent if s.own is not None]
     if len(usable) < 2:
         if len(recent) == WINDOW:  # most pictures were unusable
-            problem = recent[-1].problem or "no_face"
-            return _result("no_face" if problem == "too_small" else problem)
+            return _result(recent[-1].problem or "no_face")
         return _result("checking")
     own = mean(s.own for s in usable)
     best_other = max(

@@ -17,6 +17,7 @@ const GAP_MS = 400; // between the pictures, so they differ a little
 
 // Take one JPEG picture from the playing video.
 function snapshot(video) {
+  if (!video.videoWidth) throw new Error('The camera isn’t ready yet. Please try again in a moment.');
   const canvas = document.createElement('canvas');
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
@@ -89,8 +90,7 @@ function PhotoStep({ onSaved, onBack }) {
       .then((media) => {
         if (stopped) return media.getTracks().forEach((track) => track.stop());
         stream = media;
-        videoRef.current.srcObject = media;
-        setCamera('ready');
+        videoRef.current.srcObject = media; // "ready" once it plays (onPlaying)
       })
       .catch(() => !stopped && setCamera('blocked'));
     return () => {
@@ -122,7 +122,14 @@ function PhotoStep({ onSaved, onBack }) {
       <h2 className={classes.title}>Look at the camera</h2>
       <p className={classes.lead}>Keep your face inside the oval, in good light, with nobody else in view.</p>
       <div className={classes.stage}>
-        <video ref={videoRef} className={classes.video} autoPlay muted playsInline />
+        <video
+          ref={videoRef}
+          className={classes.video}
+          autoPlay
+          muted
+          playsInline
+          onPlaying={() => setCamera('ready')}
+        />
         <div className={`${classes.oval} ${busy ? classes.ovalBusy : ''}`} aria-hidden="true" />
         {camera !== 'ready' && (
           <div className={classes.cameraNote}>

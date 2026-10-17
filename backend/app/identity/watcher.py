@@ -62,8 +62,11 @@ class FaceWatcher:
         references, recheck_seen = await asyncio.to_thread(_load, self.session_id)
         if references is None:
             return  # no consent: the face is never checked
-        # A medium-size picture is plenty for a face and costs less to decode.
-        self.publication.set_video_quality(rtc.VideoQuality.VIDEO_QUALITY_MEDIUM)
+        # The full-size picture: a smaller layer (e.g. 320x240 from a 640x480
+        # camera) leaves too few pixels for a face (measured in the 45-minute
+        # test: "no face" after LiveKit switched layers). Same machine, so
+        # the bandwidth does not matter.
+        self.publication.set_video_quality(rtc.VideoQuality.VIDEO_QUALITY_HIGH)
         stream = rtc.VideoStream(self.track, capacity=1)  # keeps the newest only
         samples: list[Sample] = []
         logger.info("Identity check started: session %d", self.session_id)
