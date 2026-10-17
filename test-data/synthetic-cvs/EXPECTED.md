@@ -41,6 +41,7 @@ Docker. Preferred: AWS certification. Years are counted up to October 2026.
 | 26 | 26-hana-wishful.docx | ~9.8 | **Excluded** | **Wish only:** "Interested in learning Docker" does not count (the second look agrees) |
 | 27 | 27-ravi-containers.docx | ~8.8 | Ranked | **Docker never named:** "container images ... Compose files", found by meaning or by the local model's second look |
 | 28 | 28-mei-since.docx | ~10.4 | Top group | **New date formats:** "Since March 2019" and "06.2016 – 02.2019"; MSc; AWS cert |
+| 29 | 29-imran-crossway.pdf | ~7 | Ranked | **Talent rediscovery (F11):** passes the PHP gate (PHP, Laravel, Docker) but is strongest in Python/Django/FastAPI: a clear match for a Python backend job |
 
 Notes:
 - 23-28 are small Word files for trying the local-model cases by hand

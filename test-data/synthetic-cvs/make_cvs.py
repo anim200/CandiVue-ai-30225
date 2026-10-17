@@ -1,4 +1,4 @@
-"""Make the 28 SYNTHETIC test CVs for the "PHP Laravel Developer" test job.
+"""Make the 29 SYNTHETIC test CVs for the "PHP Laravel Developer" test job.
 
 Every person here is made up (example.com emails, fake +880 1700-0000xx
 phone numbers). Each CV says "SYNTHETIC TEST CV" at the top. Real CVs must
@@ -516,6 +516,30 @@ CVS = [
         "education": [("MSc in Computer Science", "Sample University", "2014 – 2016")],
         "certs": ["AWS Certified Developer – Associate (2024)"],
         "skills": {"Skills": "PHP, Laravel, Docker, AWS, Redis"}, "projects": [],
+    },
+    {
+        # Talent rediscovery (F11): applies for the PHP job and passes its
+        # gate, but is strongest in Python, so a clear match for a Python
+        # backend job (a runner-up worth finding again).
+        "file": "29-imran-crossway", "layout": "classic",
+        "name": "Imran Crossway", "role": "Backend Developer (Python and PHP)", "phone": "29", "city": "Dhaka",
+        "summary": "Backend developer with 7 years of experience: the last 5 in Python with Django and FastAPI, before that 2 years of PHP and Laravel. Ships every service in Docker and deploys on AWS.",
+        "jobs": [
+            job("Senior Python Developer", "Contoso Payments, Dhaka", "Jan 2022 – Present",
+                "Leads the payments API built with FastAPI, PostgreSQL and Celery (2 million requests a day).",
+                "Moved all services to Docker and Docker Compose; deploys on AWS ECS.",
+                "Maintains a legacy Laravel 8 admin panel used by the support team."),
+            job("Python Developer", "Adventure Works Logistics, Dhaka", "Feb 2020 – Dec 2021",
+                "Built Django REST Framework services for shipment tracking.",
+                "Wrote pytest suites and GitHub Actions pipelines."),
+            job("PHP Developer", "Wingtip Web Studio, Dhaka", "Jan 2018 – Jan 2020",
+                "Built Laravel and plain PHP websites and REST APIs for small businesses."),
+        ],
+        "education": [("BSc in Computer Science and Engineering", "Sample Engineering University", "2013 – 2017")],
+        "certs": ["AWS Certified Developer – Associate (2023)"],
+        "skills": {"Languages": "Python, PHP, SQL", "Frameworks": "Django, FastAPI, Celery, Laravel",
+                   "Tools": "Docker, Docker Compose, PostgreSQL, Redis, AWS, pytest, Git"},
+        "projects": ["Payments API: idempotent retries and webhooks, 99.95% uptime."],
     },
 ]
 
