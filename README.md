@@ -835,7 +835,9 @@ Use only sample or synthetic CVs (N13, CN5).
 
 A fixed workflow (Figure 4), started with **Screen CVs** on the job page,
 not by the chatbot, so scores stay repeatable. It screens all of the job's
-CVs in one batch, one parallel branch per CV, in the background with
+CVs in one batch, one parallel branch per CV (at most 4 at a time: the
+local models answer one request at a time, and more branches used up the
+database connections; see docs/VERIFICATION.md), in the background with
 progress ("12 of 20 CVs"). It is checkpointed, so after a restart it
 continues where it stopped (N26). **No Gemini is used**: everything runs
 locally, so there is no quota and CV text stays on this machine. Mostly
@@ -1053,6 +1055,62 @@ Security is built into each part instead of added at the end:
   Forms links (HTTPS) are accepted as the application link.
 - **No secrets or personal data in logs or error messages**, pinned and
   audited dependencies, localhost-only ports (see the sections above).
+
+## Privacy note
+
+What CandiVue keeps about a candidate, where, for how long, who receives
+it, and the limits of its fairness. Only synthetic or sample data is used
+in development and the demo (N13).
+
+**Stored (PostgreSQL and the `cv_intake` volume, on this machine):**
+
+| Data | Kept until |
+|---|---|
+| Application: name, email, the CV file, the text read from it (parsed CV, passages and their embeddings), screening scores and reasons | The applicant is deleted (`DELETE /api/jobs/{job}/cvs/{candidate}`) |
+| Interview: time, link (hash only), chat messages, the **written transcript**, Q&A analysis, CV claims check, interview score and quality, assessment report | The interview or the applicant is deleted |
+| Face reference (F7): one encrypted embedding, never a photo; consent and its time | 30 days after the interview (`FACE_RETENTION_DAYS`), on cancellation, on withdrawal, or when the applicant is deleted |
+| Saved workflow state (LangGraph checkpoints) | Deleted when the run finishes; kept only to continue a failed run or a report waiting for review; the rest is cleaned up every hour |
+| Talent pool consent (F11) | Applications older than `REDISCOVERY_MAX_AGE_DAYS` (365) are no longer matched |
+
+**Not stored:** audio and video. The call is never recorded; speech is
+streamed to Deepgram and only the text is kept; camera pictures for the
+identity check are compared in memory and dropped (N16). Uploaded
+knowledge-base files keep only their text. Logs contain ids, never names,
+email addresses, CV or transcript text (checked in all services).
+
+**Deleting a candidate** (N19) removes, in one request: the application,
+its scores and passages, its interviews with transcripts, chat, analyses,
+reports and face reference (database cascades), the CV file, and the
+saved workflow state that held copies of their data
+(`tests/test_privacy.py`). An application added from the talent pool to
+another job is that person's separate application and is deleted on its
+own. Data already sent to an external provider (below) cannot be recalled
+by CandiVue.
+
+**External providers:** see "AI provider and data sent to it" for exactly
+what each one receives: Gemini (job data, transcripts and reduced CV facts
+with names and contacts removed), Deepgram (interview audio, streamed),
+Google Forms / Drive / Sheets (what applicants submit), Gmail (invitations
+and access codes), Google Calendar (the interviewer's events), Blogger (job
+posts, no candidate data). Face recognition, CV screening and embeddings
+run locally.
+
+**Fairness and its limits:**
+
+- Scores use job requirements only. Protected attributes (age, gender,
+  ethnicity, nationality, religion, marital status) are never stored
+  (`tests/test_models.py`), and every AI prompt says not to consider or
+  infer them, nor accent, grammar or filler words (N20).
+- Nothing is decided automatically: rankings, scores, claim flags, the
+  identity result and the report are prompts for a person, who reviews
+  and approves.
+- Limits a reviewer should know: screening thresholds were calibrated on
+  synthetic CVs; speech recognition can mishear some accents (the prompts
+  tell the AI that an odd word is probably a recognition error); face
+  recognition models can be less accurate for some groups and in poor
+  light, which is why a face result is never used for scoring, never
+  assumed, and "low confidence" asks the interviewer to check; the AI can
+  be wrong, so every conclusion shows its evidence.
 
 ## Signing in and roles
 
