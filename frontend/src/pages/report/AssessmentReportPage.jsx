@@ -30,7 +30,7 @@ import { whenText } from '../../utils/dates';
 import { usePolling } from '../../utils/usePolling';
 import CompareCandidates, { MAX_COMPARED } from './CompareCandidates';
 import { downloadReport, printReport } from './exportReport';
-import { ComponentScoresCard, FindingsList, SourcePanel, SuitabilityCard } from './ReportParts';
+import { ComponentScoresCard, FindingsList, FollowUpCard, SourcePanel, SuitabilityCard } from './ReportParts';
 import classes from './Report.module.css';
 import { generatingStep, REVIEW, reportState } from './reportFormat';
 import ReviewBar from './ReviewBar';
@@ -248,7 +248,7 @@ export default function AssessmentReportPage() {
         <div className={classes.layout}>
           <div className={classes.main}>
             <div className={classes.topCards}>
-              <SuitabilityCard position={content.position} />
+              <SuitabilityCard position={content.position} identity={content.identity} />
               <ComponentScoresCard components={content.components} analysisLink={`${base}/analysis`} />
             </div>
             <FindingsList
@@ -256,6 +256,14 @@ export default function AssessmentReportPage() {
               sources={content.sources}
               selected={selected}
               onSelect={select}
+            />
+            <FollowUpCard
+              claims={content.claims}
+              quality={content.quality}
+              sources={content.sources}
+              selected={selected}
+              onSelect={select}
+              analysisLink={`${base}/analysis`}
             />
             <div className={classes.note}>
               Version {content.version}, prepared by {content.model} on{' '}

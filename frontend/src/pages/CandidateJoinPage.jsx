@@ -1,17 +1,25 @@
 // Where the private link in the invitation email leads: /join/<link token>.
-// Swaps the link for a candidate session in this tab (design: Candidate
-// Join.dc.html, states 3a, 3e, 3i and 3j); a working link opens the
-// interview steps (welcome, device check, the call: CandidateInterview).
+// Opening it emails a one-time code to the candidate's address; the link
+// with that code gives a candidate session in this tab (a forwarded link
+// alone is not enough). A reload in the same tab keeps the session. Then
+// the interview steps follow (CandidateInterview). Design: Candidate
+// Join.dc.html, states 3a, 3e, 3i and 3j; the code step is an addition.
 // No account, no scores: candidates only ever see their own interview (N9).
 
-import { Anchor, Box, Button, Stack, Text } from '@mantine/core';
+import { Anchor, Box, Button, PinInput, Stack, Text } from '@mantine/core';
 import { useDocumentTitle } from '@mantine/hooks';
-import { IconAlertCircle, IconCircleCheck, IconCloudOff, IconHelpCircle } from '@tabler/icons-react';
+import {
+  IconAlertCircle,
+  IconCircleCheck,
+  IconCloudOff,
+  IconHelpCircle,
+  IconMailOpened,
+} from '@tabler/icons-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 
 import { apiPost } from '../api/client';
-import { clearSession, saveSession } from '../auth/session';
+import { clearSession, loadSession, saveSession } from '../auth/session';
 import Logo from '../components/Logo';
 import { HELP_EMAIL } from '../config';
 import classes from './CandidateJoinPage.module.css';
@@ -20,6 +28,7 @@ import CandidateInterview from './interview/CandidateInterview';
 // Icon circle colours from the design frames.
 const RED = { bg: '#FBE9E7', color: '#B03A2E' };
 const GREEN = { bg: '#E7F3EC', color: '#2D7A4E' };
+const TEAL = { bg: '#EDF5F6', color: '#23717A' };
 
 // What to show for each result of the link check (wording from the design).
 function messageFor(result) {
@@ -43,7 +52,7 @@ function messageFor(result) {
     icon: IconCloudOff,
     tint: RED,
     title: 'We couldn’t connect you',
-    text: 'Check your internet connection and try again. Your interview slot is kept.',
+    text: result.message || 'Check your internet connection and try again. Your interview slot is kept.',
     canRetry: true,
   };
 }
@@ -51,14 +60,7 @@ function messageFor(result) {
 // White card used for every state of the link page.
 function StateCard({ children }) {
   return (
-    <Box
-      bg="white"
-      w="100%"
-      maw={400}
-      px={24}
-      py={28}
-      style={{ border: '1px solid #DEE3E6', borderRadius: 8 }}
-    >
+    <Box bg="white" w="100%" maw={420} px={24} py={28} style={{ border: '1px solid #DEE3E6', borderRadius: 8 }}>
       <Stack align="center" gap={10} ta="center">
         {children}
       </Stack>
@@ -66,36 +68,128 @@ function StateCard({ children }) {
   );
 }
 
-// Check the invitation link and show the result to the candidate.
+// A round icon in a tint.
+function StateIcon({ icon: Icon, tint }) {
+  return (
+    <Box
+      w={48}
+      h={48}
+      bg={tint.bg}
+      c={tint.color}
+      style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+    >
+      <Icon size={24} />
+    </Box>
+  );
+}
+
+// "Enter the code we emailed": six digits, checked when complete.
+function CodeStep({ linkToken, sent, onJoined, onResend }) {
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [wait, setWait] = useState(sent.resend_in);
+
+  useEffect(() => setWait(sent.resend_in), [sent]);
+  useEffect(() => {
+    if (wait <= 0) return undefined;
+    const timer = setTimeout(() => setWait((left) => left - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [wait]);
+
+  // Send the code; a wrong one says how many tries are left.
+  async function verify(value) {
+    setBusy(true);
+    setError(null);
+    try {
+      onJoined(await apiPost('/auth/candidate/verify', { link_token: linkToken, code: value }));
+    } catch (e) {
+      setError(e.message);
+      setCode('');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <StateCard>
+      <StateIcon icon={IconMailOpened} tint={TEAL} />
+      <Text fz={18} fw={600}>
+        Check your email
+      </Text>
+      <Text fz={15} lh={1.55} c="#48535B">
+        We sent a 6-digit code to <b>{sent.email_hint}</b>. Enter it to open your interview. This keeps your
+        interview private, even if the link is forwarded.
+      </Text>
+      <PinInput
+        length={6}
+        type="number"
+        oneTimeCode
+        size="lg"
+        value={code}
+        onChange={setCode}
+        onComplete={verify}
+        disabled={busy}
+        error={Boolean(error)}
+        ariaLabel="Code from the email"
+        mt={6}
+      />
+      {error && (
+        <Text fz={14} c="#932E24" role="alert">
+          {error}
+        </Text>
+      )}
+      <Button variant="subtle" size="sm" disabled={wait > 0 || busy} onClick={onResend}>
+        {wait > 0 ? `Send a new code in ${wait} s` : 'Send a new code'}
+      </Button>
+      <Text fz={13} c="#66717A">
+        The code works once, for 10 minutes. Not arrived? Check your spam folder.
+      </Text>
+    </StateCard>
+  );
+}
+
+// Check the invitation link, ask for the emailed code, then the interview.
 export default function CandidateJoinPage() {
   const { linkToken } = useParams();
-  const [result, setResult] = useState({ status: 'checking' }); // checking | joined | failed
+  const [result, setResult] = useState({ status: 'checking' }); // checking | code | joined | failed
   const [attempt, setAttempt] = useState(0); // "Try again" checks the link once more
   // The interview ended: show the "has ended" message (one stable function,
   // so the interview steps do not restart on every render).
   const showEnded = useCallback(() => setResult({ status: 'failed', httpStatus: 410 }), []);
   useDocumentTitle('Your interview · CandiVue AI');
 
-  useEffect(() => {
-    let active = true; // ignore the answer if the page was left meanwhile
-    setResult({ status: 'checking' });
-    clearSession(); // a link always starts a fresh candidate session
-    apiPost('/auth/candidate', { link_token: linkToken })
-      .then((answer) => {
-        if (!active) return;
-        saveSession({ token: answer.access_token, user: answer.user });
-        setResult({ status: 'joined' });
-      })
-      .catch((error) => {
-        if (active) setResult({ status: 'failed', httpStatus: error.status });
-      });
-    return () => {
-      active = false;
-    };
-  }, [linkToken, attempt]);
+  // Ask the backend to email a code (again: a new one).
+  const sendCode = useCallback(
+    async (again = false) => {
+      try {
+        const sent = await apiPost('/auth/candidate', { link_token: linkToken, again });
+        setResult({ status: 'code', sent });
+      } catch (error) {
+        setResult({ status: 'failed', httpStatus: error.status, message: error.status === 503 && error.message });
+      }
+    },
+    [linkToken],
+  );
 
-  const message = result.status === 'checking' ? null : messageFor(result);
-  const Icon = message?.icon;
+  useEffect(() => {
+    const session = loadSession();
+    if (session?.user?.role === 'candidate' && session.link === linkToken) {
+      setResult({ status: 'joined' }); // a reload in this tab: still signed in
+      return;
+    }
+    clearSession(); // a new link always starts a fresh candidate session
+    setResult({ status: 'checking' });
+    sendCode();
+  }, [linkToken, attempt, sendCode]);
+
+  // The right code: keep the session for this tab and this link.
+  function joined(answer) {
+    saveSession({ token: answer.access_token, user: answer.user, link: linkToken });
+    setResult({ status: 'joined' });
+  }
+
+  const message = result.status === 'failed' ? messageFor(result) : null;
 
   return (
     <Box mih="100vh" bg="#F5F7F8">
@@ -119,39 +213,35 @@ export default function CandidateJoinPage() {
       {result.status === 'joined' ? (
         <CandidateInterview onEnded={showEnded} />
       ) : (
-      <Box px={{ base: 16, sm: 24 }} py={40} style={{ display: 'flex', justifyContent: 'center' }}>
-        {result.status === 'checking' ? (
-          <StateCard>
-            <span className={classes.spinner} />
-            <Text fz={17} fw={600}>
-              Opening your interview…
-            </Text>
-          </StateCard>
-        ) : (
-          <StateCard>
-            <Box
-              w={48}
-              h={48}
-              bg={message.tint.bg}
-              c={message.tint.color}
-              style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <Icon size={24} />
-            </Box>
-            <Text fz={18} fw={600}>
-              {message.title}
-            </Text>
-            <Text fz={15} lh={1.55} c="#48535B">
-              {message.text}
-            </Text>
-            {message.canRetry && (
-              <Button mt={4} onClick={() => setAttempt((count) => count + 1)}>
-                Try again
-              </Button>
-            )}
-          </StateCard>
-        )}
-      </Box>
+        <Box px={{ base: 16, sm: 24 }} py={40} style={{ display: 'flex', justifyContent: 'center' }}>
+          {result.status === 'checking' && (
+            <StateCard>
+              <span className={classes.spinner} />
+              <Text fz={17} fw={600}>
+                Opening your interview…
+              </Text>
+            </StateCard>
+          )}
+          {result.status === 'code' && (
+            <CodeStep linkToken={linkToken} sent={result.sent} onJoined={joined} onResend={() => sendCode(true)} />
+          )}
+          {message && (
+            <StateCard>
+              <StateIcon icon={message.icon} tint={message.tint} />
+              <Text fz={18} fw={600}>
+                {message.title}
+              </Text>
+              <Text fz={15} lh={1.55} c="#48535B">
+                {message.text}
+              </Text>
+              {message.canRetry && (
+                <Button mt={4} onClick={() => setAttempt((count) => count + 1)}>
+                  Try again
+                </Button>
+              )}
+            </StateCard>
+          )}
+        </Box>
       )}
     </Box>
   );

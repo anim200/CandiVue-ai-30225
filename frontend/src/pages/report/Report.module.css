@@ -212,6 +212,21 @@
   font-weight: 700;
 }
 
+/* "Identity: confirmed by face recognition ..." under the position (F7). */
+.identityLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid #e9ecee;
+  font-size: 13.5px;
+  color: #48535b;
+}
+
+.identityConfirmed {
+  color: #245f3e;
+}
+
 .note {
   font-size: 14px;
   line-height: 1.5;

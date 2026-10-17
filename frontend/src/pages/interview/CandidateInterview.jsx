@@ -1,6 +1,8 @@
 // The candidate's interview after the private link was accepted (design:
 // Candidate Join: JoinWelcome, DeviceCheck, WaitingRoom, in call; arranged
 // as one waiting-room screen on the user's request, 13-10-2026).
+// - Identity check first (F7, only when set up and not decided yet):
+//   consent → photo → done, or continue without it (IdentityEnrolment).
 // - Waiting room: camera preview with a microphone level, device choice,
 //   the interview details, a required notice tick, then "Join waiting
 //   room". The page then tells the backend every few seconds that the
@@ -41,6 +43,7 @@ import { formatElapsed, startsIn, useElapsed, useNow } from './callTime';
 import CallView, { CallConnection, onDeviceFailure } from './CallView';
 import classes from './CandidateInterview.module.css';
 import { liveKitUrl } from './liveKit';
+import IdentityEnrolment, { IdentityChoice } from './IdentityEnrolment';
 import RoomChat from './RoomChat';
 
 const IN_CALL = 'candivue-in-call'; // this tab was let in (sessionStorage)
@@ -243,7 +246,7 @@ function InterviewFacts({ interview }) {
 }
 
 // The waiting room: preview, details, notice, then waiting to be let in.
-function WaitingRoom({ interview, devices, onDevices, waiting, onWait, onStopWaiting, error }) {
+function WaitingRoom({ interview, onInterview, devices, onDevices, waiting, onWait, onStopWaiting, error }) {
   const [agreed, setAgreed] = useState(waiting);
   const now = useNow(30000);
   const until = startsIn(interview.scheduled_at, now);
@@ -302,6 +305,7 @@ function WaitingRoom({ interview, devices, onDevices, waiting, onWait, onStopWai
               </>
             )}
             {error && <div className={classes.error}>{error}</div>}
+            <IdentityChoice identity={interview.identity} onChange={onInterview} />
           </div>
 
           <ul className={classes.tips}>
@@ -532,9 +536,13 @@ export default function CandidateInterview({ onEnded }) {
       </div>
     );
   }
+  if (interview.identity.available && interview.identity.consent === null) {
+    return <IdentityEnrolment identity={interview.identity} onDone={setInterview} />;
+  }
   return (
     <WaitingRoom
       interview={interview}
+      onInterview={setInterview}
       devices={devices}
       onDevices={(change) => setDevices((old) => ({ ...old, ...change }))}
       waiting={waiting}

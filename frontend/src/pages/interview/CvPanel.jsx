@@ -1,5 +1,5 @@
-// The candidate's CV beside the call (interviewer only, N9): the screening
-// result (rank, overall score, the four scores), each job requirement with
+// The candidate's CV beside the call (interviewer only, N9): the identity
+// check (F7, IdentityPanel), the screening result (rank, overall score, the four scores), each job requirement with
 // the CV line that showed it, roles, degree, certificates and skills, and the
 // CV itself ("Preview CV" shows a PDF inside the page; a Word file is
 // downloaded). The file is loaded with the login token as a Blob, so the
@@ -13,7 +13,6 @@ import {
   IconExternalLink,
   IconEye,
   IconProgress,
-  IconShieldCheck,
   IconX,
 } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
@@ -21,6 +20,7 @@ import { useEffect, useState } from 'react';
 import { apiGet, apiGetFile } from '../../api/client';
 import { ErrorBanner, Skeleton } from '../../components/Feedback';
 import { notifyError } from '../../components/notify';
+import IdentityPanel from './IdentityPanel';
 import classes from './RoomPanels.module.css';
 
 const STATUS = {
@@ -161,6 +161,7 @@ export default function CvPanel({ interviewId, onCollapse }) {
       </div>
 
       <div className={classes.cvScroll}>
+        <IdentityPanel interviewId={interviewId} />
         <ScreeningSummary screening={screening} />
 
         {screening?.passed && (
@@ -240,15 +241,6 @@ export default function CvPanel({ interviewId, onCollapse }) {
         ) : (
           <div className={classes.note}>The CV hasn’t been read yet. Screen the job’s CVs to see its details.</div>
         )}
-
-        <div className={classes.identity}>
-          <IconShieldCheck size={17} />
-          <div>
-            <b>Identity check</b>
-            Face and voice identification comes in a later step. Confirm the candidate’s identity another way for
-            now.
-          </div>
-        </div>
       </div>
 
       <div className={classes.cvFoot}>

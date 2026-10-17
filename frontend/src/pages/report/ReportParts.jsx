@@ -1,10 +1,13 @@
 // The parts of the assessment report (design: Assessment Report.dc.html,
-// frame 1a): the overall position on its 4-step scale, the component
-// scores, the four lists of conclusions with their source chips, and the
-// source panel that shows the CV excerpt or transcript lines behind a chip.
+// frame 1a): the overall position on its 4-step scale with the identity
+// line (F7), the component scores (CV and interview score, F9), the four
+// lists of conclusions with their source chips, the CV claims to follow up
+// and the interview quality (F8, F10), and the source panel that shows the
+// CV excerpt or transcript lines behind a chip.
 
 import {
   IconAlertTriangle,
+  IconArrowsDiff,
   IconClipboardList,
   IconFileCv,
   IconHelpCircle,
@@ -13,8 +16,12 @@ import {
   IconPointer,
   IconThumbDown,
   IconThumbUp,
+  IconUserCheck,
 } from '@tabler/icons-react';
 import { Link } from 'react-router';
+
+import StatusBadge from '../../components/StatusBadge';
+import { CLAIM_RESULTS, VERDICTS } from '../analysis/insightsFormat';
 
 import { clock } from '../analysis/analysisFormat';
 import classes from './Report.module.css';
@@ -40,7 +47,7 @@ function SourceIcon({ kind, size }) {
 }
 
 // The overall position, highlighted on the 4-step scale.
-export function SuitabilityCard({ position }) {
+export function SuitabilityCard({ position, identity }) {
   return (
     <section className={classes.card}>
       <div className={classes.label}>Overall suitability position</div>
@@ -65,11 +72,17 @@ export function SuitabilityCard({ position }) {
         Based on the component scores{position.score !== null ? ` (combined ${position.score})` : ''}. It is a
         summary for your review, not a decision.
       </div>
+      {identity && (
+        <div className={`${classes.identityLine} ${identity.state === 'confirmed' ? classes.identityConfirmed : ''}`}>
+          <IconUserCheck size={15} /> Identity: {identity.text}
+        </div>
+      )}
     </section>
   );
 }
 
-// CV screening and the four interview dimensions, 0-100, with coverage.
+// CV screening and the interview score with its six dimensions, 0-100,
+// with coverage (a dimension without evidence shows a dash).
 export function ComponentScoresCard({ components, analysisLink }) {
   const rows = componentRows(components);
   return (
@@ -81,10 +94,10 @@ export function ComponentScoresCard({ components, analysisLink }) {
           <div className={classes.scoreTrack}>
             <div
               className={`${classes.scoreFill} ${row.part === 'cv' ? classes.cvFill : ''}`}
-              style={{ width: `${row.value}%` }}
+              style={{ width: `${row.value ?? 0}%` }}
             />
           </div>
-          <b>{row.value}</b>
+          <b>{row.value ?? '–'}</b>
         </div>
       ))}
       {rows.length === 0 && <div className={classes.note}>No scores: the CV was not screened and no answer was scored.</div>}
@@ -132,6 +145,63 @@ export function FindingsList({ findings, sources, selected, onSelect }) {
           ))}
         </div>
       ))}
+    </section>
+  );
+}
+
+// CV claims a person should follow up (F8) and the interview quality (F10).
+export function FollowUpCard({ claims, quality, sources, selected, onSelect, analysisLink }) {
+  if (!claims && !quality) return null; // a report from before these checks
+  const verdict = quality && VERDICTS[quality.verdict];
+  return (
+    <section className={classes.findings}>
+      <div className={classes.section}>
+        <h2 className={classes.sectionTitle}>
+          <IconArrowsDiff size={18} color="#B03A2E" />
+          CV claims to follow up
+        </h2>
+        {claims.length === 0 && <div className={classes.none}>None: the interview supported the CV claims checked.</div>}
+        {claims.map((claim) => {
+          const style = CLAIM_RESULTS[claim.result];
+          return (
+            <div key={`${claim.claim}-${claim.cv.text}`} className={classes.finding}>
+              <div className={classes.findingText}>
+                <StatusBadge tone={style.tone} icon={<style.icon size={12} />}>
+                  {style.text}
+                </StatusBadge>{' '}
+                {claim.claim} <span className={classes.cvLabel}>({claim.cv.label})</span>
+                {claim.interview_says && <div className={classes.note}>Interview: {claim.interview_says}</div>}
+                <div className={classes.note}>Follow up: {claim.follow_up}</div>
+              </div>
+              <div className={classes.chips}>
+                {claim.sources.map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`${classes.chip} ${selected === id ? classes.chipOn : ''}`}
+                    onClick={() => onSelect(id)}
+                    aria-pressed={selected === id}
+                  >
+                    <SourceIcon kind={sources[id].kind} size={13} />
+                    {sources[id].label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {quality && (
+        <div className={classes.section}>
+          <h2 className={classes.sectionTitle}>
+            Interview quality <StatusBadge tone={verdict.tone}>{verdict.text}</StatusBadge>
+          </h2>
+          <div className={classes.findingText}>
+            {quality.reasons.join(' ') || 'The interview gave balanced, job-related evidence.'}{' '}
+            <Link to={`${analysisLink}?tab=quality`}>Details and suggestions</Link>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

@@ -8,12 +8,7 @@ export const POSITIONS = [
   ['strong_fit', 'Strong fit'],
 ];
 
-export const INTERVIEW_DIMENSIONS = [
-  ['relevance', 'Interview: relevance'],
-  ['accuracy', 'Interview: accuracy'],
-  ['completeness', 'Interview: completeness'],
-  ['articulation', 'Interview: articulation'],
-];
+const QUALITY = { good: 'Good', needs_attention: 'Needs attention', poor: 'Poor' };
 
 // The review bar per state (design: ReviewBar).
 export const REVIEW = {
@@ -46,18 +41,41 @@ export function generatingStep({ analysis, report }) {
   return report || analysis?.status === 'completed' ? 2 : 1;
 }
 
-// The rows of the component scores card: CV screening, then the interview.
+// The six interview dimensions (F9) as [key, label], from the reports given
+// (a report from before the interview score has none).
+function interviewDimensions(contents) {
+  const labels = new Map();
+  for (const c of contents) {
+    for (const [key, dim] of Object.entries(c.components.interview?.dimensions ?? {})) labels.set(key, dim.label);
+  }
+  return [...labels];
+}
+
+// The rows of the component scores card: CV screening, then the interview
+// score and its six dimensions (a dimension without evidence has no value).
 export function componentRows(components) {
   const rows = [];
   if (components.cv) {
     rows.push({ label: 'CV screening (overall)', value: components.cv.overall, part: 'cv' });
   }
   if (components.interview) {
-    for (const [key, label] of INTERVIEW_DIMENSIONS) {
-      rows.push({ label, value: components.interview[key], part: 'interview' });
+    rows.push({ label: 'Interview score (overall)', value: components.interview.overall, part: 'interview' });
+    for (const [key, label] of interviewDimensions([{ components }])) {
+      rows.push({ label: `Interview: ${label}`, value: components.interview.dimensions[key].score, part: 'interview' });
     }
   }
   return rows;
+}
+
+// "1 contradiction, 2 unverified" for the CV claims to follow up (F8).
+export function claimsSummary(claims = []) {
+  const count = (result) => claims.filter((c) => c.result === result).length;
+  const parts = [
+    [count('contradiction'), 'contradiction', 'contradictions'],
+    [count('unverified'), 'unverified', 'unverified'],
+    [count('never_discussed'), 'never discussed', 'never discussed'],
+  ].filter(([n]) => n > 0);
+  return parts.map(([n, one, many]) => `${n} ${n === 1 ? one : many}`).join(', ') || 'None';
 }
 
 // "Requirement coverage: 2 of 3 explored (not explored: AWS Certification)".
@@ -93,9 +111,11 @@ export function compareRows(rows) {
       sub: true,
       cells: content.map((c) => bar(c.components.cv?.dimensions[key]?.score)),
     })),
-    ...INTERVIEW_DIMENSIONS.map(([key, label]) => ({
+    { label: 'Interview score (overall)', cells: content.map((c) => bar(c.components.interview?.overall)) },
+    ...interviewDimensions(content).map(([key, label]) => ({
       label,
-      cells: content.map((c) => bar(c.components.interview?.[key])),
+      sub: true,
+      cells: content.map((c) => bar(c.components.interview?.dimensions?.[key]?.score)),
     })),
     {
       label: 'Requirements explored',
@@ -103,6 +123,9 @@ export function compareRows(rows) {
     },
     { label: 'Main strength', cells: content.map((c) => text(c.findings.strengths[0]?.text)) },
     { label: 'Main gap', cells: content.map((c) => text((c.findings.gaps[0] ?? c.findings.weaknesses[0])?.text)) },
+    { label: 'CV claims to follow up', cells: content.map((c) => text(c.claims && claimsSummary(c.claims))) },
+    { label: 'Interview quality', cells: content.map((c) => text(c.quality && QUALITY[c.quality.verdict])) },
+    { label: 'Identity', cells: content.map((c) => text(c.identity?.text)) },
     { label: 'Review status', cells: rows.map((row) => text(listStatus(row).label)) },
   ];
 }

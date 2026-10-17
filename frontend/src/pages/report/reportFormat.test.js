@@ -2,16 +2,33 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { compareRows, componentRows, coverageLine, generatingStep, listStatus, reportState } from './reportFormat';
+import {
+  claimsSummary,
+  compareRows,
+  componentRows,
+  coverageLine,
+  generatingStep,
+  listStatus,
+  reportState,
+} from './reportFormat';
 
 const content = (name, overall) => ({
   position: { headline: `${name} fit` },
   components: {
     cv: { overall, dimensions: { skills: { label: 'Technical skills', score: overall - 5 } } },
-    interview: { relevance: 80, accuracy: 70, completeness: 60, articulation: 75 },
+    interview: {
+      overall: 72,
+      dimensions: {
+        technical: { label: 'Technical competency', score: 70 },
+        experience_depth: { label: 'Experience depth', score: null },
+      },
+    },
     coverage: { explored: 2, total: 3, unexplored: ['AWS Certification'] },
   },
   findings: { strengths: [{ text: `${name} strength` }], weaknesses: [{ text: 'A weakness' }], gaps: [], verify: [] },
+  claims: [{ result: 'contradiction' }, { result: 'never_discussed' }],
+  quality: { verdict: 'needs_attention', reasons: [] },
+  identity: { state: 'confirmed', text: 'Confirmed by face recognition at 00:04.' },
 });
 
 describe('reportFormat', () => {
@@ -32,14 +49,13 @@ describe('reportFormat', () => {
     expect(generatingStep({ analysis: { status: 'completed' }, report: null })).toBe(2);
   });
 
-  it('lists the CV score, then the four interview scores', () => {
+  it('lists the CV score, then the interview score and its dimensions', () => {
     const rows = componentRows(content('Good', 82).components);
     expect(rows.map((r) => [r.label, r.value])).toEqual([
       ['CV screening (overall)', 82],
-      ['Interview: relevance', 80],
-      ['Interview: accuracy', 70],
-      ['Interview: completeness', 60],
-      ['Interview: articulation', 75],
+      ['Interview score (overall)', 72],
+      ['Interview: Technical competency', 70],
+      ['Interview: Experience depth', null],
     ]);
     expect(componentRows({ cv: null, interview: null, coverage: {} })).toEqual([]);
   });
@@ -72,5 +88,14 @@ describe('reportFormat', () => {
     expect(row('Requirements explored')).toEqual(['2 of 3', '2 of 3']);
     expect(row('Main gap')).toEqual(['A weakness', 'A weakness']); // no gaps: the first weakness
     expect(row('Review status')).toEqual(['Approved', 'Waiting for review']);
+    expect(row('Interview score (overall)')).toEqual([72, 72]);
+    expect(row('CV claims to follow up')).toEqual(['1 contradiction, 1 never discussed', '1 contradiction, 1 never discussed']);
+    expect(row('Interview quality')).toEqual(['Needs attention', 'Needs attention']);
+    expect(row('Identity')[0]).toBe('Confirmed by face recognition at 00:04.');
+  });
+
+  it('summarises the CV claims to follow up', () => {
+    expect(claimsSummary([{ result: 'unverified' }, { result: 'unverified' }])).toBe('2 unverified');
+    expect(claimsSummary([])).toBe('None');
   });
 });
