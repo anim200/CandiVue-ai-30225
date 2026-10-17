@@ -1,4 +1,9 @@
-"""Sign in (interviewer), join by link (candidate), and "who am I"."""
+"""Sign in (interviewer), join by link (candidate), and "who am I".
+
+A candidate opens their interview in two steps: the link's token sends a
+one-time code to their email (app/auth/access_code.py), and the link with
+that code gives a token for that one interview. A forwarded link alone is
+not enough."""
 
 import logging
 from typing import Annotated
@@ -8,6 +13,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.auth.access_code import AccessCodeError, check_code, send_code
 from app.auth.dependencies import SESSION_EXPIRED, CurrentUser, get_current_user
 from app.auth.security import (
     Role,
@@ -40,9 +46,25 @@ class LoginRequest(BaseModel):
 
 
 class CandidateJoinRequest(BaseModel):
-    """What the candidate page sends: the token from the invitation link."""
+    """What the candidate page sends: the token from the invitation link
+    (again=true: send a new code)."""
 
     link_token: str = Field(min_length=16, max_length=200)
+    again: bool = False
+
+
+class CodeSentOut(BaseModel):
+    """Where the code went (partly hidden) and when a new one may be sent."""
+
+    email_hint: str
+    resend_in: int  # seconds
+
+
+class CandidateCodeRequest(BaseModel):
+    """The link's token and the code from the email."""
+
+    link_token: str = Field(min_length=16, max_length=200)
+    code: str = Field(min_length=6, max_length=12)
 
 
 class Me(BaseModel):
@@ -79,22 +101,30 @@ def login(body: LoginRequest, db: Annotated[Session, Depends(get_db)]) -> TokenR
     )
 
 
-@router.post("/candidate", response_model=TokenResponse)
-def join_by_link(
+@router.post("/candidate", response_model=CodeSentOut)
+def send_access_code(
     body: CandidateJoinRequest, db: Annotated[Session, Depends(get_db)]
-) -> TokenResponse:
-    """Swap the token from the invitation link for a candidate token that only
-    works for that one interview."""
-    interview = db.scalar(
-        select(InterviewSession).where(
-            InterviewSession.join_token_hash == hash_link_token(body.link_token)
-        )
-    )
-    if interview is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, LINK_NOT_RECOGNISED)
-    if interview.status in (SessionStatus.ENDED, SessionStatus.CANCELLED):
-        raise HTTPException(status.HTTP_410_GONE, INTERVIEW_OVER)
+) -> CodeSentOut:
+    """Opening the invitation link: email the candidate a one-time code
+    (or say where the recent one went)."""
+    interview = _interview(db, body.link_token)
+    try:
+        return CodeSentOut(**send_code(db, interview, again=body.again))
+    except AccessCodeError as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from None
 
+
+@router.post("/candidate/verify", response_model=TokenResponse)
+def join_by_link(
+    body: CandidateCodeRequest, db: Annotated[Session, Depends(get_db)]
+) -> TokenResponse:
+    """Swap the link's token and the emailed code for a candidate token that
+    only works for that one interview."""
+    interview = _interview(db, body.link_token)
+    try:
+        check_code(db, interview, body.code)
+    except AccessCodeError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from None
     logger.info("Candidate joined by link: session %d", interview.id)
     return TokenResponse(
         access_token=create_access_token(interview.id, Role.CANDIDATE),
@@ -115,3 +145,17 @@ def me(
     if account is None:  # account deleted after the token was issued
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, SESSION_EXPIRED)
     return Me(role=Role.INTERVIEWER, name=account.full_name, email=account.email)
+
+
+def _interview(db: Session, link_token: str) -> InterviewSession:
+    """The interview of an invitation link; 404 when unknown, 410 when over."""
+    interview = db.scalar(
+        select(InterviewSession).where(
+            InterviewSession.join_token_hash == hash_link_token(link_token)
+        )
+    )
+    if interview is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, LINK_NOT_RECOGNISED)
+    if interview.status in (SessionStatus.ENDED, SessionStatus.CANCELLED):
+        raise HTTPException(status.HTTP_410_GONE, INTERVIEW_OVER)
+    return interview

@@ -9,6 +9,7 @@ os.environ.setdefault(
 )
 os.environ.setdefault("JWT_SECRET", "test-only-secret-that-is-long-enough-0123456789")
 
+import re
 import uuid
 from types import SimpleNamespace
 
@@ -17,6 +18,7 @@ from helpers import ScriptedModel
 from sqlalchemy import select
 
 from app.ai import llm
+from app.auth import access_code
 from app.auth.security import Role, create_access_token, hash_password
 from app.db.database import SessionLocal, check_database
 from app.db.models import Job, User
@@ -26,6 +28,40 @@ from app.integrations.calendar import CalendarError
 from app.interviews import calendar_sync
 from app.main import app
 from app.rediscovery import pool
+
+
+@pytest.fixture(autouse=True)
+def access_codes(monkeypatch):
+    """No real email in tests: the interview access codes "sent" are kept
+    here, newest last ({"to", "code"})."""
+    sent = []
+
+    def send(to, subject, text, html=None, invite=None):
+        """Remember the code instead of emailing it."""
+        code = re.search(r"(\d{3}) (\d{3})", text).group(0).replace(" ", "")
+        sent.append({"to": to, "code": code})
+        return {"sent_to": to, "message_id": "test"}
+
+    monkeypatch.setattr(access_code, "send_email", send)
+    return sent
+
+
+@pytest.fixture
+def candidate_login(client, access_codes):
+    """Open an interview link as the candidate's page does (link → emailed
+    code → token); returns the verify response."""
+
+    def login(link_token: str):
+        """The two steps for one link."""
+        sent = client.post("/api/auth/candidate", json={"link_token": link_token})
+        if sent.status_code != 200:
+            return sent
+        code = access_codes[-1]["code"]
+        return client.post(
+            "/api/auth/candidate/verify", json={"link_token": link_token, "code": code}
+        )
+
+    return login
 
 
 @pytest.fixture(autouse=True)

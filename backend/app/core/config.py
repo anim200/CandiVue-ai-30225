@@ -68,6 +68,14 @@ class Settings(BaseSettings):
     deepgram_model: str = "nova-3"
     deepgram_language: str = "en"
 
+    # Identity check (F7): face references are encrypted with this key
+    # (Fernet: 32 url-safe base64 bytes; README "Identity check"). Empty:
+    # the identity check is off and the candidate is not asked. References
+    # are deleted this many days after the interview.
+    face_reference_key: SecretStr | None = None
+    face_retention_days: int = Field(default=30, gt=0)
+    face_model_dir: str = "/opt/face-models"  # YuNet + SFace, built into the image
+
     # CV Collector (app/collector, cv-collector container). The Google key is
     # given only to that container (read-only service account, N7).
     google_service_account_key: SecretStr | None = None  # JSON or base64 JSON
@@ -99,6 +107,7 @@ class Settings(BaseSettings):
         "llm_api_key",
         "livekit_api_secret",
         "deepgram_api_key",
+        "face_reference_key",
         "google_service_account_key",
         "demo_interviewer_password",
         mode="before",

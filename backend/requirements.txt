@@ -30,3 +30,7 @@ livekit-api==1.2.1
 # (LiveKit real-time SDK) and streams each speaker's audio to Deepgram
 livekit==1.1.20
 websockets==16.1.1
+# Identity check (F7): local face detection/recognition (OpenCV YuNet + SFace)
+# and encryption of the stored face references
+opencv-python-headless==4.14.0.94
+cryptography==50.0.2

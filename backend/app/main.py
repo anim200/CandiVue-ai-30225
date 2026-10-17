@@ -1,5 +1,8 @@
 """Creates the FastAPI app. Start it with: uvicorn app.main:app"""
 
+import asyncio
+import contextlib
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -25,10 +28,30 @@ from app.core.errors import register_error_handlers
 from app.core.logging import setup_logging
 from app.db.database import SessionLocal
 from app.graphs.checkpointer import open_checkpointer
+from app.identity.references import purge_expired
 from app.runs.runner import resume_interrupted_runs
 
 settings = get_settings()
 setup_logging(settings.log_level)
+logger = logging.getLogger(__name__)
+
+PURGE_EVERY_SECONDS = 3600
+
+
+def purge_face_references() -> None:
+    """Delete the face references whose time is up (F7 retention, N17)."""
+    with SessionLocal() as db:
+        purge_expired(db)
+
+
+async def purge_face_references_hourly() -> None:
+    """Run purge_face_references() now and then every hour."""
+    while True:
+        try:
+            await asyncio.to_thread(purge_face_references)
+        except Exception as error:  # noqa: BLE001 - try again next hour
+            logger.warning("Face reference clean-up failed: %s", type(error).__name__)
+        await asyncio.sleep(PURGE_EVERY_SECONDS)
 
 
 @asynccontextmanager
@@ -43,7 +66,11 @@ async def lifespan(app: FastAPI):
         app.state.checkpointer = checkpointer
         # Continue AI runs that were interrupted by a stop or crash (N26).
         resume_interrupted_runs()
+        purging = asyncio.create_task(purge_face_references_hourly())
         yield
+        purging.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await purging
 
 
 app = FastAPI(

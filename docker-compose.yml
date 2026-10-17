@@ -58,6 +58,8 @@ services:
       GOOGLE_FORM_POSITION_FIELD: ${GOOGLE_FORM_POSITION_FIELD:-}
       MAX_CV_MB: ${MAX_CV_MB:-10}
       REDISCOVERY_MAX_AGE_DAYS: ${REDISCOVERY_MAX_AGE_DAYS:-365}
+      FACE_REFERENCE_KEY: ${FACE_REFERENCE_KEY:-}
+      FACE_RETENTION_DAYS: ${FACE_RETENTION_DAYS:-30}
     volumes:
       - cv_intake:/data/cv_intake  # CVs for screening (later steps)
     ports:
@@ -227,9 +229,10 @@ services:
       backend:
         condition: service_healthy  # the backend has applied the migrations
 
-  # Live transcript (F4): joins every live interview as a hidden, listen-only
-  # participant, streams each speaker's audio to Deepgram and saves the
-  # transcript turns. Same image as the backend, other command. Only this
+  # Live transcript (F4) and identity check (F7): joins every live interview
+  # as a hidden, listen-only participant, streams each speaker's audio to
+  # Deepgram and saves the transcript turns, and compares the candidate's
+  # camera with their face reference. Same image as the backend. Only this
   # container gets DEEPGRAM_API_KEY. It shares LiveKit's network: LiveKit
   # tells every participant to send media to 127.0.0.1 (right for the
   # browsers on this computer), and here 127.0.0.1 is LiveKit itself. The
@@ -256,6 +259,7 @@ services:
       DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
       DEEPGRAM_MODEL: ${DEEPGRAM_MODEL:-nova-3}
       DEEPGRAM_LANGUAGE: ${DEEPGRAM_LANGUAGE:-en}
+      FACE_REFERENCE_KEY: ${FACE_REFERENCE_KEY:-}
     depends_on:
       backend:
         condition: service_healthy  # the backend has applied the migrations
