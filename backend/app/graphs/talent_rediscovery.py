@@ -24,7 +24,7 @@ from sqlalchemy import delete
 from app.db.database import SessionLocal
 from app.db.models import Job, RediscoveryMatch, RediscoveryRun
 from app.graphs.checkpointer import open_checkpointer
-from app.graphs.cv_screening import build_screen_cv, job_context
+from app.graphs.cv_screening import MAX_PARALLEL_CVS, build_screen_cv, job_context
 from app.rediscovery.pool import RUN_KIND, SHOW_FROM, pool_ids
 from app.runs.runner import graph_config, register_run_kind
 from app.screening.weights import effective_weights
@@ -129,7 +129,7 @@ def build_talent_rediscovery(checkpointer):
 def run_rediscovery(run_id: int) -> None:
     """Work function for the background runner: run (or continue) a check."""
     config = graph_config(RUN_KIND, run_id)
-    config["recursion_limit"] = 50
+    config |= {"recursion_limit": 50, "max_concurrency": MAX_PARALLEL_CVS}
     with open_checkpointer() as checkpointer:
         graph = build_talent_rediscovery(checkpointer)
         started = graph.get_state(config).next

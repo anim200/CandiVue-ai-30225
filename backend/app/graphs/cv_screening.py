@@ -78,6 +78,11 @@ from app.screening.text import (
 logger = logging.getLogger(__name__)
 
 RUN_KIND = "cv_screening"
+# CVs screened at the same time. Each branch uses a database connection
+# and the local models, which answer one request at a time on a CPU; more
+# branches only wait, and (measured: about 20 at once) they used up the
+# connection pool, so API requests stalled and a CV was wrongly skipped.
+MAX_PARALLEL_CVS = 4
 MAX_CV_CHARS_FOR_ATS = 3000  # enough of the CV to compare with the JD
 KEY_TERM_COUNT = 20
 STOPWORDS = frozenset(
@@ -713,7 +718,7 @@ def run_screening(run_id: int) -> None:
     screening run. A run that stopped half-way continues from its last
     checkpoint instead of starting again (N26)."""
     config = graph_config(RUN_KIND, run_id)
-    config["recursion_limit"] = 50
+    config |= {"recursion_limit": 50, "max_concurrency": MAX_PARALLEL_CVS}
     with open_checkpointer() as checkpointer:
         graph = build_cv_screening(checkpointer)
         started = graph.get_state(config).next
