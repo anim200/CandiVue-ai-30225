@@ -13,6 +13,7 @@ import time
 from datetime import timedelta
 
 import pytest
+from sqlalchemy import text
 
 from app.ai.errors import AIServiceError
 from app.analysis.qa_pairs import (
@@ -374,6 +375,12 @@ def interviewer(ended):
     return {"Authorization": f"Bearer {token}"}
 
 
+def saved_threads() -> set[str]:
+    """Every saved workflow thread id."""
+    with SessionLocal() as db:
+        return set(db.scalars(text("SELECT DISTINCT thread_id FROM checkpoints")))
+
+
 def analyse(session_id: int) -> QAAnalysis:
     """Create the interview's analysis and run it to the end (in this thread)."""
     with SessionLocal() as db:
@@ -438,6 +445,8 @@ def test_the_analysis_scores_job_and_company_answers_and_maps_requirements(
         "Evaluations",
         "InterviewReview",
     ]
+    # Finished: its saved workflow state is deleted (N16).
+    assert f"qa_analysis-{analysis.id}" not in saved_threads()
     # The report starts as soon as the analysis is done (B5).
     assert background_runs[-1][0] == final_assessment.RUN_KIND
 
@@ -577,6 +586,7 @@ def test_the_report_merges_scores_and_waits_for_review(ended, monkeypatch):
     assert report.status == RunStatus.WAITING_FOR_REVIEW
     assert report.review_status == ReviewStatus.PENDING_REVIEW
     assert llm.count("Findings") == 1  # one AI request for the report
+    assert f"final_assessment-{report.id}" in saved_threads()  # waits for review
     content = report.content
     assert content["version"] == 1
     components = content["components"]
@@ -711,6 +721,8 @@ def test_changes_requested_then_approved(ended, monkeypatch, interviewer, client
     assert approved.status_code == 200
     report = client.get(url, headers=interviewer).json()["report"]
     assert report["status"] == "completed" and report["review_status"] == "approved"
+    # Kept while it waited for the review, deleted once approved (N16).
+    assert f"final_assessment-{report['id']}" not in saved_threads()
     assert report["approved_at"] is not None and report["reviewed_by"] == "Sam Rivers"
     assert report["content"]["version"] == 2  # the reviewed version is the final one
     again = client.post(
