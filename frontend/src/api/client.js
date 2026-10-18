@@ -103,9 +103,10 @@ export function apiGetFile(path) {
   return request('GET', path, undefined, UPLOAD_TIMEOUT_MS, true);
 }
 
-// Delete something on the backend (DELETE).
-export function apiDelete(path) {
-  return request('DELETE', path);
+// Delete something on the backend (DELETE). timeoutMs: deleting a whole
+// job may take longer (it cancels interviews and removes the job post).
+export function apiDelete(path, timeoutMs = TIMEOUT_MS) {
+  return request('DELETE', path, undefined, timeoutMs);
 }
 
 // Ask the backend whether it and its database are working.

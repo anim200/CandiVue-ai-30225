@@ -2,7 +2,8 @@
 // "Screen CVs", the scoring weights, the screening run (progress, ranking,
 // excluded and unreadable CVs, candidate drawer), past applicants who may
 // fit (talent pool, F11) and the applicants: the CVs the CV Collector took
-// from the job's Google Form, plus any added by hand ("Add CV").
+// from the job's Google Form, plus any added by hand ("Add CV"). "Delete
+// job" removes the job with everything about it, after a confirmation.
 // Interviewers only (route guard + backend).
 
 import { Anchor, Button, Checkbox, Collapse, FileButton, Group, Loader, Modal, Text } from '@mantine/core';
@@ -25,12 +26,12 @@ import {
   IconX,
 } from '@tabler/icons-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 
 import { apiDelete, apiGet, apiGetFile, apiPost, apiPut, apiUpload } from '../../api/client';
 import ConfirmModal, { POP_TRANSITION } from '../../components/ConfirmModal';
 import { ErrorBanner, Skeleton } from '../../components/Feedback';
-import { notifyDone } from '../../components/notify';
+import { notifyDone, notifyWarning } from '../../components/notify';
 import StatusBadge from '../../components/StatusBadge';
 import { STAGES } from '../assistant/labels';
 import classes from './JobPage.module.css';
@@ -40,6 +41,7 @@ import WeightsCard from './WeightsCard';
 
 const POLL_MS = 2000; // progress refresh while screening runs
 const ACTIVE = ['pending', 'running'];
+const DELETE_TIMEOUT_MS = 120000; // cancels interviews and removes the job post
 
 // "7 Oct, 15:09": when a CV arrived, a run finished or applications close.
 function dateTime(value) {
@@ -54,6 +56,31 @@ function dateTime(value) {
 // "1 CV received" / "2 CVs received".
 function cvCount(count) {
   return `${count} ${count === 1 ? 'CV' : 'CVs'} received`;
+}
+
+// "1 applicant" / "3 applicants".
+function plural(count, word) {
+  return `${count} ${word}${count === 1 ? '' : 's'}`;
+}
+
+// What "Delete job" will remove, for the confirmation dialog.
+function DeleteJobText({ job, applicants }) {
+  const what =
+    applicants > 0
+      ? `its ${plural(applicants, 'applicant')} and their CVs, interviews, transcripts and reports.`
+      : 'its profile and chat.';
+  const one = job.interview_count === 1;
+  const interviews = job.interview_count
+    ? ` ${plural(job.interview_count, 'scheduled interview')} will be cancelled: ${one ? 'the candidate is' : 'the candidates are'} emailed and the calendar ${one ? 'event' : 'events'} removed.`
+    : '';
+  const post = job.job_board_post_url ? ' The job post is removed from the job board.' : '';
+  return (
+    <>
+      <b>{job.title}</b> will be deleted with {what}
+      {interviews}
+      {post} This can’t be undone.
+    </>
+  );
 }
 
 // Open a PDF in a new tab, or download a Word file. The file is fetched with
@@ -247,6 +274,7 @@ function ApplicantRow({ applicant, onView, onTalentPool, onRemove, viewing }) {
 // The page: job header, then the applicants (or the empty state).
 export default function JobPage() {
   const { jobId } = useParams();
+  const navigate = useNavigate();
   const [job, setJob] = useState(null);
   const [applicants, setApplicants] = useState(null); // null = loading
   const [failed, setFailed] = useState(null); // message, or null
@@ -262,6 +290,8 @@ export default function JobPage() {
   const [starting, setStarting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [applicantsOpen, setApplicantsOpen] = useState(null); // null = automatic
+  const [deleting, setDeleting] = useState(false); // confirmation open
+  const [deleteBusy, setDeleteBusy] = useState(false);
   useDocumentTitle(`${job?.title ?? 'Job'} · CandiVue AI`);
 
   // Load the job and its applicants.
@@ -394,6 +424,24 @@ export default function JobPage() {
     }
   }
 
+  // Delete the job (confirmed), then go back to the jobs list. What could
+  // not be done (e.g. the job post) is shown so it can be done by hand.
+  async function deleteJob() {
+    setDeleteBusy(true);
+    setActionError(null);
+    try {
+      const result = await apiDelete(`/jobs/${jobId}`, DELETE_TIMEOUT_MS);
+      const cancelled = result.interviews_cancelled;
+      notifyDone(`Deleted ${job.title}${cancelled ? ` and cancelled ${plural(cancelled, 'interview')}` : ''}`);
+      if (result.problems.length) notifyWarning('Please finish by hand', result.problems.join(' '));
+      navigate('/jobs');
+    } catch (error) {
+      setActionError(error.message);
+      setDeleting(false);
+      setDeleteBusy(false);
+    }
+  }
+
   // "Refresh": check for new CVs, with a spinner so the click is visible.
   async function refresh() {
     setRefreshing(true);
@@ -487,6 +535,16 @@ export default function JobPage() {
             )}
             <Button component={Link} to={`/assistant/${job.id}`} variant="default" leftSection={<IconMessageCircle size={16} />}>
               Open chat
+            </Button>
+            <Button
+              variant="subtle"
+              color="#B03A2E"
+              leftSection={<IconTrash size={16} />}
+              onClick={() => setDeleting(true)}
+              disabled={running}
+              title={running ? 'Wait until the screening finishes' : undefined}
+            >
+              Delete job
             </Button>
           </Group>
         </div>
@@ -635,6 +693,17 @@ export default function JobPage() {
       >
         {removing?.full_name || 'This applicant'} and their CV will be deleted from CandiVue. This
         can’t be undone. The answer in the Google Form is not changed.
+      </ConfirmModal>
+
+      <ConfirmModal
+        opened={deleting}
+        onClose={() => setDeleting(false)}
+        title="Delete this job?"
+        confirmLabel="Delete job"
+        onConfirm={deleteJob}
+        busy={deleteBusy}
+      >
+        <DeleteJobText job={job} applicants={applicants.length} />
       </ConfirmModal>
     </div>
   );

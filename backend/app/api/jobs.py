@@ -1,5 +1,5 @@
 """Jobs API: create a job (it starts a Hiring Assistant thread), list jobs,
-and a job's applicants: the CVs the CV Collector received from the Google
+delete a job with everything about it, and a job's applicants: the CVs the CV Collector received from the Google
 Form, or the interviewer uploaded by hand (fallback); view and remove them.
 
 Interviewers only (N9). Job profiles are filled in through the Hiring
@@ -43,6 +43,7 @@ from app.db.models.candidate import CandidateStatus
 from app.db.models.job import JobBoardStatus, JobDescriptionStatus, JobStatus
 from app.db.models.run import RunStatus
 from app.interviews import planning
+from app.jobs.deletion import JobBusy, delete_job
 from app.knowledge.files import clean_filename
 from app.runs.cleanup import purge_stale_threads
 from app.screening.weights import ScoringWeights, effective_weights
@@ -116,6 +117,15 @@ class UploadResult(BaseModel):
     filename: str
     added: bool
     message: str  # "Added" or why the file was refused
+
+
+class DeletedJobOut(BaseModel):
+    """What deleting a job did; problems: what to remove by hand."""
+
+    applicants: int
+    interviews_cancelled: int
+    post_removed: bool
+    problems: list[str]
 
 
 def job_stage(job: Job, latest_jd: JobDescription | None) -> str:
@@ -222,6 +232,22 @@ def get_job(job_id: int, db: Annotated[Session, Depends(get_db)]) -> JobOut:
     if job is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, NOT_FOUND)
     return to_job_out(db, job)
+
+
+@router.delete("/{job_id}", response_model=DeletedJobOut)
+def remove_job(job_id: int, db: Annotated[Session, Depends(get_db)]) -> DeletedJobOut:
+    """Delete the job and everything about it (app/jobs/deletion.py):
+    scheduled interviews are cancelled (email, calendar), the job-board post
+    is removed. Refused while a run of the job is working or an interview is
+    live."""
+    job = db.get(Job, job_id)
+    if job is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, NOT_FOUND)
+    try:
+        deleted = delete_job(db, job)
+    except JobBusy as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
+    return DeletedJobOut(**vars(deleted))
 
 
 @router.get("/{job_id}/cvs", response_model=list[CvOut])
