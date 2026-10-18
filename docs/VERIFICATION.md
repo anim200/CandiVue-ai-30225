@@ -108,8 +108,9 @@ microphones send perfect digital silence between clips; the interviewer's
 browser then rejoined the call every 20-40 s (7-8 times in 4 minutes).
 With faint noise, like any real microphone, it never did (0). Screenings
 left over from earlier test runs (whose test jobs had been deleted) were
-still running at the start of the 45-minute test; in the app, jobs cannot
-be deleted.
+still running at the start of the 45-minute test; jobs could not be
+deleted in the app then. Since 18-10-2026 "Delete job" exists and refuses
+while a screening of the job is running (`tests/test_job_deletion.py`).
 
 ### Re-test after the fixes
 
@@ -146,7 +147,8 @@ report ready 87 s after "End" (43 units, 6 Gemini requests); the screening
 | Access control (N9) | `test_auth_routes`, guards in every feature test | – |
 | Workflow recovery (N26) | `test_runner` (resume at startup), `test_checkpointer`, "continues after a failure" tests | Screening failure → "Try again" continues |
 
-**Totals:** 293 backend tests and 36 frontend tests pass; ruff clean;
+**Totals:** 313 backend tests and 36 frontend tests pass (after the
+selection email and job deletion, 18-10-2026); ruff clean;
 frontend build passes.
 
 ### Release readiness

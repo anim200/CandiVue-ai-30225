@@ -86,6 +86,11 @@ Update this file at the end of each work session. Every Claude thread reads it.
   - 9.4 Verification matrix (feature → tests → live check); new tests: OCR of a scanned PDF, blank scan, same CVs → same scores. 293 backend + 36 frontend tests.
   - Open (user): the trainer's 20 sample CVs for the final end-to-end run (procedure in VERIFICATION.md), one 5-minute check with a real microphone and webcam, Redmine ids for modules 6-9.
 
+- Selection email and job deletion (user request 18-10-2026, requirement.md §4B-14), branch module/selection-and-delete from module/verification:
+  - Selection email: "Send selection email" on an approved report only; text from the KB Email templates (a template without `{interview_link}`, e.g. `test-data/knowledge-base/email-templates/selection-congratulations.md`) or a standard text; editable preview; sent through the email MCP; `candidates.selected_at` (migration e5b1c8d2f7a4) → "Selected" badge in the ranking and note on the report; a second email is refused. Routes `GET/POST /api/interviews/{id}/selection-email`. Conflicts with BID §4.2 (workflow ends at the assessment): needs trainer approval (§14).
+  - Delete job: "Delete job" on the job page with a confirmation listing what goes; `DELETE /api/jobs/{id}` (`app/jobs/deletion.py`) cancels scheduled interviews (email + calendar), removes the Blogger post (new jobboard-mcp tool `delete_job_post`; a failure is reported, the job is still deleted), deletes rows (cascade), CV folder and saved state; 409 while a screening/rediscovery/analysis/report runs or an interview is live.
+  - Tests: 313 backend (new test_selection_email, test_job_deletion) + 10 jobboard-mcp + 36 frontend. Live UI check 18-10-2026 on a throwaway synthetic job: preview from the KB template, sent, "Selected" shown; delete dialog, job removed, 1 interview cancelled. Not checked live: removing a real Blogger post.
+
 ## Design notes to apply in later modules
 - Two roles: Interviewer logs in with email + password; Candidate authenticates with the unique interview link. Both get a role-based JWT; the backend enforces the role (N9). Candidate token is limited to one session.
 - Interview link safeguards (WBS 4.1–4.2): link valid only from shortly before the scheduled time until the interview ends; disabled after the interview; one candidate connection at a time; only the token hash is stored (done).
@@ -113,7 +118,7 @@ Update this file at the end of each work session. Every Claude thread reads it.
 - Git Bash is used for git commands; check the branch name in the prompt before committing
 
 ## Next
-- Give the Redmine task ids for modules 6, 7, 8 and 9, so the `#TBD-*` refs can be rewritten; then merge them into dev. Update Figure 5 (job answers via RAG).
+- Give the Redmine task ids for modules 6, 7, 8 and 9 and for the selection email / job deletion, so the `#TBD-*` refs can be rewritten; then merge them into dev. Update Figure 5 (job answers via RAG).
 - F11 demo: extend job 151's closing date (or apply to an open job) so Imran's form answer is collected with the talent-pool flag; create the Python job in the chat.
 - Then: update Figures 2, 5 and 6 (module 8 changes); final end-to-end run with the trainer's 20 sample CVs when received (docs/VERIFICATION.md).
 - Renew the Blogger refresh token before the demo (Testing mode: 7 days; renewed 17-10-2026).
@@ -124,6 +129,7 @@ Update this file at the end of each work session. Every Claude thread reads it.
 - Calendar MCP integration (out of scope in the BID unless it is the F11 innovation feature): built 11-10-2026 with the user's approval; still to confirm with the trainer
 - F5 split: job-related answers → LLM, company-related answers → RAG
 - F7 face/voice recognition: keep or drop?
+- Selection email after an approved report (§4B-14): BID §4.2 ends the workflow at the assessment
 
 ## Redmine task IDs
 - #646013 Initialize and share the BJIT GitHub repository, README and .gitignore

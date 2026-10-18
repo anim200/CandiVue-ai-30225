@@ -307,8 +307,13 @@ Approved JDs are posted to a **private Blogger blog** (free, no paid API),
 through our own small MCP server in `jobboard-mcp/`:
 
 ```
-backend --MCP (create_job_post)--> jobboard-mcp --HTTPS--> Blogger API v3
+backend --MCP (create_job_post, update_job_post, delete_job_post)--> jobboard-mcp --HTTPS--> Blogger API v3
 ```
+
+Deleting a job in CandiVue also removes its post (`delete_job_post`; a
+post that is already gone counts as removed). If the blog cannot be
+reached, the job is still deleted and a message asks you to delete the
+post on the blog yourself.
 
 The backend only knows the MCP address; the Google credentials stay in
 the `jobboard-mcp` container. Without them the app still works and the
@@ -709,6 +714,18 @@ Setup (once):
    password (no spaces), and `EMAIL_TEST_RECIPIENT` = your own address.
 4. `docker compose up -d --build`
 
+**Selection email (§4B-14).** On an **approved** assessment report,
+"Send selection email" opens the email to check: the text comes from an
+Email templates document **without** `{interview_link}` (e.g.
+`selection-congratulations.md`, placeholders `{candidate_name}` and
+`{job_title}`), or a short standard text. Subject and text can be edited,
+then it is sent through the same email MCP (no button, no calendar
+invite, no offer details: HR sends the offer outside CandiVue). The
+candidate is then shown as **Selected** in the ranking and on the report,
+and cannot be emailed twice. It is never sent automatically, and the
+route refuses it before the report is approved (needs trainer approval:
+`docs/requirement.md` §14).
+
 Keep `EMAIL_TEST_RECIPIENT` set: every email then goes to you, with
 "[Test for <candidate address>]" in the subject, so no real person is
 mailed (N13). An email that fails never loses the interview: it shows
@@ -1066,7 +1083,7 @@ in development and the demo (N13).
 
 | Data | Kept until |
 |---|---|
-| Application: name, email, the CV file, the text read from it (parsed CV, passages and their embeddings), screening scores and reasons | The applicant is deleted (`DELETE /api/jobs/{job}/cvs/{candidate}`) |
+| Application: name, email, the CV file, the text read from it (parsed CV, passages and their embeddings), screening scores and reasons | The applicant or the job is deleted (`DELETE /api/jobs/{job}/cvs/{candidate}`, `DELETE /api/jobs/{job}`) |
 | Interview: time, link (hash only), chat messages, the **written transcript**, Q&A analysis, CV claims check, interview score and quality, assessment report | The interview or the applicant is deleted |
 | Face reference (F7): one encrypted embedding, never a photo; consent and its time | 30 days after the interview (`FACE_RETENTION_DAYS`), on cancellation, on withdrawal, or when the applicant is deleted |
 | Saved workflow state (LangGraph checkpoints) | Deleted when the run finishes; kept only to continue a failed run or a report waiting for review; the rest is cleaned up every hour |
@@ -1087,11 +1104,19 @@ another job is that person's separate application and is deleted on its
 own. Data already sent to an external provider (below) cannot be recalled
 by CandiVue.
 
+**Deleting a job** ("Delete job" on the job page, after a confirmation
+that lists what goes) does the same for every applicant of the job, and
+also removes the job profile, JDs, screening and rediscovery runs, the
+job's chat, the CV folder and the job-board post. Scheduled interviews are
+cancelled first (cancellation email, calendar event removed). It is
+refused while a screening, talent rediscovery, analysis or report of the
+job is running, or an interview is live (`tests/test_job_deletion.py`).
+
 **External providers:** see "AI provider and data sent to it" for exactly
 what each one receives: Gemini (job data, transcripts and reduced CV facts
 with names and contacts removed), Deepgram (interview audio, streamed),
-Google Forms / Drive / Sheets (what applicants submit), Gmail (invitations
-and access codes), Google Calendar (the interviewer's events), Blogger (job
+Google Forms / Drive / Sheets (what applicants submit), Gmail (invitations,
+access codes and selection emails), Google Calendar (the interviewer's events), Blogger (job
 posts, no candidate data). Face recognition, CV screening and embeddings
 run locally.
 
