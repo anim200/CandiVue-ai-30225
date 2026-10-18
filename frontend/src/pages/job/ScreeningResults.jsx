@@ -13,6 +13,7 @@ import {
   IconMailCheck,
   IconMailX,
   IconPlayerRecord,
+  IconTrophy,
   IconCheck,
   IconChevronDown,
   IconChevronRight,
@@ -43,6 +44,7 @@ const PIPELINE = {
   invitation_failed: { tone: 'danger', icon: IconMailX, text: 'Invitation failed' },
   in_interview: { tone: 'info', icon: IconPlayerRecord, text: 'In interview' },
   interviewed: { tone: 'success', icon: IconCircleCheck, text: 'Interviewed' },
+  selected: { tone: 'success', icon: IconTrophy, text: 'Selected' }, // selection email sent
 };
 
 const SECTION_NAMES = {

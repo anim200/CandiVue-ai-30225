@@ -115,6 +115,21 @@
   color: #1e4a31;
 }
 
+/* "Send selection email" under the Approved banner (§4B-14). */
+.selectionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border: 1px solid #dfe4e7;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 15px;
+  color: #48535b;
+}
+
 .versionNote {
   display: flex;
   flex-direction: column;

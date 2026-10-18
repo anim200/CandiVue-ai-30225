@@ -50,6 +50,9 @@ class Candidate(TimestampMixin, Base):
     # Set when the interviewer shortlists the candidate in the Hiring
     # Assistant; only shortlisted candidates can be invited to an interview.
     shortlisted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Set when the selection email was sent after the approved report
+    # (§4B-14): the candidate was selected, and is not emailed twice.
+    selected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Talent pool (F11): the applicant agreed (form question, or the
     # interviewer when adding the CV by hand) that this application may be
     # matched against other open vacancies. Never matched without it.

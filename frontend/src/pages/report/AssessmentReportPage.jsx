@@ -2,6 +2,7 @@
 // assessment of one interviewed candidate (F6). It is prepared by itself
 // after the interview's Q&A analysis, then waits for the interviewer's
 // review: approve it, or request changes with a comment (HITL, §4B-7).
+// Once approved, the selection email can be sent to the candidate (§4B-14).
 // Every conclusion shows its sources; the report exports as a printable
 // HTML file, and candidates of the same job compare side by side.
 // Interviewers only.
@@ -34,6 +35,7 @@ import { ComponentScoresCard, FindingsList, FollowUpCard, SourcePanel, Suitabili
 import classes from './Report.module.css';
 import { generatingStep, REVIEW, reportState } from './reportFormat';
 import ReviewBar from './ReviewBar';
+import SelectionEmail from './SelectionEmail';
 
 // "Interview 14 Oct 2026, 32 min".
 function interviewText(interview) {
@@ -67,7 +69,7 @@ export default function AssessmentReportPage() {
   const { interviewId } = useParams();
   const navigate = useNavigate();
   const [interview, setInterview] = useState(null);
-  const [page, setPage] = useState(null); // { analysis, report }
+  const [page, setPage] = useState(null); // { analysis, report, selected_at }
   const [failed, setFailed] = useState(false);
   const [tab, setTab] = useState('report');
   const [selected, setSelected] = useState(null);
@@ -237,6 +239,14 @@ export default function AssessmentReportPage() {
               final and can be exported.
             </span>
           </div>
+        )}
+        {state === 'approved' && (
+          <SelectionEmail
+            interviewId={interviewId}
+            candidateName={interview.candidate_name}
+            selectedAt={page.selected_at}
+            onSent={setPage}
+          />
         )}
         {state === 'waiting' && content.version > 1 && (
           <div className={classes.versionNote}>

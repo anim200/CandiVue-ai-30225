@@ -1,12 +1,14 @@
-"""Interview invitation emails (§4B-4, §4B-8).
+"""Emails to candidates: interview invitations (§4B-4, §4B-8),
+cancellations, and the selection email after an approved report (§4B-14).
 
 The text comes from the knowledge base's Email templates collection (RAG):
 the search finds the template and the whole document is rebuilt from its
 passages. A template needs a "Subject:" line; its text runs until a "---"
 line or a new "# " heading, and these placeholders are filled:
 {candidate_name} {job_title} {date} {time} {time_zone} {duration}
-{interview_link}. Without a usable template (or if the search fails), a
-standard text is used, so invitations never get stuck.
+{interview_link}. An invitation template has the {interview_link}
+placeholder; a selection template has none. Without a usable template (or
+if the search fails), a standard text is used, so emails never get stuck.
 
 Each email has a plain-text part and an HTML part built from a fixed,
 simple layout: paragraphs, a details table for "- **Label:** value" lines,
@@ -61,7 +63,24 @@ We will contact you if a new time is arranged.
 Kind regards,
 The hiring team
 """
+SELECTION = """Subject: Congratulations: {job_title}
+
+Hello {candidate_name},
+
+Thank you for interviewing for the {job_title} role. We are happy to tell you that you have been selected.
+
+Our team will contact you soon about the next steps.
+
+Kind regards,
+The hiring team
+"""
 STANDARD_NAME = "standard text (no template in the knowledge base)"
+# Per kind of email: the search words, whether the template has the
+# {interview_link} placeholder, and the standard text.
+TEMPLATES = {
+    "invitation": ("interview invitation email", True, STANDARD),
+    "selection": ("job selection congratulations email", False, SELECTION),
+}
 PREVIEW_LINK = "[private link, made when you confirm]"
 # A template line at least this long was wrapped by the editor: the next
 # line continues the same sentence. Shorter lines ("Kind regards,") are
@@ -79,19 +98,22 @@ class Invitation:
     html: str
 
 
-def template(db: Session) -> tuple[str, str]:
-    """The invitation template from the knowledge base (the whole document)
-    and its file name, or the standard text."""
+def template(db: Session, kind: str = "invitation") -> tuple[str, str]:
+    """The template of this kind ("invitation" or "selection") from the
+    knowledge base (the whole document) and its file name, or the standard
+    text."""
+    query, with_link, standard = TEMPLATES[kind]
     try:
-        passages = search_knowledge(
-            db, "interview invitation email", [KnowledgeCollection.EMAIL_TEMPLATES], 3
-        )
-    except AIServiceError:  # the search model is down: still invite people
+        passages = search_knowledge(db, query, [KnowledgeCollection.EMAIL_TEMPLATES], 5)
+    except AIServiceError:  # the search model is down: still send the email
         passages = []
-    best = next((p for p in passages if "Subject:" in p.text), None)
-    if best is None:
-        return STANDARD, STANDARD_NAME
-    return _whole_document(db, best.document_id), best.filename
+    for passage in passages:
+        if "Subject:" not in passage.text:
+            continue
+        document = _whole_document(db, passage.document_id)
+        if ("{interview_link}" in document) == with_link:
+            return document, passage.filename
+    return standard, STANDARD_NAME
 
 
 def compose(
@@ -103,19 +125,7 @@ def compose(
     link: str,
 ) -> Invitation:
     """Fill the template for one candidate."""
-    values = _values(candidate, job, starts_at, duration, link)
-    lines = text.splitlines()
-    first = next(i for i, line in enumerate(lines) if line.startswith("Subject:"))
-    section = []
-    for line in lines[first + 1 :]:
-        if line.startswith(("---", "# ")):
-            break
-        section.append(line)
-    filled = "\n".join(section)
-    subject = lines[first].split(":", 1)[1].strip()
-    for key, value in values.items():
-        filled = filled.replace(f"{{{key}}}", value)
-        subject = subject.replace(f"{{{key}}}", value)
+    subject, filled = _fill(text, _values(candidate, job, starts_at, duration, link))
     blocks = _blocks(filled)
     if link not in filled:  # the link must always be in the invitation
         blocks.append(("list", [f"**Your personal link:** {link}"]))
@@ -175,6 +185,43 @@ def deliver_cancellation(db: Session, session: InterviewSession) -> str | None:
         return str(exc)
     logger.info("Cancellation email sent: session %d", session.id)
     return None
+
+
+def selection_email(db: Session, candidate: Candidate, job: Job) -> dict:
+    """The selection email for one candidate, to check (and edit) before it
+    is sent: {"subject", "text", "template"}."""
+    text, name = template(db, "selection")
+    values = {"candidate_name": candidate.full_name or "there", "job_title": job.title}
+    subject, filled = _fill(text, values)
+    return {"subject": subject, "text": _as_text(_blocks(filled)), "template": name}
+
+
+def deliver_selection(to: str, subject: str, text: str) -> str | None:
+    """Send the (checked) selection email. Returns why it failed, or None."""
+    blocks = _blocks(text)
+    try:
+        send_email(to, subject, _as_text(blocks), _as_html(subject, blocks, ""))
+    except EmailError as exc:
+        return str(exc)
+    return None
+
+
+def _fill(text: str, values: dict) -> tuple[str, str]:
+    """The template's subject and text (from its "Subject:" line until a
+    "---" line or a new "# " heading) with the placeholders filled."""
+    lines = text.splitlines()
+    first = next(i for i, line in enumerate(lines) if line.startswith("Subject:"))
+    section = []
+    for line in lines[first + 1 :]:
+        if line.startswith(("---", "# ")):
+            break
+        section.append(line)
+    filled = "\n".join(section)
+    subject = lines[first].split(":", 1)[1].strip()
+    for key, value in values.items():
+        filled = filled.replace(f"{{{key}}}", value)
+        subject = subject.replace(f"{{{key}}}", value)
+    return subject, filled
 
 
 def _values(candidate, job, starts_at: datetime, duration: int, link: str) -> dict:

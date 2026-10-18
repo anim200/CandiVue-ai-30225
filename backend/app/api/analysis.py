@@ -1,9 +1,9 @@
 """Post-interview API (F5, F6, F8-F10): the Q&A analysis of an ended
 interview (with the CV claims check, interview score and interview quality),
-its
-assessment report with the interviewer's review (HITL), the report as a
-printable HTML file, and the reports of a job for the Reports page and the
-side-by-side comparison. Interviewers only (N9): candidates never see
+its assessment report with the interviewer's review (HITL), the report as a
+printable HTML file, the selection email after an approved report (§4B-14),
+and the reports of a job for the Reports page and the side-by-side
+comparison. Interviewers only (N9): candidates never see
 analyses, scores or reports.
 
 Both run in the background (LangGraphs 3 and 4): the analysis starts when
@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 from app.analysis.interview_quality import consistency
 from app.analysis.report_html import render_report
 from app.auth.dependencies import CurrentUser, require_interviewer
+from app.core import clock
 from app.db.database import get_db
 from app.db.models import (
     AssessmentReport,
@@ -37,6 +38,7 @@ from app.db.models.assessment import ReviewStatus
 from app.db.models.interview import SessionStatus
 from app.db.models.run import RunStatus
 from app.graphs import final_assessment, qa_analysis
+from app.interviews import emails
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +56,9 @@ NO_ANALYSIS = "The Q&A analysis must finish before the report can be prepared."
 REPORT_RUNNING = "The report is already being prepared."
 NO_REPORT = "There is no report for this interview yet."
 NOT_IN_REVIEW = "This report is not waiting for your review."
+NOT_APPROVED = "The selection email can be sent once the report is approved."
+ALREADY_SELECTED = "The selection email was already sent to this candidate."
+NO_EMAIL = "This candidate has no email address."
 ACTIVE = (RunStatus.PENDING, RunStatus.RUNNING)
 
 
@@ -104,6 +109,7 @@ class ReportPageOut(BaseModel):
 
     analysis: RunOut | None
     report: ReportOut | None
+    selected_at: datetime | None = None  # when the selection email was sent
 
 
 class ReviewIn(BaseModel):
@@ -119,6 +125,23 @@ class ReviewIn(BaseModel):
         if self.action == "request_changes" and not self.feedback:
             raise ValueError("Say what should change.")
         return self
+
+
+class SelectionEmailOut(BaseModel):
+    """The selection email to check before sending: recipient, subject, text
+    and the template it was made from."""
+
+    to: str
+    subject: str
+    text: str
+    template: str
+
+
+class SelectionEmailIn(BaseModel):
+    """The checked (possibly edited) selection email."""
+
+    subject: str = Field(min_length=2, max_length=200)
+    text: str = Field(min_length=10, max_length=5000)
 
 
 class JobReportOut(BaseModel):
@@ -173,12 +196,13 @@ def get_report(
     interview_id: int, db: Annotated[Session, Depends(get_db)]
 ) -> ReportPageOut:
     """The interview's report and the analysis it rests on."""
-    _session(db, interview_id)
+    session = _session(db, interview_id)
     analysis = _analysis(db, interview_id)
     report = final_assessment.latest_report(db, interview_id)
     return ReportPageOut(
         analysis=_run(analysis) if analysis else None,
         report=_report(db, report) if report else None,
+        selected_at=db.get(Candidate, session.candidate_id).selected_at,
     )
 
 
@@ -253,6 +277,40 @@ def export_report(
     )
 
 
+# ---------- selection email (§4B-14) ----------
+
+
+@router.get(
+    "/interviews/{interview_id}/selection-email", response_model=SelectionEmailOut
+)
+def preview_selection_email(
+    interview_id: int, db: Annotated[Session, Depends(get_db)]
+) -> SelectionEmailOut:
+    """The selection email from the knowledge-base template (or the
+    standard text), to check and edit before sending."""
+    session = _session(db, interview_id)
+    candidate = _selectable(db, session)
+    email = emails.selection_email(db, candidate, db.get(Job, session.job_id))
+    return SelectionEmailOut(to=candidate.email, **email)
+
+
+@router.post("/interviews/{interview_id}/selection-email", response_model=ReportPageOut)
+def send_selection_email(
+    interview_id: int, body: SelectionEmailIn, db: Annotated[Session, Depends(get_db)]
+) -> ReportPageOut:
+    """Send the checked selection email; the candidate is then marked as
+    selected and is never emailed twice."""
+    session = _session(db, interview_id)
+    candidate = _selectable(db, session, lock=True)
+    problem = emails.deliver_selection(candidate.email, body.subject, body.text)
+    if problem:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, problem)
+    candidate.selected_at = clock.now()
+    db.commit()
+    logger.info("Selection email sent: candidate %d", candidate.id)
+    return get_report(interview_id, db)
+
+
 @router.get("/jobs/{job_id}/reports", response_model=list[JobReportOut])
 def job_reports(
     job_id: int, db: Annotated[Session, Depends(get_db)]
@@ -296,6 +354,23 @@ def _session(db: Session, interview_id: int) -> InterviewSession:
     if session is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, NOT_FOUND)
     return session
+
+
+def _selectable(
+    db: Session, session: InterviewSession, lock: bool = False
+) -> Candidate:
+    """The candidate, if they may get the selection email: the report is
+    approved, they were not emailed yet and have an address; or 409. lock:
+    hold the row, so two clicks cannot send it twice."""
+    report = final_assessment.latest_report(db, session.id)
+    if report is None or report.review_status != ReviewStatus.APPROVED:
+        raise HTTPException(status.HTTP_409_CONFLICT, NOT_APPROVED)
+    candidate = db.get(Candidate, session.candidate_id, with_for_update=lock)
+    if candidate.selected_at:
+        raise HTTPException(status.HTTP_409_CONFLICT, ALREADY_SELECTED)
+    if not candidate.email:
+        raise HTTPException(status.HTTP_409_CONFLICT, NO_EMAIL)
+    return candidate
 
 
 def _analysis(db: Session, interview_id: int) -> QAAnalysis | None:
