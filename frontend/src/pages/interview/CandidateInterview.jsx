@@ -1,8 +1,9 @@
 // The candidate's interview after the private link was accepted (design:
 // Candidate Join: JoinWelcome, DeviceCheck, WaitingRoom, in call; arranged
 // as one waiting-room screen on the user's request, 13-10-2026).
-// - Identity check first (F7, only when set up and not decided yet):
-//   consent → photo → done, or continue without it (IdentityEnrolment).
+// - Check-in first (F7, §4B-15: only when set up, the application photo is
+//   usable and not decided yet): consent → pictures → done, or skip it
+//   (IdentityCheckIn).
 // - Waiting room: camera preview with a microphone level, device choice,
 //   the interview details, a required notice tick, then "Join waiting
 //   room". The page then tells the backend every few seconds that the
@@ -43,7 +44,7 @@ import { formatElapsed, startsIn, useElapsed, useNow } from './callTime';
 import CallView, { CallConnection, onDeviceFailure } from './CallView';
 import classes from './CandidateInterview.module.css';
 import { liveKitUrl } from './liveKit';
-import IdentityEnrolment, { IdentityChoice } from './IdentityEnrolment';
+import IdentityCheckIn, { IdentityChoice } from './IdentityCheckIn';
 import RoomChat from './RoomChat';
 
 const IN_CALL = 'candivue-in-call'; // this tab was let in (sessionStorage)
@@ -537,7 +538,7 @@ export default function CandidateInterview({ onEnded }) {
     );
   }
   if (interview.identity.available && interview.identity.consent === null) {
-    return <IdentityEnrolment identity={interview.identity} onDone={setInterview} />;
+    return <IdentityCheckIn identity={interview.identity} onDone={setInterview} />;
   }
   return (
     <WaitingRoom

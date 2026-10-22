@@ -138,3 +138,22 @@
     justify-content: flex-start;
   }
 }
+
+/* The application photo under the candidate's name (F7). */
+.photo {
+  margin-top: 2px;
+  font-size: 12.5px;
+  font-weight: 400;
+}
+
+.photo_ok {
+  color: #2d7a4e;
+}
+
+.photo_warn {
+  color: #9a6400;
+}
+
+.photo_plain {
+  color: #66717a;
+}
