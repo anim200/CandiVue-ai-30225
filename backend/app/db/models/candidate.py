@@ -59,6 +59,11 @@ class Candidate(TimestampMixin, Base):
     open_to_other_roles: Mapped[bool] = mapped_column(
         default=False, server_default="false"
     )
+    # Identity check (F7, §4B-15): the face photo sent with the form (its
+    # Google Drive file) and the separate consent to use it. Processed only
+    # once the applicant is invited (ApplicationPhoto).
+    photo_file_id: Mapped[str | None] = mapped_column(String(200))
+    photo_consent: Mapped[bool] = mapped_column(default=False, server_default="false")
     # Set when this application was added from another job's talent pool
     # (the original application stays as it was).
     rediscovered_from_id: Mapped[int | None] = mapped_column(

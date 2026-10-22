@@ -40,7 +40,7 @@ CLEAN_UP_EVERY_SECONDS = 3600
 
 
 def clean_up_personal_data() -> None:
-    """Delete personal data whose time is up: face references after their
+    """Delete personal data whose time is up: application photos after their
     retention (F7, N17) and saved workflow state that is no longer needed
     (N16, N19)."""
     with SessionLocal() as db:

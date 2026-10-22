@@ -68,13 +68,17 @@ class Settings(BaseSettings):
     deepgram_model: str = "nova-3"
     deepgram_language: str = "en"
 
-    # Identity check (F7): face references are encrypted with this key
-    # (Fernet: 32 url-safe base64 bytes; README "Identity check"). Empty:
-    # the identity check is off and the candidate is not asked. References
-    # are deleted this many days after the interview.
+    # Identity check (F7, §4B-15): application photos are encrypted with this
+    # key (Fernet: 32 url-safe base64 bytes; README "Identity check"). Empty:
+    # the identity check is off and the candidate is not asked. Photos are
+    # deleted this many days after the interview. Face similarity from which
+    # check-in pictures match the photo (SFace's own same-person line is
+    # 0.363), and below which they clearly do not.
     face_reference_key: SecretStr | None = None
     face_retention_days: int = Field(default=30, gt=0)
     face_model_dir: str = "/opt/face-models"  # YuNet + SFace, built into the image
+    face_match_from: float = Field(default=0.363, gt=0, lt=1)
+    face_unsure_from: float = Field(default=0.28, gt=0, lt=1)
 
     # CV Collector (app/collector, cv-collector container). The Google key is
     # given only to that container (read-only service account, N7).

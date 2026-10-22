@@ -15,16 +15,21 @@ from app.core import clock
 from app.core.config import get_settings
 from app.db.database import SessionLocal
 from app.db.models import (
+    ApplicationPhoto,
     Candidate,
     CandidateScore,
-    FaceReference,
     InterviewSession,
     Job,
     QAAnalysis,
     ScreeningRun,
     TranscriptTurn,
 )
-from app.db.models.interview import InvitationStatus, SessionStatus, Speaker
+from app.db.models.interview import (
+    InvitationStatus,
+    PhotoStatus,
+    SessionStatus,
+    Speaker,
+)
 from app.db.models.run import RunStatus
 from app.graphs.checkpointer import open_checkpointer
 from app.interviews import planning
@@ -59,7 +64,7 @@ def threads() -> set[str]:
 @pytest.fixture
 def applicant(tmp_path, monkeypatch):
     """A screened applicant with a CV file, an ended interview with a
-    transcript, a failed analysis, a face reference and saved threads."""
+    transcript, a failed analysis, an application photo and saved threads."""
     monkeypatch.setattr(get_settings(), "cv_intake_dir", str(tmp_path))
     with SessionLocal() as db:
         job = Job(title="Privacy test job")
@@ -99,8 +104,8 @@ def applicant(tmp_path, monkeypatch):
             )
         )
         db.add(
-            FaceReference(
-                session_id=session.id, candidate_id=candidate.id, embedding=b"x"
+            ApplicationPhoto(
+                candidate_id=candidate.id, status=PhotoStatus.READY, embedding=b"x"
             )
         )
         analysis = QAAnalysis(session_id=session.id, status=RunStatus.FAILED)
@@ -135,7 +140,7 @@ def test_deleting_a_candidate_removes_everything_about_them(applicant, client):
         assert db.get(Candidate, applicant["candidate"]) is None
         assert db.get(InterviewSession, applicant["session"]) is None
         assert db.get(QAAnalysis, applicant["analysis"]) is None
-        for model in (CandidateScore, FaceReference):
+        for model in (CandidateScore, ApplicationPhoto):
             assert (
                 db.scalar(
                     select(model.id).where(model.candidate_id == applicant["candidate"])

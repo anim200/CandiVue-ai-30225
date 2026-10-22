@@ -1,16 +1,23 @@
-"""Identity check (F7): the decision rules, consent and the face reference
-(stored encrypted, deleted on withdrawal and after the retention time), the
-interviewer's view (profile only on a confident match), "Check again", the
-live comparison and the report line. No real faces: the face model is a
-fake that reads a person's "face" from the first byte of the picture; one
-test checks that the real models load and find no face in a blank image.
+"""Identity check (F7, §4B-15): the photo sent with the application is
+processed once the applicant is invited (stored encrypted, deleted after
+the retention time), the candidate checks in with three camera pictures,
+the interviewer sees the photo and the match score (the profile only on a
+match), and the candidate never sees the result.
+
+No real faces: the face model is a fake that reads whose "face" a picture
+shows from its first pixel value. The photo reading (types, size, EXIF
+rotation) uses real images made here; one test checks that the real face
+models load and find no face in a blank image.
 """
 
+import io
 from datetime import timedelta
 
 import numpy as np
+import pillow_heif
 import pytest
 from cryptography.fernet import Fernet
+from PIL import Image
 from pydantic import SecretStr
 from sqlalchemy import select
 
@@ -18,43 +25,75 @@ from app.auth.security import Role, create_access_token
 from app.core import clock
 from app.core.config import get_settings
 from app.db.database import SessionLocal
-from app.db.models import Candidate, FaceReference, InterviewSession, Job
-from app.db.models.interview import IdentityConsent, InvitationStatus, SessionStatus
-from app.identity import faces, references, watcher
+from app.db.models import ApplicationPhoto, Candidate, InterviewSession, Job
+from app.db.models.interview import InvitationStatus, PhotoStatus, SessionStatus
+from app.identity import checkin, faces, photos, references
 from app.identity.faces import FaceError
-from app.identity.matching import MATCH_FROM, Sample, decide, identity_summary
+from app.identity.matching import decide, identity_summary, score
+from app.identity.photos import PhotoError, read_photo
 from app.interviews import planning
 
 pytestmark = pytest.mark.usefixtures("database_available")
 
-# Unit vectors standing for three people's faces.
-ALEX, BEA, CAL = np.eye(3, 128, dtype=np.float32)
+# Unit vectors standing for people's faces: Alex, Bea, Cal; then pictures
+# that look 32 % and 10 % like Alex (similarity to ALEX: 0.32 and 0.10).
+ALEX, BEA, CAL, OTHER = np.eye(4, 128, dtype=np.float32)
 
 
-def fake_face(image) -> np.ndarray:
-    """The fake face model: the picture's first byte says whose face it is
-    (0 → no face, 9 → two faces, 1/2/3 → Alex/Bea/Cal)."""
-    who = int(image[0])
-    if who == 0:
-        raise FaceError("no_face")
-    if who == 9:
-        raise FaceError("several_faces")
-    return (ALEX, BEA, CAL)[who - 1]
+def like_alex(similarity: float) -> np.ndarray:
+    """A face whose similarity to Alex is exactly `similarity`."""
+    return (similarity * ALEX + np.sqrt(1 - similarity**2) * OTHER).astype(np.float32)
 
 
-def picture(who: int) -> bytes:
-    """A "picture" of a person for the fake model."""
-    return bytes([who, 0, 0])
+FACES = {1: ALEX, 2: BEA, 3: CAL, 4: like_alex(0.32), 5: like_alex(0.10)}
+# 0: no face, 9: two people, 7: face too small, 8: too dark.
+PROBLEMS = {0: "no_face", 9: "several_faces", 7: "too_small"}
+
+
+def who(image) -> int:
+    """Whose face the fake model sees: the picture's first pixel value."""
+    return int(np.asarray(image).flat[0])
+
+
+def fake_find_face(image) -> np.ndarray:
+    """The fake detector: a face box, or the problem the value stands for."""
+    if who(image) in PROBLEMS:
+        raise FaceError(PROBLEMS[who(image)])
+    return np.array([10, 10, 40, 40], np.float32)
+
+
+def fake_check_light(image, face) -> None:
+    """The fake light check: value 8 is too dark."""
+    if who(image) == 8:
+        raise FaceError("too_dark")
+
+
+def fake_embedding(image, face=None) -> np.ndarray:
+    """The fake recogniser: the face the value stands for."""
+    return FACES.get(who(image), ALEX)
+
+
+def picture(person: int) -> bytes:
+    """A camera "picture" of a person for the fake model."""
+    return bytes([person, 0, 0])
+
+
+def photo_file(person: int, fmt: str = "PNG", size=(100, 100)) -> bytes:
+    """A real image file whose first pixel value says whose photo it is."""
+    buffer = io.BytesIO()
+    Image.new("RGB", size, (0, 0, person)).save(buffer, fmt)  # BGR: blue first
+    return buffer.getvalue()
 
 
 @pytest.fixture(autouse=True)
 def fake_faces(monkeypatch):
     """The fake face model, and a fresh encryption key."""
     monkeypatch.setattr(
-        references, "decode_image", lambda data: np.frombuffer(data, np.uint8)
+        faces, "decode_image", lambda data: np.frombuffer(data, np.uint8)
     )
-    monkeypatch.setattr(references, "face_embedding", fake_face)
-    monkeypatch.setattr(watcher, "face_embedding", fake_face)
+    monkeypatch.setattr(faces, "find_face", fake_find_face)
+    monkeypatch.setattr(faces, "check_light", fake_check_light)
+    monkeypatch.setattr(faces, "face_embedding", fake_embedding)
     monkeypatch.setattr(
         get_settings(), "face_reference_key", SecretStr(Fernet.generate_key().decode())
     )
@@ -62,18 +101,21 @@ def fake_faces(monkeypatch):
 
 @pytest.fixture
 def interview():
-    """A job with two invited candidates (Alex and Bea), one interview each."""
+    """A job with two invited applicants (Alex and Bea), one interview each,
+    both with a photo and consent from the form (not processed yet)."""
     with SessionLocal() as db:
         job = Job(title="PHP Developer", profile={"requirements": []})
         db.add(job)
         db.flush()
-        sessions = []
-        for name in ("Alex Strong", "Bea Good"):
+        ids = {"job": job.id}
+        for key, name in (("alex", "Alex Strong"), ("bea", "Bea Good")):
             candidate = Candidate(
                 job_id=job.id,
                 full_name=name,
-                email=f"{name.split()[0].lower()}@example.com",
+                email=f"{key}@example.com",
                 cv_filename="cv.pdf",
+                photo_file_id=f"photo-{key}",
+                photo_consent=True,
                 parsed_cv={
                     "years_experience": 6,
                     "years_source": "dates",
@@ -92,13 +134,20 @@ def interview():
             )
             db.add(session)
             db.flush()
-            sessions.append(session.id)
+            ids[key], ids[f"{key}_candidate"] = session.id, candidate.id
         db.commit()
-        ids = {"job": job.id, "alex": sessions[0], "bea": sessions[1]}
     yield ids
     with SessionLocal() as db:
         db.delete(db.get(Job, ids["job"]))
         db.commit()
+
+
+def give_photo(candidate_id: int, person: int) -> PhotoStatus:
+    """Process an application photo as the CV Collector does."""
+    with SessionLocal() as db:
+        return references.save_photo(
+            db, db.get(Candidate, candidate_id), photo_file(person)
+        )
 
 
 def as_candidate(session_id: int) -> dict:
@@ -113,10 +162,10 @@ def as_interviewer() -> dict:
     return {"Authorization": f"Bearer {create_access_token(1, Role.INTERVIEWER)}"}
 
 
-def enrol(client, session_id: int, who: int, shots=(None, None, None)):
-    """Send three pictures, as the candidate's page does."""
+def check_in(client, session_id: int, person: int, shots=(None, None, None)):
+    """Send three camera pictures, as the candidate's page does."""
     files = [
-        ("pictures", (f"{i}.jpg", picture(who if s is None else s), "image/jpeg"))
+        ("pictures", (f"{i}.jpg", picture(person if s is None else s), "image/jpeg"))
         for i, s in enumerate(shots)
     ]
     return client.post(
@@ -124,55 +173,204 @@ def enrol(client, session_id: int, who: int, shots=(None, None, None)):
     )
 
 
-# ---------- the decision rules ----------
+def view(client, session_id: int) -> dict:
+    """What the interviewer sees for the interview."""
+    return client.get(
+        f"/api/interviews/{session_id}/identity", headers=as_interviewer()
+    ).json()
 
 
-def test_one_bad_picture_never_decides_and_identity_is_never_assumed():
-    same, unsure, other = Sample(own=0.8), Sample(own=0.33), Sample(own=0.1)
-
-    assert decide([same])["state"] == "checking"  # not enough pictures yet
-    assert decide([same, same])["state"] == "matched"
-    assert decide([same, Sample(problem="no_face"), same])["state"] == "matched"
-    assert decide([unsure, unsure, same])["state"] == "low_confidence"
-    assert decide([other, other])["state"] == "no_match"
-    assert decide([Sample(problem="several_faces")] * 3)["state"] == "several_faces"
-    assert decide([Sample(problem="too_small")] * 3)["state"] == "too_small"
-    assert decide([Sample(problem="camera_off")] * 3)["state"] == "camera_off"
-    # Clearly another applicant of the job: no match, with their name.
-    someone = Sample(own=0.3, other=("Bea Good", 0.9))
-    assert decide([someone, someone]) == {
-        "state": "no_match",
-        "similarity": 0.3,
-        "other": "Bea Good",
-    }
-    assert MATCH_FROM > 0.363  # a margin above SFace's own threshold
+# ---------- the match score and the decision rules ----------
 
 
-# ---------- consent and the face reference ----------
+def test_the_match_score_scale():
+    assert [score(s) for s in (-0.2, 0, 0.14, 0.28, 0.363, 0.70, 0.95)] == [
+        0,
+        0,
+        20,
+        40,  # the "unsure" line
+        60,  # SFace's own same-person line
+        100,
+        100,
+    ]
 
 
-def test_the_reference_is_stored_encrypted_and_only_with_consent(client, interview):
-    before = client.get(
-        "/api/candidate/interview", headers=as_candidate(interview["alex"])
+def test_the_decision_rules():
+    assert decide([0.8, 0.75, 0.82], [])["state"] == "matched"
+    assert decide([0.8, 0.75, 0.82], [])["score"] == 100
+    assert decide([0.32, 0.33, 0.34], [])["state"] == "not_confirmed"
+    assert decide([0.1, 0.05, 0.12], [])["state"] == "no_match"
+    # A good average with one clearly different picture is not a match.
+    assert decide([0.9, 0.9, 0.1], [])["state"] == "not_confirmed"
+    # Clearly closer to another applicant of the job: named.
+    other = decide([0.1, 0.1, 0.1], [("Bea Good", [0.9, 0.85, 0.88])])
+    assert other["state"] == "other_applicant" and other["other"] == "Bea Good"
+    # Another applicant only a little closer does not count.
+    assert decide([0.6] * 3, [("Bea Good", [0.65] * 3)])["state"] == "matched"
+
+
+# ---------- the application photo ----------
+
+
+def test_only_invited_applicants_with_consent_have_their_photo_processed(interview):
+    with SessionLocal() as db:
+        waiting = {c.id for c in references.photos_to_process(db)}
+        assert waiting == {interview["alex_candidate"], interview["bea_candidate"]}
+
+        alex = db.get(Candidate, interview["alex_candidate"])
+        alex.photo_consent = False  # did not tick the photo consent
+        bea_session = db.get(InterviewSession, interview["bea"])
+        bea_session.invitation_status = InvitationStatus.PENDING  # not emailed yet
+        db.commit()
+        assert references.photos_to_process(db) == []
+
+
+def test_a_photo_is_stored_encrypted_with_a_small_copy(interview):
+    assert give_photo(interview["alex_candidate"], 1) == PhotoStatus.READY
+
+    with SessionLocal() as db:
+        photo = db.scalar(
+            select(ApplicationPhoto).where(
+                ApplicationPhoto.candidate_id == interview["alex_candidate"]
+            )
+        )
+        assert photo.embedding[:5] == b"gAAAA" and photo.thumbnail[:5] == b"gAAAA"
+        small = Image.open(
+            io.BytesIO(references.thumbnail(db, interview["alex_candidate"]))
+        )
+        assert small.format == "JPEG" and small.size == (photos.THUMBNAIL_SIDE,) * 2
+        own = references.job_photos(db, db.get(InterviewSession, interview["alex"]))[
+            "own"
+        ]
+        assert np.allclose(own, ALEX)
+        assert references.photos_to_process(db)[0].id == interview["bea_candidate"]
+
+
+@pytest.mark.parametrize(
+    "person, status",
+    [
+        (0, PhotoStatus.NO_FACE),
+        (9, PhotoStatus.SEVERAL_FACES),
+        (7, PhotoStatus.TOO_SMALL),
+    ],
+    ids=["no face", "two people", "face too small"],
+)
+def test_an_unusable_photo_keeps_only_the_reason(interview, client, person, status):
+    assert give_photo(interview["alex_candidate"], person) == status
+
+    shown = view(client, interview["alex"])
+    assert shown["state"] == "no_photo" and shown["photo"]["available"] is False
+    assert (
+        shown["photo"]["text"]
+        == photos.TEXTS[status][0].lower() + photos.TEXTS[status][1:]
     )
-    assert before.json()["identity"] == {
+    with SessionLocal() as db:
+        assert references.thumbnail(db, interview["alex_candidate"]) is None
+
+
+def test_a_failed_download_is_tried_again_a_few_times(interview):
+    with SessionLocal() as db:
+        alex = db.get(Candidate, interview["alex_candidate"])
+        for _ in range(references.MAX_DOWNLOAD_TRIES):
+            assert alex.id in {c.id for c in references.photos_to_process(db)}
+            references.photo_download_failed(db, alex)
+        assert alex.id not in {c.id for c in references.photos_to_process(db)}
+        assert references.photo_state(db, alex) == "download_failed"
+
+
+def test_photo_types_size_and_rotation_are_handled():
+    assert read_photo(photo_file(1, "JPEG")).shape == (100, 100, 3)
+    assert read_photo(photo_file(1, "WEBP")).shape == (100, 100, 3)
+    heic = io.BytesIO()
+    pillow_heif.from_pillow(Image.new("RGB", (64, 48), (0, 0, 1))).save(
+        heic, quality=90
+    )
+    assert read_photo(heic.getvalue()).shape == (48, 64, 3)  # an iPhone photo
+
+    # A phone photo stored sideways with an EXIF note is turned upright.
+    sideways = io.BytesIO()
+    exif = Image.Exif()
+    exif[0x0112] = 6  # "rotate 90° to show"
+    Image.new("RGB", (120, 80)).save(sideways, "JPEG", exif=exif)
+    assert read_photo(sideways.getvalue()).shape[:2] == (120, 80)
+
+    # Very large photos are scaled down before the face search.
+    assert (
+        max(read_photo(photo_file(1, "PNG", (3000, 2000))).shape[:2]) == photos.MAX_SIDE
+    )
+
+    for data, status in (
+        (b"%PDF-1.4 not a photo", PhotoStatus.UNREADABLE),
+        (b"\xff\xd8\xff" + b"broken", PhotoStatus.UNREADABLE),
+        (b"\xff\xd8\xff" + bytes(photos.MAX_PHOTO_BYTES), PhotoStatus.TOO_LARGE),
+    ):
+        with pytest.raises(PhotoError) as error:
+            read_photo(data)
+        assert error.value.status == status
+
+
+# ---------- check-in ----------
+
+
+def test_the_candidate_checks_in_only_when_the_photo_is_ready(client, interview):
+    url, headers = "/api/candidate/interview", as_candidate(interview["alex"])
+    assert client.get(url, headers=headers).json()["identity"]["available"] is False
+    assert (
+        check_in(client, interview["alex"], 1).status_code == 422
+    )  # nothing to compare
+
+    give_photo(interview["alex_candidate"], 1)
+
+    assert client.get(url, headers=headers).json()["identity"] == {
         "available": True,
         "consent": None,
         "retention_days": 30,
     }
 
-    given = enrol(client, interview["alex"], who=1)
 
-    assert given.status_code == 200 and given.json()["identity"]["consent"] == "given"
-    with SessionLocal() as db:
-        stored = db.scalar(
-            select(FaceReference).where(FaceReference.session_id == interview["alex"])
-        )
-        assert stored.embedding[:5] == b"gAAAA"  # Fernet ciphertext, not the numbers
-        own = references.job_references(
-            db, db.get(InterviewSession, interview["alex"])
-        )["own"]
-        assert np.allclose(own[0], ALEX)
+def test_a_matching_check_in_shows_the_score_and_profile(client, interview):
+    give_photo(interview["alex_candidate"], 1)
+
+    answer = check_in(client, interview["alex"], 1)
+
+    assert answer.status_code == 200
+    candidate_side = answer.json()["identity"]
+    assert candidate_side["consent"] == "given"
+    assert "score" not in str(answer.json()) and "match" not in str(answer.json())  # N9
+    shown = view(client, interview["alex"])
+    assert shown["state"] == "matched" and shown["score"] == 100
+    assert shown["text"] == "Matches the application photo"
+    assert shown["photo"]["available"] is True
+    assert shown["profile"]["name"] == "Alex Strong"
+    assert shown["profile"]["skills"] == ["PHP", "Laravel", "Docker"]
+
+
+@pytest.mark.parametrize(
+    "person, state, score_range",
+    [(4, "not_confirmed", (40, 59)), (5, "no_match", (0, 39)), (3, "no_match", (0, 0))],
+    ids=["unsure", "different person", "stranger"],
+)
+def test_a_doubtful_check_in_never_shows_the_profile(
+    client, interview, person, state, score_range
+):
+    give_photo(interview["alex_candidate"], 1)
+
+    assert check_in(client, interview["alex"], person).status_code == 200
+
+    shown = view(client, interview["alex"])
+    assert shown["state"] == state and shown["profile"] is None
+    assert score_range[0] <= shown["score"] <= score_range[1]
+
+
+def test_another_applicant_at_the_check_in_is_named(client, interview):
+    give_photo(interview["alex_candidate"], 1)
+    give_photo(interview["bea_candidate"], 2)
+
+    check_in(client, interview["alex"], 2)  # Bea attends Alex's interview
+
+    shown = view(client, interview["alex"])
+    assert shown["state"] == "other_applicant"
+    assert "looks like Bea Good, another applicant" in shown["text"]
 
 
 @pytest.mark.parametrize(
@@ -180,41 +378,67 @@ def test_the_reference_is_stored_encrypted_and_only_with_consent(client, intervi
     [
         ((1, 0, 1), "No face found"),
         ((1, 9, 1), "More than one face"),
+        ((1, 7, 1), "too far from the camera"),
+        ((1, 8, 1), "too dark"),
         ((1, 2, 1), "do not look alike"),
     ],
-    ids=["no face", "two faces", "different people"],
+    ids=["no face", "two people", "too far", "too dark", "different people"],
 )
-def test_unusable_pictures_are_refused_with_the_reason(
+def test_unusable_pictures_are_refused_with_what_to_change(
     client, interview, shots, message
 ):
-    answer = enrol(client, interview["alex"], who=1, shots=shots)
+    give_photo(interview["alex_candidate"], 1)
+
+    answer = check_in(client, interview["alex"], 1, shots=shots)
 
     assert answer.status_code == 422 and message in answer.json()["detail"]
-    with SessionLocal() as db:
-        assert not db.scalar(
-            select(FaceReference.id).where(
-                FaceReference.session_id == interview["alex"]
-            )
+    assert view(client, interview["alex"])["state"] == "waiting"
+
+
+def test_after_too_many_tries_the_candidate_continues_without(client, interview):
+    give_photo(interview["alex_candidate"], 1)
+    for _ in range(checkin.MAX_ATTEMPTS - 1):
+        assert (
+            check_in(client, interview["alex"], 1, shots=(1, 0, 1)).status_code == 422
         )
 
+    last = check_in(client, interview["alex"], 1, shots=(1, 0, 1))
 
-def test_withdrawing_deletes_the_reference_at_once(client, interview):
-    enrol(client, interview["alex"], who=1)
+    assert last.status_code == 422 and "after several tries" in last.json()["detail"]
+    candidate = client.get(
+        "/api/candidate/interview", headers=as_candidate(interview["alex"])
+    )
+    assert (
+        candidate.json()["identity"]["consent"] == "given"
+    )  # goes on to the waiting room
+    shown = view(client, interview["alex"])
+    assert shown["state"] == "failed" and shown["score"] is None
+    assert check_in(client, interview["alex"], 1).status_code == 422  # no more tries
+
+
+def test_declining_deletes_the_photo_at_once(client, interview):
+    give_photo(interview["alex_candidate"], 1)
 
     answer = client.delete(
         "/api/candidate/identity", headers=as_candidate(interview["alex"])
     )
 
     assert answer.json()["identity"]["consent"] == "declined"
+    assert view(client, interview["alex"])["state"] == "declined"
     with SessionLocal() as db:
+        assert (
+            references.photo_state(db, db.get(Candidate, interview["alex_candidate"]))
+            == "no_consent"
+        )
         assert not db.scalar(
-            select(FaceReference.id).where(
-                FaceReference.session_id == interview["alex"]
+            select(ApplicationPhoto.id).where(
+                ApplicationPhoto.candidate_id == interview["alex_candidate"]
             )
         )
 
 
 def test_without_the_key_the_candidate_is_not_asked(client, interview, monkeypatch):
+    give_photo(interview["alex_candidate"], 1)
     monkeypatch.setattr(get_settings(), "face_reference_key", None)
 
     shown = client.get(
@@ -222,12 +446,113 @@ def test_without_the_key_the_candidate_is_not_asked(client, interview, monkeypat
     )
 
     assert shown.json()["identity"]["available"] is False
-    assert enrol(client, interview["alex"], who=1).status_code == 409
+    assert check_in(client, interview["alex"], 1).status_code == 409
+    assert view(client, interview["alex"])["state"] == "off"
 
 
-def test_references_are_deleted_after_the_retention_time(client, interview):
-    enrol(client, interview["alex"], who=1)
-    enrol(client, interview["bea"], who=2)
+# ---------- what the interviewer sees ----------
+
+
+@pytest.mark.parametrize(
+    "change, reason",
+    [
+        ({"photo_file_id": None}, "no photo was sent with the application."),
+        (
+            {"photo_consent": False},
+            "the applicant did not agree to the use of their photo.",
+        ),
+        ({}, "the application photo has not been processed yet."),
+    ],
+    ids=["no photo", "no consent", "not processed yet"],
+)
+def test_the_interviewer_is_told_why_nothing_was_compared(
+    client, interview, change, reason
+):
+    with SessionLocal() as db:
+        candidate = db.get(Candidate, interview["alex_candidate"])
+        for key, value in change.items():
+            setattr(candidate, key, value)
+        db.commit()
+
+    shown = view(client, interview["alex"])
+
+    assert shown["state"] == "no_photo" and shown["text"] == f"No comparison: {reason}"
+    assert shown["score"] is None
+
+
+def test_the_photo_is_shown_to_interviewers_only(client, interview):
+    url = f"/api/interviews/{interview['alex']}/identity/photo"
+    assert client.get(url, headers=as_interviewer()).status_code == 404  # none yet
+
+    give_photo(interview["alex_candidate"], 1)
+    shown = client.get(url, headers=as_interviewer())
+
+    assert shown.status_code == 200 and shown.headers["content-type"] == "image/jpeg"
+    assert shown.headers["cache-control"] == "no-store"
+    assert client.get(url, headers=as_candidate(interview["alex"])).status_code == 403
+
+
+def test_the_waiting_room_banner_carries_the_check_in_result(client, interview):
+    give_photo(interview["alex_candidate"], 1)
+    check_in(client, interview["alex"], 5)  # clearly someone else
+    client.post("/api/candidate/waiting", headers=as_candidate(interview["alex"]))
+
+    lobby = client.post(
+        f"/api/interviews/{interview['alex']}/presence", headers=as_interviewer()
+    ).json()
+
+    assert lobby["candidate_waiting"] is True
+    assert lobby["identity"]["state"] == "no_match"
+    assert lobby["identity"]["score"] < 40
+
+
+def test_the_interviews_list_shows_the_photo_state(client, interview):
+    give_photo(interview["alex_candidate"], 9)
+
+    listed = client.get("/api/interviews", headers=as_interviewer()).json()
+
+    states = {row["id"]: row["photo"] for row in listed}
+    assert states[interview["alex"]] == "several_faces"
+    assert states[interview["bea"]] == "pending"
+
+
+def test_candidates_never_see_the_result(client, interview):
+    candidate = as_candidate(interview["alex"])
+    base = f"/api/interviews/{interview['alex']}/identity"
+
+    assert client.get(base, headers=candidate).status_code == 403
+    assert client.get(f"{base}/photo", headers=candidate).status_code == 403
+
+
+def test_the_report_says_whether_the_photo_matched(client, interview):
+    give_photo(interview["alex_candidate"], 1)
+    with SessionLocal() as db:
+        session = db.get(InterviewSession, interview["alex"])
+        assert identity_summary(db, session)["state"] == "not_checked"
+
+    check_in(client, interview["alex"], 1)
+    with SessionLocal() as db:
+        session = db.get(InterviewSession, interview["alex"])
+        assert identity_summary(db, session) == {
+            "state": "confirmed",
+            "text": "Matched the application photo at check-in (match score 100%).",
+        }
+
+    check_in(client, interview["alex"], 5)
+    with SessionLocal() as db:
+        summary = identity_summary(db, db.get(InterviewSession, interview["alex"]))
+        assert (
+            summary["state"] == "not_confirmed"
+            and "Different person" in summary["text"]
+        )
+
+
+# ---------- deletion ----------
+
+
+def test_photos_are_deleted_after_the_retention_time(interview):
+    give_photo(interview["alex_candidate"], 1)
+    give_photo(interview["bea_candidate"], 2)
     with SessionLocal() as db:
         alex = db.get(InterviewSession, interview["alex"])
         alex.status, alex.ended_at = (
@@ -237,113 +562,35 @@ def test_references_are_deleted_after_the_retention_time(client, interview):
         db.commit()
 
         assert references.purge_expired(db) == 1  # Bea's interview is still to come
-        left = db.scalars(select(FaceReference.session_id)).all()
-        assert interview["alex"] not in left and interview["bea"] in left
+        left = db.scalars(select(ApplicationPhoto.candidate_id)).all()
+        assert (
+            interview["alex_candidate"] not in left
+            and interview["bea_candidate"] in left
+        )
 
         db.get(InterviewSession, interview["bea"]).status = SessionStatus.CANCELLED
         db.commit()
         assert references.purge_expired(db) == 1  # cancelled: deleted
 
 
-# ---------- the live check and the interviewer's view ----------
-
-
-def test_the_live_check_compares_with_the_job_references(client, interview):
-    enrol(client, interview["alex"], who=1)
-    enrol(client, interview["bea"], who=2)
+def test_a_recent_interview_keeps_its_photo(interview):
+    give_photo(interview["alex_candidate"], 1)
     with SessionLocal() as db:
-        refs = references.job_references(
-            db, db.get(InterviewSession, interview["alex"])
+        alex = db.get(InterviewSession, interview["alex"])
+        alex.status, alex.ended_at = (
+            SessionStatus.ENDED,
+            clock.now() - timedelta(days=2),
         )
-
-    alex = watcher.compare(np.array([1], np.uint8), refs)
-    bea = watcher.compare(np.array([2], np.uint8), refs)
-    nobody = watcher.compare(np.array([0], np.uint8), refs)
-
-    assert alex.own == pytest.approx(1.0) and alex.other == (
-        "Bea Good",
-        pytest.approx(0.0),
-    )
-    assert (
-        decide([bea, bea])["state"] == "no_match"
-        and decide([bea, bea])["other"] == "Bea Good"
-    )
-    assert nobody.problem == "no_face"
+        db.commit()
+        assert references.purge_expired(db) == 0
 
 
-def test_a_candidate_without_consent_is_never_checked(client, interview):
-    with SessionLocal() as db:
-        assert (
-            references.job_references(db, db.get(InterviewSession, interview["alex"]))
-            is None
-        )
-
-    view = client.get(
-        f"/api/interviews/{interview['alex']}/identity", headers=as_interviewer()
-    ).json()
-
-    assert view["state"] == "no_reference" and view["profile"] is None
+# ---------- the real face models ----------
 
 
-def test_the_profile_is_shown_only_on_a_confident_match(client, interview):
-    enrol(client, interview["alex"], who=1)
-    url = f"/api/interviews/{interview['alex']}/identity"
-
-    def show(result):
-        """Save a live result, then read the interviewer's view."""
-        with SessionLocal() as db:
-            db.get(InterviewSession, interview["alex"]).identity_result = result
-            db.commit()
-        return client.get(url, headers=as_interviewer()).json()
-
-    unsure = show({"state": "low_confidence", "similarity": 0.33})
-    matched = show({"state": "matched", "similarity": 0.81, "confirmed_at_ms": 4000})
-
-    assert unsure["profile"] is None and "Low confidence" in unsure["text"]
-    profile = matched["profile"]
-    assert profile["name"] == "Alex Strong" and profile["skills"] == [
-        "PHP",
-        "Laravel",
-        "Docker",
-    ]
-    assert (
-        profile["headline"] == "About 6 years of experience, latest role: PHP Developer"
-    )
-
-    rechecked = client.post(f"{url}/recheck", headers=as_interviewer()).json()
-
-    assert rechecked["state"] == "checking" and rechecked["profile"] is None
-    with SessionLocal() as db:
-        session = db.get(InterviewSession, interview["alex"])
-        assert session.identity_recheck_at is not None
-        assert session.identity_result["confirmed_at_ms"] == 4000  # kept for the report
-
-
-def test_the_report_says_whether_the_identity_was_confirmed(interview):
-    with SessionLocal() as db:
-        session = db.get(InterviewSession, interview["alex"])
-        assert identity_summary(session)["state"] == "not_checked"
-        session.identity_consent = IdentityConsent.GIVEN
-        session.identity_result = {"state": "matched", "confirmed_at_ms": 4000}
-        assert identity_summary(session) == {
-            "state": "confirmed",
-            "text": "Confirmed by face recognition at 00:04 against the reference "
-            "given with consent.",
-        }
-        session.identity_result = {"state": "no_match", "confirmed_at_ms": None}
-        assert identity_summary(session)["state"] == "not_confirmed"
-
-
-def test_candidates_never_see_the_identity_result(client, interview):
-    candidate = as_candidate(interview["alex"])
-    url = f"/api/interviews/{interview['alex']}/identity"
-
-    assert client.get(url, headers=candidate).status_code == 403
-    assert client.post(f"{url}/recheck", headers=candidate).status_code == 403
-
-
-def test_the_real_face_models_load_and_find_no_face_in_a_blank_picture():
+def test_the_real_face_models_load_and_find_no_face_in_a_blank_picture(monkeypatch):
+    monkeypatch.undo()  # the real models, not the fakes
     with pytest.raises(FaceError) as error:
-        faces.face_embedding(np.full((240, 320, 3), 200, np.uint8))
+        faces.find_face(np.full((240, 320, 3), 200, np.uint8))
 
     assert error.value.reason == "no_face"

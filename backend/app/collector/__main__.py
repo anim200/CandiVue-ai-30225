@@ -1,6 +1,7 @@
 """Start the CV Collector: "python -m app.collector" (the cv-collector container).
 
-Every CV_COLLECT_INTERVAL_SECONDS it collects new CVs. A failed round is
+Every CV_COLLECT_INTERVAL_SECONDS it collects new CVs, then processes the
+face photos of newly invited applicants (F7, §4B-15). A failed round is
 logged and tried again next time; it never stops the service.
 """
 
@@ -9,6 +10,7 @@ import time
 
 from app.collector.collect import CollectorSetupError, collect_round
 from app.collector.google_source import GoogleSource, GoogleSourceError, load_key
+from app.collector.photo_round import process_photos
 from app.core.config import get_settings
 from app.core.logging import setup_logging
 
@@ -39,6 +41,9 @@ def main() -> None:
         try:
             result = collect_round(source)
             logger.info("CV collection round: %s", result)
+            photos = process_photos(source)
+            if photos.ready or photos.unusable or photos.failed:
+                logger.info("Application photos: %s", photos)
         except (GoogleSourceError, CollectorSetupError) as exc:
             logger.warning("CV collection round failed: %s", exc)
         except Exception as exc:  # noqa: BLE001 - keep the service running; retry next round

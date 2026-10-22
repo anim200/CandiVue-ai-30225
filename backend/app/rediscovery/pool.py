@@ -125,6 +125,10 @@ def add_to_job(db: Session, job: Job, origin: Candidate) -> Candidate:
         status=CandidateStatus.PARSED,
         open_to_other_roles=True,
         rediscovered_from_id=origin.id,
+        # The face photo sent with the application (F7): the same person,
+        # processed again only if they are invited for this job.
+        photo_file_id=origin.photo_file_id,
+        photo_consent=origin.photo_consent,
     )
     db.add(copy)
     db.flush()  # the new id names the copied file

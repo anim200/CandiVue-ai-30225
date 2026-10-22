@@ -1,13 +1,11 @@
 """Start the transcriber: "python -m app.transcriber" (the transcriber container).
 
 Every POLL_SECONDS it looks for live interviews with the interviewer or the
-candidate in the call and starts one RoomListener for each (transcript and
-identity check, F4 and F7). A listener that
-stops (interview ended, room left empty, connection lost) is started again
+candidate in the call and starts one RoomListener for each (F4). A
+listener that stops (interview ended, room left empty, connection lost) is started again
 on a later round if the interview is still live, so a restart or a dropped
 connection only loses a few seconds; turns already saved stay (N26).
-Without DEEPGRAM_API_KEY it tells each live room "not set up" (and still
-joins for the identity check when that is set up).
+Without DEEPGRAM_API_KEY it only tells each live room "not set up".
 When Docker stops or restarts it (SIGTERM), every listener first saves its
 last words, then it exits.
 """
@@ -25,7 +23,6 @@ from app.core.logging import setup_logging
 from app.db.database import SessionLocal
 from app.db.models import InterviewSession
 from app.db.models.interview import SessionStatus
-from app.identity.references import is_set_up as identity_set_up
 from app.transcriber.listener import (
     NOT_SET_UP,
     RoomListener,
@@ -65,7 +62,7 @@ async def one_round(listeners: Listeners) -> None:
                     session_id,
                 )
     for session_id, started_at in await asyncio.to_thread(live_sessions):
-        if settings.deepgram_api_key is None and not identity_set_up():
+        if settings.deepgram_api_key is None:
             await asyncio.to_thread(set_problem, session_id, NOT_SET_UP)
             continue
         if session_id in listeners or not await humans_in_room(session_id):

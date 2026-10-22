@@ -416,8 +416,8 @@ def remove_applicant(
     job_id: int, candidate_id: int, db: Annotated[Session, Depends(get_db)]
 ) -> Response:
     """Remove an applicant and everything about them (N19): the database
-    rows (scores, interviews, transcripts, analyses, reports, face
-    reference: they cascade), the CV file and the saved workflow state."""
+    rows (scores, interviews, transcripts, analyses, reports, application
+    photo: they cascade), the CV file and the saved workflow state."""
     candidate = _applicant(db, job_id, candidate_id)
     db.delete(candidate)
     db.commit()

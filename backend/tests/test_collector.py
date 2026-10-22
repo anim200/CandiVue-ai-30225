@@ -10,18 +10,24 @@ import json
 import zipfile
 from datetime import UTC, datetime, timedelta
 
+import numpy as np
 import pytest
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from app.assistant.posting import application_link
 from app.auth.security import Role, create_access_token
-from app.collector import collect, intake
+from app.collector import collect, intake, photo_round
 from app.collector.collect import CollectorSetupError, collect_round, find_columns
 from app.collector.google_source import GoogleSourceError, load_key
+from app.collector.photo_round import process_photos
 from app.core.config import get_settings
 from app.db.database import SessionLocal
-from app.db.models import Candidate, Job
+from app.db.models import Candidate, InterviewSession, Job
 from app.db.models.candidate import CandidateStatus
+from app.db.models.interview import InvitationStatus
+from app.identity import references
 from app.main import app
 
 pytestmark = pytest.mark.usefixtures("database_available")
@@ -395,3 +401,114 @@ def test_no_cvs_by_hand_after_the_closing_date(intake_dir, job_id):
     assert response.status_code == 409
     assert "Applications closed" in response.json()["detail"]
     assert candidates(job_id) == []
+
+
+# ---------- the application photo (F7, §4B-15) ----------
+
+PHOTO_COLUMNS = [
+    "Photo of your face",
+    "Photo consent: you may use my photo at the interview",
+]
+
+
+def with_photo(row: list, photo_id: str | None, consent: str = "Yes") -> list:
+    """A form answer that also has the photo and photo-consent questions."""
+    link = f"https://drive.google.com/open?id={photo_id}" if photo_id else ""
+    return [*row, link, consent]
+
+
+def test_the_photo_and_its_consent_are_recorded_not_downloaded(intake_dir, job_id):
+    google = FakeGoogle(
+        [
+            with_photo(answer(job_id, "file-0000001"), "photo-000001"),
+            with_photo(
+                answer(job_id, "file-0000002", name="B"), "photo-000002", consent=""
+            ),
+            with_photo(answer(job_id, "file-0000003", name="C"), None),
+        ],
+        {f"file-000000{i}": ("cv.pdf", PDF) for i in (1, 2, 3)},
+    )
+    google.rows[0] = HEADER + PHOTO_COLUMNS
+
+    collect_round(google)
+
+    got = [(c.photo_file_id, c.photo_consent) for c in candidates(job_id)]
+    assert got == [("photo-000001", True), ("photo-000002", False), (None, False)]
+    assert all(d.startswith("file-") for d in google.downloads)  # photos wait
+
+
+@pytest.fixture
+def invited(job_id, monkeypatch):
+    """An invited applicant with a photo; the photo model is a fake."""
+    monkeypatch.setattr(
+        get_settings(), "face_reference_key", SecretStr(Fernet.generate_key().decode())
+    )
+    monkeypatch.setattr(
+        references,
+        "prepare",
+        lambda data: (np.eye(1, 128, dtype=np.float32)[0], b"jpeg"),
+    )
+    with SessionLocal() as db:
+        candidate = Candidate(
+            job_id=job_id,
+            full_name="Candidate A",
+            cv_filename="cv.pdf",
+            photo_file_id="photo-000001",
+            photo_consent=True,
+        )
+        db.add(candidate)
+        db.flush()
+        db.add(
+            InterviewSession(
+                candidate_id=candidate.id,
+                job_id=job_id,
+                scheduled_at=datetime.now(UTC) + timedelta(days=1),
+                join_token_hash=f"hash-{candidate.id}",
+                invitation_status=InvitationStatus.SENT,
+            )
+        )
+        db.commit()
+        return candidate.id
+
+
+def photo_status(candidate_id: int) -> str:
+    """Where the candidate's application photo stands."""
+    with SessionLocal() as db:
+        return references.photo_state(db, db.get(Candidate, candidate_id))
+
+
+def test_an_invited_applicants_photo_is_processed_once(invited):
+    google = FakeGoogle([], {"photo-000001": ("me.jpg", b"\xff\xd8\xff photo")})
+
+    first = process_photos(google)
+    again = process_photos(google)
+
+    assert (first.ready, again.ready) == (1, 0)
+    assert google.downloads == ["photo-000001"]
+    assert photo_status(invited) == "ready"
+
+
+def test_a_too_large_photo_is_refused_without_downloading(invited, monkeypatch):
+    monkeypatch.setattr(photo_round, "MAX_PHOTO_BYTES", 10)
+    google = FakeGoogle([], {"photo-000001": ("me.jpg", b"x" * 11)})
+
+    assert process_photos(google).unusable == 1
+    assert google.downloads == [] and photo_status(invited) == "too_large"
+
+
+def test_a_failed_photo_download_is_tried_next_round(invited):
+    google = FakeGoogle([], {"photo-000001": ("me.jpg", b"\xff\xd8\xff photo")})
+    google.broken.add("photo-000001")
+
+    assert process_photos(google).failed == 1
+    assert photo_status(invited) == "download_failed"
+
+    google.broken.clear()
+    assert process_photos(google).ready == 1
+
+
+def test_without_the_key_no_photo_is_processed(invited, monkeypatch):
+    monkeypatch.setattr(get_settings(), "face_reference_key", None)
+    google = FakeGoogle([], {"photo-000001": ("me.jpg", b"\xff\xd8\xff photo")})
+
+    assert process_photos(google).ready == 0 and google.downloads == []

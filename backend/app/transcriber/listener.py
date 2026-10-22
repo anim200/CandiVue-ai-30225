@@ -1,5 +1,4 @@
-"""Listening to one live interview: its transcript (F4) and the candidate's
-identity check (F7, app/identity/watcher.py).
+"""Listening to one live interview: its transcript (F4).
 
 RoomListener joins the interview's LiveKit room as a hidden participant
 ("transcriber": it cannot send audio or video, and the people in the call do
@@ -41,8 +40,6 @@ Edge cases:
   FINAL_WAIT_SECONDS, the last live (interim) words are saved instead.
 - While listening it writes a heartbeat (transcriber_seen_at), so the room
   shows "Listening"; any problem goes to transcript_problem.
-- Without DEEPGRAM_API_KEY it still joins for the identity check (when set
-  up) and the room says speech-to-text is not set up.
 """
 
 import asyncio
@@ -65,7 +62,6 @@ from app.core.config import get_settings
 from app.db.database import SessionLocal
 from app.db.models import InterviewSession, Job
 from app.db.models.interview import SessionStatus, Speaker
-from app.identity.watcher import FaceWatcher
 from app.interviews.room import room_name
 from app.transcriber import deepgram
 from app.transcriber.turns import TurnBuilder, TurnState, save_turn
@@ -494,7 +490,6 @@ class RoomListener:
         self.started_at = started_at
         self.room = rtc.Room()
         self.streams: dict[str, tuple[SpeakerStream, asyncio.Task]] = {}
-        self.watchers: dict[str, tuple[FaceWatcher, asyncio.Task]] = {}
         self.transcribing = get_settings().deepgram_api_key is not None
         self.keyterms: list[str] = []
         self.leaving = asyncio.Event()
@@ -537,7 +532,7 @@ class RoomListener:
         of every stream are saved first."""
         self.leaving.set()
 
-    async def push(self, message: dict, reliable: bool, topic: str = TOPIC) -> None:
+    async def push(self, message: dict, reliable: bool) -> None:
         """Send a message to the interviewer(s) in the call only."""
         to = [
             p.identity
@@ -549,7 +544,7 @@ class RoomListener:
                 json.dumps(message),
                 reliable=reliable,
                 destination_identities=to,
-                topic=topic,
+                topic=TOPIC,
             )
 
     def _people(self) -> list:
@@ -559,19 +554,9 @@ class RoomListener:
         ]
 
     def _on_track(self, track, publication, participant) -> None:
-        """A person's microphone: transcribe it. The candidate's camera:
-        check who it is (F7). Shared screens and anyone else are ignored."""
+        """A person's microphone: transcribe it. Cameras, shared screens and
+        anyone else are ignored."""
         speaker = speaker_of(participant.identity)
-        if (
-            track.kind == rtc.TrackKind.KIND_VIDEO
-            and speaker == Speaker.CANDIDATE
-            and publication.source == rtc.TrackSource.SOURCE_CAMERA
-        ):
-            watcher = FaceWatcher(
-                self.session_id, self.started_at, track, publication, self.push
-            )
-            self.watchers[track.sid] = (watcher, asyncio.ensure_future(watcher.run()))
-            return
         if track.kind != rtc.TrackKind.KIND_AUDIO or speaker is None:
             return
         if not self.transcribing:
@@ -583,18 +568,15 @@ class RoomListener:
         logger.info("Transcribing %s: session %d", speaker.value, self.session_id)
 
     def _on_track_gone(self, track, publication, participant) -> None:
-        """A microphone or camera left (person left or reconnected): finish
-        its stream or identity check."""
-        entry = self.streams.pop(track.sid, None) or self.watchers.pop(track.sid, None)
+        """A microphone left (person left or reconnected): finish its stream."""
+        entry = self.streams.pop(track.sid, None)
         if entry:
             asyncio.ensure_future(entry[0].stop())
 
     async def _stop_all(self) -> None:
-        """Finish every stream and identity check, and wait for the last
-        words to be saved."""
-        entries = [*self.streams.values(), *self.watchers.values()]
+        """Finish every stream and wait for the last words to be saved."""
+        entries = list(self.streams.values())
         self.streams.clear()
-        self.watchers.clear()
         for stream, _task in entries:
             await stream.stop()
         tasks = [task for _stream, task in entries]
