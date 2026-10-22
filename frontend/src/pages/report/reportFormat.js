@@ -129,3 +129,16 @@ export function compareRows(rows) {
     { label: 'Review status', cells: rows.map((row) => text(listStatus(row).label)) },
   ];
 }
+
+// A warning for the selection email when the identity check (F7) did not
+// confirm the candidate: from a report ("confirmed", ...) or from the
+// final ranking ("matched", ...). None when it matched or is not set up.
+const NOT_CHECKED = ['no_photo', 'declined', 'waiting', 'not_checked'];
+export function identityWarning(identity) {
+  if (!identity || ['confirmed', 'matched', 'off'].includes(identity.state)) return null;
+  const detail = identity.text.replace(/^(No comparison|Not checked): /, '').replace(/\.$/, '');
+  const said = detail.charAt(0).toLowerCase() + detail.slice(1);
+  return NOT_CHECKED.includes(identity.state)
+    ? `The face check was not done: ${said}. Make sure you are emailing the right person.`
+    : `The face check did not confirm this candidate: ${said}.`;
+}

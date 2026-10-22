@@ -132,7 +132,10 @@ def test_without_a_template_the_standard_text_is_used(approved, mailbox, client)
 
     email = client.get(url(approved), headers=INTERVIEWER).json()
 
-    assert email["subject"] == "Congratulations: Data Analyst"
+    assert email["subject"] == (
+        "Congratulations: you have been selected for the Data Analyst role"
+    )
+    assert "Dear Robin Sample," in email["text"]
     assert email["template"] == emails.STANDARD_NAME
 
 
@@ -226,3 +229,47 @@ def test_candidates_cannot_see_or_send_it(approved, mailbox, client):
     assert client.get(url(approved), headers=candidate).status_code == 403
     assert client.post(url(approved), json=email, headers=candidate).status_code == 403
     assert mailbox.sent == []
+
+
+def test_the_preview_shows_the_email_as_the_candidate_sees_it(approved, client):
+    edited = {
+        "subject": "Welcome aboard",
+        "text": "Hello Robin,\n\nYou <b>got</b> the job.",
+    }
+
+    answer = client.post(f"{url(approved)}/preview", json=edited, headers=INTERVIEWER)
+
+    assert answer.status_code == 200
+    html = answer.json()["html"]
+    assert "Welcome aboard" in html and "Hello Robin," in html
+    assert "&lt;b&gt;got&lt;/b&gt;" in html  # the text is escaped, never markup
+
+
+def test_the_reports_list_ranks_only_approved_reports(approved, client):
+    with SessionLocal() as db:
+        report = db.get(AssessmentReport, approved["report"])
+        report.content = {
+            "version": 1,
+            "position": {"score": 78},
+            "components": {"interview": {"overall": 74}},
+        }
+        db.commit()
+
+    rows = client.get(
+        f"/api/jobs/{approved['job']}/reports", headers=INTERVIEWER
+    ).json()
+
+    (row,) = rows
+    assert row["rank"] == 1 and row["not_ranked"] is None
+    assert row["selected_at"] is None and row["has_email"] is True
+    assert row["identity"]["state"] in {"no_photo", "off"}
+
+    with SessionLocal() as db:
+        db.get(
+            AssessmentReport, approved["report"]
+        ).review_status = ReviewStatus.PENDING_REVIEW
+        db.commit()
+    (row,) = client.get(
+        f"/api/jobs/{approved['job']}/reports", headers=INTERVIEWER
+    ).json()
+    assert row["rank"] is None and "waiting for your review" in row["not_ranked"]

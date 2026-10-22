@@ -63,13 +63,19 @@ We will contact you if a new time is arranged.
 Kind regards,
 The hiring team
 """
-SELECTION = """Subject: Congratulations: {job_title}
+SELECTION = """Subject: Congratulations: you have been selected for the {job_title} role
 
-Hello {candidate_name},
+Dear {candidate_name},
 
-Thank you for interviewing for the {job_title} role. We are happy to tell you that you have been selected.
+Thank you for the time and care you put into your interview for the {job_title} role. We enjoyed learning about your experience and the way you approach your work.
 
-Our team will contact you soon about the next steps.
+We are delighted to let you know that you have been selected to move forward.
+
+Our HR team will contact you within the next few working days to discuss the next steps.
+
+If you have any questions in the meantime, simply reply to this email.
+
+Congratulations once again. We look forward to working with you.
 
 Kind regards,
 The hiring team
@@ -194,6 +200,12 @@ def selection_email(db: Session, candidate: Candidate, job: Job) -> dict:
     values = {"candidate_name": candidate.full_name or "there", "job_title": job.title}
     subject, filled = _fill(text, values)
     return {"subject": subject, "text": _as_text(_blocks(filled)), "template": name}
+
+
+def selection_html(subject: str, text: str) -> str:
+    """The selection email as the candidate will see it (HTML card), for
+    the preview before sending."""
+    return _as_html(subject, _blocks(text), "")
 
 
 def deliver_selection(to: str, subject: str, text: str) -> str | None:

@@ -33,7 +33,7 @@ import CompareCandidates, { MAX_COMPARED } from './CompareCandidates';
 import { downloadReport, printReport } from './exportReport';
 import { ComponentScoresCard, FindingsList, FollowUpCard, SourcePanel, SuitabilityCard } from './ReportParts';
 import classes from './Report.module.css';
-import { generatingStep, REVIEW, reportState } from './reportFormat';
+import { generatingStep, identityWarning, REVIEW, reportState } from './reportFormat';
 import ReviewBar from './ReviewBar';
 import SelectionEmail from './SelectionEmail';
 
@@ -245,6 +245,7 @@ export default function AssessmentReportPage() {
             interviewId={interviewId}
             candidateName={interview.candidate_name}
             selectedAt={page.selected_at}
+            identityWarning={identityWarning(content.identity)}
             onSent={setPage}
           />
         )}

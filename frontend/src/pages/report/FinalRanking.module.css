@@ -1,0 +1,247 @@
+/* The final ranking on the Reports page (§4B-15 f). Same card look as the
+   reports list; the table becomes stacked rows in a narrow card. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px;
+  background: #fff;
+  border: 1px solid #dee3e6;
+  border-radius: 8px;
+  container-type: inline-size;
+  animation: fadeUp 0.3s ease-out;
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.title svg {
+  color: #23717a;
+}
+
+.lead,
+.empty {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: #66717a;
+}
+
+.table {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 76px 56px 76px 100px 200px;
+  gap: 0 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #e9ecee;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.header {
+  padding-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #66717a;
+}
+
+.rank {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #edf5f6;
+  color: #1c5d65;
+  font-weight: 700;
+}
+
+.header .rank,
+.header > span:first-child {
+  background: none;
+  width: auto;
+  height: auto;
+}
+
+.who {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.name {
+  font-weight: 600;
+  color: #1a2227;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.name:hover {
+  color: #23717a;
+  text-decoration: underline;
+}
+
+.position {
+  font-size: 13px;
+  color: #48535b;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.overall {
+  font-size: 17px;
+  color: #1c5d65;
+}
+
+.none {
+  color: #8a959d;
+}
+
+.compareLabel {
+  font-size: 13px;
+}
+
+.action {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sent {
+  font-size: 13px;
+  color: #2d7a4e;
+  font-weight: 600;
+}
+
+.compare {
+  padding-top: 4px;
+  border-top: 1px solid #e9ecee;
+}
+
+.waiting {
+  padding-top: 10px;
+  border-top: 1px solid #e9ecee;
+}
+
+.subTitle {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #48535b;
+}
+
+.waiting ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.waiting li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 14px;
+}
+
+.waiting li a {
+  font-weight: 600;
+  color: #23717a;
+}
+
+.waiting li span {
+  color: #66717a;
+}
+
+/* Narrow card (tablet/phone): one block per candidate, labelled scores. */
+@container (max-width: 760px) {
+  .header {
+    display: none;
+  }
+
+  .row {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    grid-template-areas:
+      'rank who who'
+      'rank overall cv'
+      'rank interview compare'
+      'rank action action';
+    gap: 6px 12px;
+    align-items: start;
+  }
+
+  .row > :nth-child(1) {
+    grid-area: rank;
+  }
+
+  .row > :nth-child(2) {
+    grid-area: who;
+  }
+
+  .row > :nth-child(3) {
+    grid-area: overall;
+  }
+
+  .row > :nth-child(4) {
+    grid-area: cv;
+  }
+
+  .row > :nth-child(5) {
+    grid-area: interview;
+  }
+
+  .row > :nth-child(6) {
+    grid-area: compare;
+  }
+
+  .row > :nth-child(7) {
+    grid-area: action;
+    justify-content: flex-start;
+  }
+
+  .row > [data-label]::before {
+    content: attr(data-label) ' ';
+    color: #66717a;
+    font-size: 13px;
+  }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

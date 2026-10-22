@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.analysis import final_ranking
 from app.analysis.interview_quality import consistency
 from app.analysis.report_html import render_report
 from app.auth.dependencies import CurrentUser, require_interviewer
@@ -38,6 +39,7 @@ from app.db.models.assessment import ReviewStatus
 from app.db.models.interview import SessionStatus
 from app.db.models.run import RunStatus
 from app.graphs import final_assessment, qa_analysis
+from app.identity.matching import identity_view
 from app.interviews import emails
 
 logger = logging.getLogger(__name__)
@@ -154,6 +156,12 @@ class JobReportOut(BaseModel):
     interview_at: datetime
     analysis_status: RunStatus | None
     report: ReportOut | None
+    # Final ranking (§4B-15 f): only approved reports are ranked
+    rank: int | None = None
+    not_ranked: str | None = None  # why not, in words
+    selected_at: datetime | None = None  # selection email sent
+    has_email: bool = True  # the selection email needs an address
+    identity: dict | None = None  # check-in result (F7): {"state", "score", "text"}
 
 
 # ---------- Q&A analysis (F5) ----------
@@ -294,6 +302,16 @@ def preview_selection_email(
     return SelectionEmailOut(to=candidate.email, **email)
 
 
+@router.post("/interviews/{interview_id}/selection-email/preview")
+def preview_selection_html(
+    interview_id: int, body: SelectionEmailIn, db: Annotated[Session, Depends(get_db)]
+) -> dict:
+    """The (edited) selection email as the candidate will see it: the HTML
+    card, for the preview before sending. Nothing is sent."""
+    _session(db, interview_id)
+    return {"html": emails.selection_html(body.subject, body.text)}
+
+
 @router.post("/interviews/{interview_id}/selection-email", response_model=ReportPageOut)
 def send_selection_email(
     interview_id: int, body: SelectionEmailIn, db: Annotated[Session, Depends(get_db)]
@@ -315,7 +333,8 @@ def send_selection_email(
 def job_reports(
     job_id: int, db: Annotated[Session, Depends(get_db)]
 ) -> list[JobReportOut]:
-    """Every ended interview of the job with its report, newest first."""
+    """Every ended interview of the job with its report, newest first, and
+    the final ranking of the approved reports (final_ranking.rank)."""
     if db.get(Job, job_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, JOB_NOT_FOUND)
     sessions = db.scalars(
@@ -328,10 +347,12 @@ def job_reports(
             InterviewSession.ended_at.desc().nulls_last(), InterviewSession.id.desc()
         )
     )
-    rows = []
+    rows, entries = [], []
     for session in sessions:
         analysis = _analysis(db, session.id)
         report = final_assessment.latest_report(db, session.id)
+        candidate = db.get(Candidate, session.candidate_id)
+        view = identity_view(db, session)
         rows.append(
             JobReportOut(
                 interview_id=session.id,
@@ -340,12 +361,41 @@ def job_reports(
                 interview_at=session.started_at or session.scheduled_at,
                 analysis_status=analysis.status if analysis else None,
                 report=_report(db, report) if report else None,
+                selected_at=candidate.selected_at,
+                has_email=bool(candidate.email),
+                identity={key: view[key] for key in ("state", "score", "text")},
             )
         )
+        entries.append(_ranking_entry(session, report))
+    places = final_ranking.rank(entries)
+    for row in rows:
+        row.rank, row.not_ranked = places[row.interview_id]
     return rows
 
 
 # ---------- helpers ----------
+
+
+def _ranking_entry(
+    session: InterviewSession, report: AssessmentReport | None
+) -> final_ranking.Entry:
+    """What the final ranking needs from one ended interview and its report."""
+    content = (report.content or {}) if report else {}
+    if report is None or report.status in (RunStatus.PENDING, RunStatus.RUNNING):
+        state = "no_report"
+    elif report.status == RunStatus.FAILED:
+        state = "failed"
+    else:
+        state = str(report.review_status)
+    interview = (content.get("components") or {}).get("interview") or {}
+    return final_ranking.Entry(
+        interview_id=session.id,
+        candidate_id=session.candidate_id,
+        held_at=session.started_at or session.scheduled_at,
+        report=state,
+        overall=(content.get("position") or {}).get("score"),
+        interview=interview.get("overall"),
+    )
 
 
 def _session(db: Session, interview_id: int) -> InterviewSession:

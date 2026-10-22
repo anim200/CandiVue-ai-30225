@@ -8,6 +8,7 @@ import {
   componentRows,
   coverageLine,
   generatingStep,
+  identityWarning,
   listStatus,
   reportState,
 } from './reportFormat';
@@ -97,5 +98,21 @@ describe('reportFormat', () => {
   it('summarises the CV claims to follow up', () => {
     expect(claimsSummary([{ result: 'unverified' }, { result: 'unverified' }])).toBe('2 unverified');
     expect(claimsSummary([])).toBe('None');
+  });
+
+  it('warns before the selection email when the identity was not confirmed', () => {
+    expect(identityWarning({ state: 'confirmed', text: 'Matched' })).toBeNull();
+    expect(identityWarning({ state: 'matched', text: 'Matches the application photo' })).toBeNull();
+    expect(identityWarning({ state: 'off', text: 'Not set up' })).toBeNull();
+    expect(identityWarning(null)).toBeNull();
+    expect(identityWarning({ state: 'no_match', text: 'Different person: does not match the application photo' })).toBe(
+      'The face check did not confirm this candidate: different person: does not match the application photo.',
+    );
+    expect(identityWarning({ state: 'no_photo', text: 'No comparison: no photo was sent with the application.' })).toBe(
+      'The face check was not done: no photo was sent with the application. Make sure you are emailing the right person.',
+    );
+    expect(identityWarning({ state: 'not_checked', text: 'Not checked: the candidate has not checked in yet.' })).toBe(
+      'The face check was not done: the candidate has not checked in yet. Make sure you are emailing the right person.',
+    );
   });
 });

@@ -722,3 +722,55 @@
     width: 0;
   }
 }
+
+/* The selection email preview and the confirmation (§4B-15). */
+.previewBox {
+  border: 1px solid #dee3e6;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f4f6f7;
+}
+
+.previewHead {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 10px 14px;
+  border-bottom: 1px solid #dee3e6;
+  background: #fff;
+  font-size: 14px;
+}
+
+.previewHead span {
+  color: #66717a;
+  font-size: 12.5px;
+}
+
+.previewFrame {
+  display: block;
+  width: 100%;
+  height: 420px;
+  border: 0;
+  background: #f4f6f7;
+}
+
+.confirmRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fbf0d9;
+  color: #5a3d00;
+  font-size: 14px;
+}
+
+.listSection {
+  margin: 8px 0 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #48535b;
+}
