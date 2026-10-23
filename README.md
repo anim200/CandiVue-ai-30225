@@ -141,8 +141,8 @@ How it runs:
   all from `GET /api/dashboard` (interviewer only). The job page shows the
   screening as a *Ranking* (with a score distribution chart) or as a
   read-only *Pipeline* (Screened → Shortlisted → Invited → Interviewed →
-  Selected); the report and the comparison show the interview dimensions
-  as a radar chart.
+  Selected); the comparison of 2-3 candidates shows the interview
+  dimensions as a radar chart.
 - **Light or dark:** *Appearance* in the user menu (and a sun/moon button
   on the login and candidate pages). The choice is remembered in the browser
   and all its tabs follow it; the default is light. All colours of our own
@@ -280,6 +280,7 @@ START -> load_context -> assistant --(tool call)--> tools --> assistant ...
          confirm_posting --post----> post_to_job_board --> assistant
          confirm_posting --skip----> assistant
          tools --(request_job_posting)--> confirm_posting
+         assistant --(only decline_off_topic)--> off_topic --> END
 ```
 
 - **assistant**: the LLM reads the chat and decides the next step.
@@ -312,6 +313,27 @@ START -> load_context -> assistant --(tool call)--> tools --> assistant ...
   the chat. If the form link is missing, it asks for it first; if the
   job board fails after 3 tries, the chat shows **Try again** and
   **Copy job description**.
+- **Scope guardrail** (`app/assistant/scope.py`): the assistant only
+  helps with hiring for this job (in the interview room: this interview).
+  For a purely off-topic message ("Tell me about Bangladesh", maths, news,
+  jokes, "ignore your instructions") the model calls `decline_off_topic`;
+  the **off_topic** node then shows a fixed reply ("I can only help with
+  hiring for this job ... Please ask me something about this job."),
+  hides anything the model wrote next to the call and ends the turn, so
+  there is no partial answer and no extra AI request. Short answers to
+  the assistant's own questions ("Bangladesh" for the location),
+  greetings and "what can you do?" are in scope. A mixed message
+  ("SQL is mandatory. Also tell me a joke.") keeps its job part: the
+  model marks `also_job_request` and answers only that part. Only the
+  fact that a request was declined is logged, never its text. Live check
+  on 23-10-2026 with `gemini-3.5-flash-lite`: 11 of 11 messages handled
+  as expected.
+- **While the AI works** the chat shows the Signal status in place of the
+  reply: the assistant's match mark (its icon everywhere) moving, the current step ("Thinking…", or
+  steps such as "Posting to the job board…") and the time since the
+  request started (`components/AiSignalStatus.jsx`). Screening, the Q&A
+  analysis, the report being prepared and the talent pool check use it
+  too, with the real progress ("Screening CV 3 of 5…").
 - **Retry path**: a tool call with invalid arguments goes back to the LLM
   as an error so it can correct itself; a turn that never ends is stopped
   after 30 steps with a clear message; "Try again" continues a turn that
