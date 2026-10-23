@@ -10,6 +10,7 @@ import {
   generatingStep,
   identityWarning,
   listStatus,
+  radarData,
   reportState,
 } from './reportFormat';
 
@@ -114,5 +115,30 @@ describe('reportFormat', () => {
     expect(identityWarning({ state: 'not_checked', text: 'Not checked: the candidate has not checked in yet.' })).toBe(
       'The face check was not done: the candidate has not checked in yet. Make sure you are emailing the right person.',
     );
+  });
+
+  it('builds the radar of the interview dimensions per candidate', () => {
+    const content = (scores) => ({
+      components: {
+        interview: {
+          dimensions: Object.fromEntries(
+            Object.entries(scores).map(([key, score]) => [key, { label: key.toUpperCase(), score }]),
+          ),
+        },
+      },
+    });
+    const a = { name: 'Rina', content: content({ tech: 80, comm: 70, depth: 60, align: null }) };
+    const b = { name: 'Sami', content: content({ tech: 50, comm: 90, depth: 40, align: null }) };
+
+    expect(radarData([a, b])).toEqual([
+      { dimension: 'TECH', Rina: 80, Sami: 50 },
+      { dimension: 'COMM', Rina: 70, Sami: 90 },
+      { dimension: 'DEPTH', Rina: 60, Sami: 40 },
+    ]); // ALIGN has no score for anyone
+    expect(radarData([{ name: 'X', content: content({ tech: 80, comm: 70 }) }])).toEqual([]); // too few
+    expect(radarData([{ name: 'Y', content: { components: { interview: null } } }])).toEqual([]);
+    const named = { name: 'Z', content: content({ a: 1, b: 2, c: 3 }) };
+    named.content.components.interview.dimensions.a.label = 'Experience depth';
+    expect(radarData([named])[0].dimension).toBe('Depth'); // short corner names
   });
 });

@@ -2,7 +2,8 @@
 // ScreeningProgress, RankingTable, CandidateDrawer with ScoreBreakdownCard and
 // RequirementList, ExcludedList, UnreadableList). Interviewers only.
 
-import { Button, Collapse, Drawer } from '@mantine/core';
+import { Button, Collapse, Drawer, SegmentedControl } from '@mantine/core';
+import { BarChart } from '@mantine/charts';
 import {
   IconAlertTriangle,
   IconCalendarQuestion,
@@ -27,6 +28,8 @@ import {
 import { useState } from 'react';
 
 import StatusBadge from '../../components/StatusBadge';
+import PipelineBoard from './PipelineBoard';
+import { countTicks, scoreBands } from './pipelineFormat';
 import { WEIGHT_FIELDS } from './WeightsCard';
 import classes from './Screening.module.css';
 
@@ -231,8 +234,10 @@ export function CandidateDrawer({ result, rankedCount, onClose, onViewCv, viewin
 export default function ScreeningResults({ data, onViewCv, viewingId }) {
   const [selected, setSelected] = useState(null);
   const [excludedOpen, setExcludedOpen] = useState(true);
+  const [view, setView] = useState('ranking'); // ranking | pipeline
   const { run, ranked, excluded, unreadable } = data;
   const total = ranked.length + excluded.length + unreadable.length;
+  const bands = scoreBands(ranked);
 
   return (
     <>
@@ -241,72 +246,109 @@ export default function ScreeningResults({ data, onViewCv, viewingId }) {
         Scores support your decision. CandiVue never rejects or hires anyone automatically.
       </div>
 
-      <section className={classes.card} aria-label="Ranked candidates">
-        <div className={classes.cardTop}>
-          <div className={classes.cardTitle}>Ranked candidates</div>
-          <div className={classes.small}>
-            {ranked.length} {ranked.length === 1 ? 'candidate' : 'candidates'} met every mandatory requirement.
-            Weights: {weightsLine(run.weights)}.
-            {ranked.some((r) => r.scanned) && ' The scan icon marks CVs read from an image with text recognition.'}
-            {ranked.some((r) => r.years_unknown) && ' The calendar icon marks CVs whose years of experience could not be read: please check them.'}
-          </div>
-        </div>
-        {ranked.length === 0 ? (
-          <div className={classes.emptyRow}>No candidate met every mandatory requirement.</div>
-        ) : (
-          <>
-            <div className={classes.head}>
-              <div>Rank</div>
-              <div>Candidate</div>
-              <div>Overall (0–100)</div>
-              <div className={classes.dimCol}>Technical skills</div>
-              <div className={classes.dimCol}>Relevant experience</div>
-              <div className={classes.dimCol}>Qualifi­cations</div>
-              <div className={classes.dimCol}>ATS CV–JD match</div>
-              <div>Status</div>
-              <div />
-            </div>
-            {ranked.map((result) => (
-              <button
-                type="button"
-                key={result.candidate_id}
-                className={`${classes.row} ${selected?.candidate_id === result.candidate_id ? classes.rowSelected : ''}`}
-                onClick={() => setSelected(result)}
-              >
-                <div className={classes.rank}>{result.rank}</div>
-                <div className={classes.name}>
-                  <span className={classes.nameText}>{result.name || result.cv_filename}</span>
-                  {result.scanned && (
-                    <span className={classes.scanChip} title="Scanned CV: read from an image with text recognition. Worth a quick check against the original.">
-                      <IconScan size={12} />
-                    </span>
-                  )}
-                  {result.years_unknown && (
-                    <span className={classes.checkChip} title="Years of experience could not be read from this CV. Please check it.">
-                      <IconCalendarQuestion size={12} />
-                    </span>
-                  )}
-                </div>
-                <div className={classes.overall}>
-                  <b className={classes.num}>{result.overall}</b>
-                  <div className={classes.miniBar}>
-                    <div className={classes.miniFill} style={{ width: `${result.overall}%` }} />
-                  </div>
-                </div>
-                {WEIGHT_FIELDS.map(([key]) => (
-                  <div key={key} className={`${classes.num} ${classes.dimCol}`}>
-                    {result.dimensions[key]?.score}
-                  </div>
-                ))}
-                <PipelineBadge result={result} />
-                <IconChevronRight size={16} className={classes.chevron} />
-              </button>
-            ))}
-          </>
-        )}
-      </section>
+      <SegmentedControl
+        className={classes.viewSwitch}
+        value={view}
+        onChange={setView}
+        aria-label="Show the results as"
+        data={[
+          { value: 'ranking', label: 'Ranking' },
+          { value: 'pipeline', label: 'Pipeline' },
+        ]}
+      />
 
-      {excluded.length > 0 && (
+      {view === 'pipeline' && <PipelineBoard ranked={ranked} excluded={excluded} onOpen={setSelected} />}
+
+      {view === 'ranking' && ranked.length > 1 && (
+        <section className={classes.card} aria-label="Score distribution">
+          <div className={classes.cardTop}>
+            <div className={classes.cardTitle}>Score distribution</div>
+            <div className={classes.small}>How many ranked candidates reached each overall score band.</div>
+          </div>
+          <div className={classes.chart}>
+            <BarChart
+              h={150}
+              data={bands}
+              dataKey="band"
+              series={[{ name: 'Candidates', color: 'harbor.6' }]}
+              tickLine="none"
+              gridAxis="x"
+              barProps={{ radius: [4, 4, 0, 0] }}
+              yAxisProps={{ allowDecimals: false, width: 28, ticks: countTicks(bands) }}
+              aria-label="Number of ranked candidates per overall score band"
+            />
+          </div>
+        </section>
+      )}
+
+      {view === 'ranking' && (
+        <section className={classes.card} aria-label="Ranked candidates">
+          <div className={classes.cardTop}>
+            <div className={classes.cardTitle}>Ranked candidates</div>
+            <div className={classes.small}>
+              {ranked.length} {ranked.length === 1 ? 'candidate' : 'candidates'} met every mandatory requirement.
+              Weights: {weightsLine(run.weights)}.
+              {ranked.some((r) => r.scanned) && ' The scan icon marks CVs read from an image with text recognition.'}
+              {ranked.some((r) => r.years_unknown) && ' The calendar icon marks CVs whose years of experience could not be read: please check them.'}
+            </div>
+          </div>
+          {ranked.length === 0 ? (
+            <div className={classes.emptyRow}>No candidate met every mandatory requirement.</div>
+          ) : (
+            <>
+              <div className={classes.head}>
+                <div>Rank</div>
+                <div>Candidate</div>
+                <div>Overall (0–100)</div>
+                <div className={classes.dimCol}>Technical skills</div>
+                <div className={classes.dimCol}>Relevant experience</div>
+                <div className={classes.dimCol}>Qualifi­cations</div>
+                <div className={classes.dimCol}>ATS CV–JD match</div>
+                <div>Status</div>
+                <div />
+              </div>
+              {ranked.map((result) => (
+                <button
+                  type="button"
+                  key={result.candidate_id}
+                  className={`${classes.row} ${selected?.candidate_id === result.candidate_id ? classes.rowSelected : ''}`}
+                  onClick={() => setSelected(result)}
+                >
+                  <div className={classes.rank}>{result.rank}</div>
+                  <div className={classes.name}>
+                    <span className={classes.nameText}>{result.name || result.cv_filename}</span>
+                    {result.scanned && (
+                      <span className={classes.scanChip} title="Scanned CV: read from an image with text recognition. Worth a quick check against the original.">
+                        <IconScan size={12} />
+                      </span>
+                    )}
+                    {result.years_unknown && (
+                      <span className={classes.checkChip} title="Years of experience could not be read from this CV. Please check it.">
+                        <IconCalendarQuestion size={12} />
+                      </span>
+                    )}
+                  </div>
+                  <div className={classes.overall}>
+                    <b className={classes.num}>{result.overall}</b>
+                    <div className={classes.miniBar}>
+                      <div className={classes.miniFill} style={{ width: `${result.overall}%` }} />
+                    </div>
+                  </div>
+                  {WEIGHT_FIELDS.map(([key]) => (
+                    <div key={key} className={`${classes.num} ${classes.dimCol}`}>
+                      {result.dimensions[key]?.score}
+                    </div>
+                  ))}
+                  <PipelineBadge result={result} />
+                  <IconChevronRight size={16} className={classes.chevron} />
+                </button>
+              ))}
+            </>
+          )}
+        </section>
+      )}
+
+      {view === 'ranking' && excluded.length > 0 && (
         <section className={classes.card} aria-label="Excluded candidates">
           <button type="button" className={classes.collapseHead} onClick={() => setExcludedOpen((open) => !open)}>
             {excludedOpen ? <IconChevronDown size={18} /> : <IconChevronRight size={18} />}

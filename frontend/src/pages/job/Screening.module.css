@@ -673,3 +673,12 @@
     width: 0;
   }
 }
+
+/* Ranking | Pipeline switch and the score distribution chart. */
+.viewSwitch {
+  align-self: flex-start;
+}
+
+.chart {
+  padding: 0 16px 12px;
+}

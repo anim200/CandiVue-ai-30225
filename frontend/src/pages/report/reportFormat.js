@@ -142,3 +142,29 @@ export function identityWarning(identity) {
     ? `The face check was not done: ${said}. Make sure you are emailing the right person.`
     : `The face check did not confirm this candidate: ${said}.`;
 }
+
+// Short names for the radar's corners (the full names are in the bars).
+const SHORT = {
+  'Response relevance': 'Relevance',
+  'Technical competency': 'Technical',
+  'Job alignment': 'Alignment',
+  'Problem-solving approach': 'Problem-solving',
+  'Experience depth': 'Depth',
+};
+
+// The radar chart of the interview dimensions (F9): one point per dimension
+// that has a score for at least one candidate, one series per candidate
+// ({ name, content }). Fewer than three dimensions make no radar: [].
+export function radarData(candidates) {
+  const contents = candidates.map((c) => c.content);
+  const points = interviewDimensions(contents)
+    .map(([key, label]) => {
+      const point = { dimension: SHORT[label] ?? label };
+      for (const { name, content } of candidates) {
+        point[name] = content.components.interview?.dimensions?.[key]?.score ?? null;
+      }
+      return point;
+    })
+    .filter((point) => candidates.some(({ name }) => point[name] != null));
+  return points.length >= 3 ? points : [];
+}
