@@ -129,9 +129,20 @@ The interviewer and candidate screens are a single-page web app in
 | Components | Mantine 9 | Ready-made, accessible components (tables, forms, date pickers, charts, notifications) that fit a data-heavy tool, with no CSS framework to learn. |
 | Navigation | React Router 8 | One address per screen, so pages can be bookmarked and shared between tabs. |
 | Icons / fonts | Tabler Icons, Public Sans, IBM Plex Mono | Installed as npm packages, so the app loads no files from external sites. |
+| Charts | Mantine Charts (Recharts) | Same look and colours as the other Mantine parts, light and dark. |
 
 How it runs:
 
+- **Start page:** after sign-in the interviewer sees *Home*: counts (open
+  jobs, applications this week, CVs to screen, interviews today, reports to
+  review, selected this month), "Needs you" (live interviews, interviews
+  today, reports to review, jobs with CVs to screen, jobs waiting in the
+  chat), the next interviews and applications per day for the last 14 days,
+  all from `GET /api/dashboard` (interviewer only). The job page shows the
+  screening as a *Ranking* (with a score distribution chart) or as a
+  read-only *Pipeline* (Screened → Shortlisted → Invited → Interviewed →
+  Selected); the report and the comparison show the interview dimensions
+  as a radar chart.
 - **Light or dark:** *Appearance* in the user menu (and a sun/moon button
   on the login and candidate pages). The choice is remembered in the browser
   and all its tabs follow it; the default is light. All colours of our own
