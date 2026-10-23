@@ -14,6 +14,7 @@ from app.api import (
     assistant,
     auth,
     candidate,
+    dashboard,
     health,
     interviews,
     jobs,
@@ -94,6 +95,7 @@ app.add_middleware(
 
 register_error_handlers(app)
 app.include_router(health.router)
+app.include_router(dashboard.router)
 app.include_router(auth.router)
 app.include_router(knowledge.router)
 app.include_router(jobs.router)
