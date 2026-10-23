@@ -79,6 +79,13 @@ Update this file at the end of each work session. Every Claude thread reads it.
   - Tests: 287 backend (new: test_identity, test_interview_quality, access-code tests, batching/review/request-count tests) + 36 frontend; ruff clean.
   - Still to do (user): Redmine task ids for modules 6-8 (`#TBD-*` refs), Figure 2 (identity in the transcriber), Figures 5 and 6 (new nodes).
 
+- Module 9 Security, Privacy, Performance & Required-Feature Verification, branch module/verification from module/stretch-features (18-10-2026, user: do only what is not done yet). Full report: `docs/VERIFICATION.md`.
+  - 9.1 Security review: route guards, bounded request bodies, upload checks, secrets, pinned dependencies and images, logs without personal data: all pass. Provider failures: local embeddings now retry 3× (only provider without retries).
+  - 9.2 Privacy: found that LangGraph checkpoints kept CV text, transcript lines and chats after runs finished and after a candidate was deleted (~54 MB). Now: a finished run deletes its state (runner), `app/runs/cleanup.py` purges state of finished/deleted runs, jobs and interviews hourly (with the face-reference purge) and right after a candidate is deleted (54 MB → 8.5 MB; `tests/test_privacy.py`). README "Privacy note" (stored fields, retention, deletion, providers, fairness limits).
+  - 9.3 Performance + #647758 stability test (45 min, two browsers, synthetic voices with room noise, painting as camera, 29-CV screening at minute 5, candidate reload at minute 20): call connected throughout, 218 turns in order, 95.8 % / 97.4 % of words, turn saved median 0.8 s (95 % ≤ 2.7 s), memory flat, analysis + report 82 s after End with 6 Gemini requests. Found and fixed: local-model requests timed out in Ollama's queue (now one at a time) → screening failed; identity check used a medium video layer (now full size) and says "Face unclear" when the face is too small; enrolment could take empty pictures (now waits for the video); screening ran ~20 CVs at once and exhausted the DB connection pool (API stalls up to 30 s, a valid CV skipped) → now 4 at a time (`MAX_PARALLEL_CVS`): API slowest 0.62 s instead of >20 s. Test artifact (not an app bug): synthetic microphones sending digital silence made the interviewer's browser rejoin every 20-40 s; with faint room noise: never.
+  - 9.4 Verification matrix (feature → tests → live check); new tests: OCR of a scanned PDF, blank scan, same CVs → same scores. 293 backend + 36 frontend tests.
+  - Open (user): the trainer's 20 sample CVs for the final end-to-end run (procedure in VERIFICATION.md), one 5-minute check with a real microphone and webcam, Redmine ids for modules 6-9.
+
 ## Design notes to apply in later modules
 - Two roles: Interviewer logs in with email + password; Candidate authenticates with the unique interview link. Both get a role-based JWT; the backend enforces the role (N9). Candidate token is limited to one session.
 - Interview link safeguards (WBS 4.1–4.2): link valid only from shortly before the scheduled time until the interview ends; disabled after the interview; one candidate connection at a time; only the token hash is stored (done).
@@ -106,9 +113,9 @@ Update this file at the end of each work session. Every Claude thread reads it.
 - Git Bash is used for git commands; check the branch name in the prompt before committing
 
 ## Next
-- Give the Redmine task ids for modules 6, 7 and 8, so the `#TBD-*` refs can be rewritten; then merge them into dev. Update Figure 5 (job answers via RAG).
+- Give the Redmine task ids for modules 6, 7, 8 and 9, so the `#TBD-*` refs can be rewritten; then merge them into dev. Update Figure 5 (job answers via RAG).
 - F11 demo: extend job 151's closing date (or apply to an open job) so Imran's form answer is collected with the talent-pool flag; create the Python job in the chat.
-- Then: stability test over a ~45 min interview (#647758); update Figures 2, 5 and 6 (module 8 changes).
+- Then: update Figures 2, 5 and 6 (module 8 changes); final end-to-end run with the trainer's 20 sample CVs when received (docs/VERIFICATION.md).
 - Renew the Blogger refresh token before the demo (Testing mode: 7 days; renewed 17-10-2026).
 - Open from F4: real-microphone timestamp check, the occasional 401 right after sign-in, update the Figure 2 label (Deepgram instead of Google STT).
 

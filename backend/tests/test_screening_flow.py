@@ -203,6 +203,32 @@ def test_a_screening_run_ranks_excludes_and_skips(job_id, monkeypatch):
         assert alex.email == "alex.strong@example.com"  # read from the CV
 
 
+def test_the_same_cvs_get_the_same_scores_every_time(job_id, monkeypatch):
+    """Scores are repeatable (F2, B2): screening again gives the same ranks,
+    scores and exclusion reasons."""
+    client = TestClient(app)
+    run_now(monkeypatch)
+
+    def screen() -> list:
+        """One screening run's ranking and exclusions."""
+        client.post(f"/api/jobs/{job_id}/screenings", headers=headers())
+        result = client.get(
+            f"/api/jobs/{job_id}/screenings/latest", headers=headers()
+        ).json()
+        ranked = [
+            (
+                r["name"],
+                r["rank"],
+                r["overall"],
+                {k: d["score"] for k, d in r["dimensions"].items()},
+            )
+            for r in result["ranked"]
+        ]
+        return ranked + [(r["name"], r["summary"]) for r in result["excluded"]]
+
+    assert screen() == screen()
+
+
 STATED = """Sam Stated
 sam.stated@example.com
 Summary

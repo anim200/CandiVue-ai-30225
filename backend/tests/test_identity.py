@@ -136,6 +136,7 @@ def test_one_bad_picture_never_decides_and_identity_is_never_assumed():
     assert decide([unsure, unsure, same])["state"] == "low_confidence"
     assert decide([other, other])["state"] == "no_match"
     assert decide([Sample(problem="several_faces")] * 3)["state"] == "several_faces"
+    assert decide([Sample(problem="too_small")] * 3)["state"] == "too_small"
     assert decide([Sample(problem="camera_off")] * 3)["state"] == "camera_off"
     # Clearly another applicant of the job: no match, with their name.
     someone = Sample(own=0.3, other=("Bea Good", 0.9))

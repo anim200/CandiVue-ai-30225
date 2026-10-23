@@ -29,29 +29,33 @@ from app.core.logging import setup_logging
 from app.db.database import SessionLocal
 from app.graphs.checkpointer import open_checkpointer
 from app.identity.references import purge_expired
+from app.runs.cleanup import purge_stale_threads
 from app.runs.runner import resume_interrupted_runs
 
 settings = get_settings()
 setup_logging(settings.log_level)
 logger = logging.getLogger(__name__)
 
-PURGE_EVERY_SECONDS = 3600
+CLEAN_UP_EVERY_SECONDS = 3600
 
 
-def purge_face_references() -> None:
-    """Delete the face references whose time is up (F7 retention, N17)."""
+def clean_up_personal_data() -> None:
+    """Delete personal data whose time is up: face references after their
+    retention (F7, N17) and saved workflow state that is no longer needed
+    (N16, N19)."""
     with SessionLocal() as db:
         purge_expired(db)
+        purge_stale_threads(db)
 
 
-async def purge_face_references_hourly() -> None:
-    """Run purge_face_references() now and then every hour."""
+async def clean_up_hourly() -> None:
+    """Run clean_up_personal_data() now and then every hour."""
     while True:
         try:
-            await asyncio.to_thread(purge_face_references)
+            await asyncio.to_thread(clean_up_personal_data)
         except Exception as error:  # noqa: BLE001 - try again next hour
-            logger.warning("Face reference clean-up failed: %s", type(error).__name__)
-        await asyncio.sleep(PURGE_EVERY_SECONDS)
+            logger.warning("Clean-up failed: %s", type(error).__name__)
+        await asyncio.sleep(CLEAN_UP_EVERY_SECONDS)
 
 
 @asynccontextmanager
@@ -66,11 +70,11 @@ async def lifespan(app: FastAPI):
         app.state.checkpointer = checkpointer
         # Continue AI runs that were interrupted by a stop or crash (N26).
         resume_interrupted_runs()
-        purging = asyncio.create_task(purge_face_references_hourly())
+        cleaning = asyncio.create_task(clean_up_hourly())
         yield
-        purging.cancel()
+        cleaning.cancel()
         with contextlib.suppress(asyncio.CancelledError):
-            await purging
+            await cleaning
 
 
 app = FastAPI(

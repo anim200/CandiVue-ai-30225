@@ -191,6 +191,7 @@ def test_failed_indexing_shows_a_plain_message_and_can_be_retried(
             raise TimeoutError("provider timeout")
 
     monkeypatch.setattr(embeddings, "get_embedding_model", lambda: BrokenEmbeddings())
+    monkeypatch.setattr(embeddings.time, "sleep", lambda seconds: None)
     document_id = upload(client, headers, "x.txt", b"Some synthetic text.").json()["id"]
     listed = client.get("/api/knowledge/documents", headers=headers).json()
     document = next(d for d in listed if d["id"] == document_id)

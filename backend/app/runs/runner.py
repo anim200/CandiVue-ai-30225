@@ -22,6 +22,7 @@ from sqlalchemy import select
 from app.ai.errors import AIServiceError
 from app.db.database import SessionLocal
 from app.db.models.run import RunStatus
+from app.graphs.checkpointer import forget_thread
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,8 @@ def execute_run(kind: str, run_id: int) -> None:
         logger.info("Run waiting for review: %s %d", kind, run_id)
     else:
         _update(run_kind.model, run_id, status=RunStatus.COMPLETED, finished_at=_now())
+        # Its saved state was only needed to continue it: delete it (N16).
+        forget_thread(graph_config(kind, run_id))
         logger.info("Run completed: %s %d", kind, run_id)
 
 

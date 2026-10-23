@@ -44,15 +44,39 @@ def test_unknown_provider_is_a_clear_error(monkeypatch):
         get_embedding_model()
 
 
-def test_unreachable_model_becomes_a_clear_ai_error(monkeypatch):
+def test_unreachable_model_is_tried_again_then_a_clear_ai_error(monkeypatch):
+    calls = []
+
     class Down:
         """Embedding model that cannot be reached."""
 
         def embed_query(self, text):
             """Fail like a stopped Ollama would."""
+            calls.append(text)
             raise ConnectionError("connection refused")
 
     monkeypatch.setattr(embeddings, "get_embedding_model", lambda: Down())
+    monkeypatch.setattr(embeddings.time, "sleep", lambda seconds: None)
 
     with pytest.raises(embeddings.AIServiceError):
         embeddings.embed_query("anything")
+    assert len(calls) == embeddings.ATTEMPTS  # bounded: 3 tries, then the error
+
+
+def test_a_busy_model_succeeds_on_a_later_try(monkeypatch):
+    answers = [TimeoutError("busy"), [0.1, 0.2]]
+
+    class Busy:
+        """Embedding model that is busy once."""
+
+        def embed_query(self, text):
+            """Fail the first time, answer the second."""
+            answer = answers.pop(0)
+            if isinstance(answer, Exception):
+                raise answer
+            return answer
+
+    monkeypatch.setattr(embeddings, "get_embedding_model", lambda: Busy())
+    monkeypatch.setattr(embeddings.time, "sleep", lambda seconds: None)
+
+    assert embeddings.embed_query("anything") == [0.1, 0.2]

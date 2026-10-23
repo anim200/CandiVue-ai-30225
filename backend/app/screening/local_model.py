@@ -24,6 +24,7 @@ not met), so the result is never worse than the rules alone.
 
 import logging
 import re
+import threading
 from datetime import date
 from functools import lru_cache
 
@@ -39,6 +40,11 @@ logger = logging.getLogger(__name__)
 MAX_CV_CHARS = 6000  # enough for a normal CV, keeps each call a few seconds
 MIN_QUOTE_CHARS = 4
 SEED = 7
+# Ollama on a CPU answers one request at a time. Asking one at a time here
+# (several CVs are screened in parallel) keeps the timeout for the answer
+# itself instead of the wait in Ollama's queue (measured in the 45-minute
+# test: queued requests timed out and the screening stopped).
+_one_at_a_time = threading.Lock()
 NUMBER_WORDS = {  # "seven years" → 7
     word: number
     for number, word in enumerate(
@@ -187,12 +193,13 @@ def _ask(prompt: str, schema: type[BaseModel]) -> BaseModel | None:
     not fit is None; a model that cannot be reached is an AIServiceError."""
     settings = get_settings()
     try:
-        response = _client().chat(
-            model=settings.screening_model,
-            messages=[{"role": "user", "content": prompt}],
-            format=schema.model_json_schema(),
-            options={"temperature": 0, "seed": SEED},
-        )
+        with _one_at_a_time:
+            response = _client().chat(
+                model=settings.screening_model,
+                messages=[{"role": "user", "content": prompt}],
+                format=schema.model_json_schema(),
+                options={"temperature": 0, "seed": SEED},
+            )
     except Exception as exc:
         # Only the error type: the message could contain CV text.
         logger.warning("Local screening model failed: %s", type(exc).__name__)

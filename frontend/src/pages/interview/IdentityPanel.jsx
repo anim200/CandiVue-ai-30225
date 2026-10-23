@@ -28,6 +28,7 @@ const BADGES = {
   low_confidence: { tone: 'warning', icon: IconUserQuestion, text: 'Low confidence' },
   no_match: { tone: 'danger', icon: IconUserX, text: 'No match' },
   no_face: { tone: 'warning', icon: IconEyeOff, text: 'No face in view' },
+  too_small: { tone: 'warning', icon: IconEyeOff, text: 'Face unclear' },
   several_faces: { tone: 'warning', icon: IconEyeOff, text: 'Several faces' },
   camera_off: { tone: 'neutral', icon: IconEyeOff, text: 'Camera off' },
   checking: { tone: 'info', icon: null, text: 'Checking…' },
