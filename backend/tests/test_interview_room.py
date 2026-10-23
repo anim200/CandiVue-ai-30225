@@ -18,7 +18,7 @@ from langchain_core.messages import AIMessage
 from livekit import api
 from pydantic import SecretStr
 
-from app.assistant import room_tools
+from app.assistant import room_tools, scope
 from app.auth.security import Role, create_access_token, hash_password
 from app.core import clock
 from app.core.config import get_settings
@@ -482,3 +482,17 @@ def test_the_room_assistant_has_its_own_thread_and_saves_cv_questions(
     steps = [i["text"] for i in third.json()["items"] if i["kind"] == "step"]
     assert "The question bank is empty" in steps
     assert job_chat["items"] == []  # the job's own chat is untouched
+
+
+def test_the_room_assistant_declines_off_topic_questions(client, interview, scripted):
+    boss = interviewer(interview)
+    scripted += [call(scope.TOOL_NAME, {"topic": "news", "also_job_request": False})]
+
+    thread = client.post(
+        f"/api/assistant/interviews/{interview['id']}/messages",
+        headers=boss,
+        json={"text": "What is the latest football news?"},
+    ).json()
+
+    assert thread["items"][-1] == {"kind": "assistant", "text": scope.ROOM_REPLY}
+    assert scripted == []  # no second AI request
