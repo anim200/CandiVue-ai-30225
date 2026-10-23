@@ -63,7 +63,10 @@ def interview():
         db.add_all([user, job])
         db.flush()
         candidate = Candidate(
-            job_id=job.id, full_name="Alex Strong", cv_filename="a.pdf"
+            job_id=job.id,
+            full_name="Alex Strong",
+            email="alex@example.com",
+            cv_filename="a.pdf",
         )
         db.add(candidate)
         db.flush()
@@ -98,9 +101,10 @@ def interviewer(data):
     }
 
 
-def candidate(client, data):
-    """Sign in with the private link, as the candidate's page does."""
-    answer = client.post("/api/auth/candidate", json={"link_token": data["link"]})
+def candidate(login, data):
+    """Sign in with the private link and the emailed code, as the
+    candidate's page does (login: the candidate_login fixture)."""
+    answer = login(data["link"])
     return {"Authorization": f"Bearer {answer.json()['access_token']}"}
 
 
@@ -114,14 +118,18 @@ def admit(client, data):
     return client.post(f"/api/interviews/{data['id']}/admit", headers=interviewer(data))
 
 
-def test_each_person_gets_a_ticket_for_this_room_only(client, interview):
+def test_each_person_gets_a_ticket_for_this_room_only(
+    candidate_login, client, interview
+):
     room_id = f"interview-{interview['id']}"
 
     mine = client.post(
         f"/api/interviews/{interview['id']}/room", headers=interviewer(interview)
     ).json()
     admit(client, interview)
-    theirs = client.post("/api/candidate/room", headers=candidate(client, interview))
+    theirs = client.post(
+        "/api/candidate/room", headers=candidate(candidate_login, interview)
+    )
 
     claims = read_ticket(mine["token"])
     assert claims["sub"] == f"interviewer-{interview['user']}"
@@ -133,8 +141,8 @@ def test_each_person_gets_a_ticket_for_this_room_only(client, interview):
     assert claims["video"]["room"] == room_id
 
 
-def test_the_candidate_sees_only_their_interview(client, interview):
-    headers = candidate(client, interview)
+def test_the_candidate_sees_only_their_interview(candidate_login, client, interview):
+    headers = candidate(candidate_login, interview)
 
     mine = client.get("/api/candidate/interview", headers=headers).json()
 
@@ -146,7 +154,9 @@ def test_the_candidate_sees_only_their_interview(client, interview):
         "started_at",
         "status",
         "lobby",
+        "identity",  # their own choice only, never the result
     }
+    assert set(mine["identity"]) == {"available", "consent", "retention_days"}
     assert mine["job_title"] == "PHP Developer"
     assert (
         client.post(
@@ -160,9 +170,11 @@ def test_the_candidate_sees_only_their_interview(client, interview):
     )
 
 
-def test_ending_closes_the_call_and_the_link(client, interview, livekit):
+def test_ending_closes_the_call_and_the_link(
+    candidate_login, client, interview, livekit
+):
     headers = interviewer(interview)
-    link = candidate(client, interview)
+    link = candidate(candidate_login, interview)
 
     ended = client.post(f"/api/interviews/{interview['id']}/end", headers=headers)
 
@@ -226,7 +238,9 @@ def test_a_forged_webhook_is_refused(client, interview):
         )
 
 
-def test_nobody_joins_before_the_invitation_is_emailed(client, interview):
+def test_nobody_joins_before_the_invitation_is_emailed(
+    candidate_login, client, interview
+):
     with SessionLocal() as db:
         db.get(
             InterviewSession, interview["id"]
@@ -236,7 +250,9 @@ def test_nobody_joins_before_the_invitation_is_emailed(client, interview):
     mine = client.post(
         f"/api/interviews/{interview['id']}/room", headers=interviewer(interview)
     )
-    theirs = client.post("/api/candidate/room", headers=candidate(client, interview))
+    theirs = client.post(
+        "/api/candidate/room", headers=candidate(candidate_login, interview)
+    )
 
     assert mine.status_code == 409 and "send it first" in mine.json()["detail"]
     assert theirs.status_code == 409 and "not been sent" in theirs.json()["detail"]
@@ -257,8 +273,8 @@ def test_a_helper_that_is_not_a_participant_is_ignored(client, interview):
 # ---------- waiting room ----------
 
 
-def test_the_candidate_waits_until_let_in(client, interview):
-    link = candidate(client, interview)
+def test_the_candidate_waits_until_let_in(candidate_login, client, interview):
+    link = candidate(candidate_login, interview)
     boss = interviewer(interview)
 
     first = client.post("/api/candidate/waiting", headers=link).json()
@@ -279,8 +295,8 @@ def test_the_candidate_waits_until_let_in(client, interview):
     assert ticket.status_code == 200 and again.status_code == 200
 
 
-def test_a_closed_page_no_longer_counts_as_there(client, interview):
-    client.post("/api/candidate/waiting", headers=candidate(client, interview))
+def test_a_closed_page_no_longer_counts_as_there(candidate_login, client, interview):
+    client.post("/api/candidate/waiting", headers=candidate(candidate_login, interview))
     with SessionLocal() as db:
         db.get(InterviewSession, interview["id"]).candidate_waiting_at = (
             clock.now() - timedelta(seconds=room.PRESENCE_SECONDS + 1)
@@ -294,8 +310,8 @@ def test_a_closed_page_no_longer_counts_as_there(client, interview):
     assert not seen["candidate_waiting"]
 
 
-def test_nobody_is_let_in_after_the_end(client, interview):
-    link = candidate(client, interview)
+def test_nobody_is_let_in_after_the_end(candidate_login, client, interview):
+    link = candidate(candidate_login, interview)
     client.post(
         f"/api/interviews/{interview['id']}/end", headers=interviewer(interview)
     )
@@ -310,8 +326,10 @@ def test_nobody_is_let_in_after_the_end(client, interview):
 # ---------- chat ----------
 
 
-def test_chat_between_interviewer_and_candidate(client, interview, pushed):
-    link = candidate(client, interview)
+def test_chat_between_interviewer_and_candidate(
+    candidate_login, client, interview, pushed
+):
+    link = candidate(candidate_login, interview)
     boss = interviewer(interview)
     url = f"/api/interviews/{interview['id']}/messages"
 
@@ -353,8 +371,10 @@ def test_chat_checks_length_speed_and_the_end(client, interview, monkeypatch):
     assert len(client.get(url, headers=boss).json()) == 2  # still readable
 
 
-def test_the_candidate_never_sees_the_cv_panel_or_the_assistant(client, interview):
-    link = candidate(client, interview)
+def test_the_candidate_never_sees_the_cv_panel_or_the_assistant(
+    candidate_login, client, interview
+):
+    link = candidate(candidate_login, interview)
     base = f"/api/interviews/{interview['id']}"
 
     for path in (

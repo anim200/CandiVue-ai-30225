@@ -1,20 +1,24 @@
 // Interview analysis (design: Interview Analysis.dc.html): the Q&A analysis
-// of an ended interview (F5), its saved transcript (F4) and the session
-// record (F3). The analysis starts by itself when the interview ends; this
-// page shows its progress, and "Try again" continues a failed one where it
-// stopped. Interviewers only. The optional F8-F10 tabs are not built.
+// of an ended interview (F5), its saved transcript (F4), the CV claims check
+// (F8), the interview score (F9), the interview quality (F10) and the
+// session record (F3). The analysis starts by itself when the interview
+// ends; this page shows its progress, and "Try again" continues a failed one
+// where it stopped. Interviewers only.
 
 import { Anchor, Button, Tabs } from '@mantine/core';
 import { useDocumentTitle } from '@mantine/hooks';
 import {
   IconAlignLeft,
+  IconArrowsDiff,
   IconCheck,
+  IconChartBar,
   IconChevronRight,
   IconFileText,
   IconInfoCircle,
   IconLoader2,
   IconMessage2Search,
   IconRefresh,
+  IconStethoscope,
   IconX,
 } from '@tabler/icons-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -29,6 +33,7 @@ import { whenText } from '../../utils/dates';
 import { usePolling } from '../../utils/usePolling';
 import classes from './Analysis.module.css';
 import { isRunning } from './analysisFormat';
+import { ClaimsCheck, InterviewQuality, InterviewScore } from './InterviewInsights';
 import QAAnalysis from './QAAnalysis';
 import SessionDetails from './SessionDetails';
 import TranscriptViewer from './TranscriptViewer';
@@ -152,6 +157,7 @@ export default function InterviewAnalysisPage() {
 
   const { interview, analysis, turns, report } = data;
   const run = analysis.run;
+  const results = analysis.results;
   const turnMap = new Map(turns.map((turn) => [turn.id, turn]));
   const badge = run && RUN_BADGE[run.status];
 
@@ -190,7 +196,6 @@ export default function InterviewAnalysisPage() {
       </ErrorBanner>
     );
   } else {
-    const results = analysis.results;
     qaBody = (
       <>
         {results.scored === 0 && (
@@ -214,6 +219,29 @@ export default function InterviewAnalysisPage() {
         </div>
       </>
     );
+  }
+
+  // The F8-F10 tabs: their results once the analysis is done (an analysis
+  // from before these checks offers to analyse again), else the same state
+  // as the Q&A tab (progress, stopped, not held yet).
+  function insight(render) {
+    if (run?.status !== 'completed' || !results) return qaBody;
+    if (!results.quality) {
+      return (
+        <EmptyState
+          icon={IconRefresh}
+          title="Analysed before this check existed"
+          action={
+            <Button onClick={() => setConfirmAgain(true)} loading={busy}>
+              Analyse again
+            </Button>
+          }
+        >
+          Analyse the interview again to see the CV claims check, the interview score and the interview quality.
+        </EmptyState>
+      );
+    }
+    return render(results);
   }
 
   return (
@@ -259,6 +287,15 @@ export default function InterviewAnalysisPage() {
           <Tabs.Tab value="transcript" leftSection={<IconAlignLeft size={16} />}>
             Transcript
           </Tabs.Tab>
+          <Tabs.Tab value="claims" leftSection={<IconArrowsDiff size={16} />}>
+            CV claims check
+          </Tabs.Tab>
+          <Tabs.Tab value="score" leftSection={<IconChartBar size={16} />}>
+            Interview score
+          </Tabs.Tab>
+          <Tabs.Tab value="quality" leftSection={<IconStethoscope size={16} />}>
+            Interview quality
+          </Tabs.Tab>
           <Tabs.Tab value="session" leftSection={<IconInfoCircle size={16} />}>
             Session details
           </Tabs.Tab>
@@ -274,6 +311,27 @@ export default function InterviewAnalysisPage() {
             fileName={`Transcript - ${interview.candidate_name}.txt`}
             onPickPair={showPair}
           />
+        </Tabs.Panel>
+        <Tabs.Panel value="claims" className={classes.panel}>
+          {insight((r) => (
+            <ClaimsCheck claims={r.claims} turns={turnMap} onShowTurn={showTurn} />
+          ))}
+        </Tabs.Panel>
+        <Tabs.Panel value="score" className={classes.panel}>
+          {insight((r) => (
+            <InterviewScore
+              score={r.interview_score}
+              cvScore={report?.content?.components?.cv?.overall}
+              turns={turnMap}
+              onShowTurn={showTurn}
+              onShowPair={showPair}
+            />
+          ))}
+        </Tabs.Panel>
+        <Tabs.Panel value="quality" className={classes.panel}>
+          {insight((r) => (
+            <InterviewQuality quality={r.quality} interview={interview} onShowPair={showPair} />
+          ))}
         </Tabs.Panel>
         <Tabs.Panel value="session" className={classes.panel}>
           <SessionDetails interview={interview} analysisRun={run} report={report} />

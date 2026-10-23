@@ -3,8 +3,8 @@ the interview's Q&A analysis finishes, so the report is ready soon after
 the interview ends (B5) and waits for the interviewer's review.
 
     START → load_inputs → merge_scores
-          → analyze_strengths ║ analyze_weaknesses ║ find_evidence_gaps ║
-            recommend_verification
+          → write_findings   (1 AI request: strengths, weaknesses, evidence
+                              gaps, areas to verify)
           → build_report ─ check_traceability:
                 ├ all claims linked ───────────→ human_review
                 ├ missing evidence (max 2) ────→ repair_findings → build_report
@@ -12,16 +12,19 @@ the interview ends (B5) and waits for the interviewer's review.
     human_review (interrupt) ─ approved ──────────→ save_assessment → END
                              └ changes requested ─→ merge_scores (next version)
 
-- Merges CV screening (F2), the Q&A analysis (F5) and the CV itself into
-  one report: an overall position backed by component scores (computed in
-  code, app/analysis/assessment.py), and strengths, weaknesses, evidence
-  gaps and areas to verify (written by the LLM).
+- Merges CV screening (F2), the Q&A analysis (F5), the interview score
+  (F9), the CV claims to follow up (F8), the interview quality (F10), the
+  identity check (F7) and the CV itself into one report: an overall
+  position backed by component scores (computed in code,
+  app/analysis/assessment.py), and strengths, weaknesses, evidence gaps
+  and areas to verify (written by the LLM in one request).
 - Every conclusion cites CV items, timestamped transcript lines or a job
   requirement's coverage record (for what was never explored). Cited ids
   are checked; a conclusion without valid evidence is repaired (at most
   twice) and otherwise shown as unsupported, never silently kept (F6).
 - The interviewer approves the report or requests changes with a comment;
-  the comment is used to write the next version (§4B-7, HITL).
+  the comment is used to write the next version, and the same request says
+  what changed (§4B-7, HITL).
 - State is checkpointed in PostgreSQL, including the review pause (N26).
 """
 
@@ -44,14 +47,7 @@ from app.analysis.assessment import (
     evidence,
     suitability,
 )
-from app.analysis.prompts import (
-    CHANGES_PROMPT,
-    FINDINGS_PROMPT,
-    FINDINGS_PROMPTS,
-    REPAIR_PROMPT,
-    REVISION_NOTE,
-)
-from app.analysis.qa_pairs import DIMENSIONS
+from app.analysis.prompts import FINDINGS_PROMPT, REPAIR_PROMPT, REVISION_NOTE
 from app.analysis.transcript import clock_text, load_lines
 from app.core import clock
 from app.db.database import SessionLocal
@@ -59,6 +55,7 @@ from app.db.models import AssessmentReport, InterviewSession, Job, QAAnalysis
 from app.db.models.assessment import ReviewStatus
 from app.db.models.run import RunStatus
 from app.graphs.checkpointer import forget_thread, open_checkpointer
+from app.identity.matching import identity_summary
 from app.interviews import cv_view
 from app.runs.runner import graph_config, register_run_kind, start_run
 
@@ -77,9 +74,14 @@ class Finding(BaseModel):
 
 
 class Findings(BaseModel):
-    """One category of conclusions (e.g. strengths)."""
+    """The report's four lists of conclusions, and on a revision what
+    changed since the reviewed version."""
 
-    findings: list[Finding] = Field(max_length=MAX_FINDINGS)
+    strengths: list[Finding]
+    weaknesses: list[Finding]
+    gaps: list[Finding]
+    verify: list[Finding]
+    changes: str = Field(default="", max_length=300)
 
 
 class RepairedFinding(BaseModel):
@@ -96,23 +98,17 @@ class Repair(BaseModel):
     findings: list[RepairedFinding]
 
 
-class ChangeNote(BaseModel):
-    """What changed between two versions, for the interviewer."""
-
-    note: str = Field(max_length=300)
-
-
 class ReportState(TypedDict, total=False):
     """One report: inputs, scores, the four kinds of conclusions and the
     review round it is in."""
 
     report_id: int
     session_id: int
-    inputs: dict  # job title, requirements, screening result, Q&A units
+    inputs: dict  # job title, requirements, screening, Q&A units, F7-F10 results
     evidence: dict  # what conclusions may cite, by id
     components: dict
     position: dict
-    context: str  # what the LLM reads for every part of the report
+    context: str  # what the LLM reads to write the conclusions
     strengths: list[dict]
     weaknesses: list[dict]
     gaps: list[dict]
@@ -130,8 +126,9 @@ class ReportState(TypedDict, total=False):
 
 
 def load_inputs(state: ReportState) -> dict:
-    """Read the job, the CV screening result, the Q&A analysis and the
-    transcript, and list the evidence the report may cite."""
+    """Read the job, the CV screening result, the Q&A analysis (with the CV
+    claims, interview score and interview quality), the identity check and
+    the transcript, and list the evidence the report may cite."""
     with SessionLocal() as db:
         report = db.get(AssessmentReport, state["report_id"])
         session = db.get(InterviewSession, report.session_id)
@@ -160,6 +157,7 @@ def load_inputs(state: ReportState) -> dict:
         lines = load_lines(db, session)
         known = evidence(db, session, lines, matches, requirements)
         job_title = job.title
+        identity = identity_summary(session)
     line_ids = {line.turn_id: f"T{line.number}" for line in lines}
     pairs = [
         {
@@ -176,6 +174,17 @@ def load_inputs(state: ReportState) -> dict:
         }
         for pair in results.get("pairs", [])
     ]
+    # CV claims a person should follow up (F8), citing transcript lines.
+    claims = [
+        {
+            key: claim[key]
+            for key in ("claim", "cv", "result", "interview_says", "follow_up")
+        }
+        | {"sources": [line_ids[t] for t in claim["turn_ids"] if t in line_ids]}
+        for claim in results.get("claims", [])
+        if claim["result"] != "supported"
+    ]
+    quality = results.get("quality")
     return {
         "session_id": session.id,
         "evidence": known,
@@ -185,6 +194,11 @@ def load_inputs(state: ReportState) -> dict:
             "pairs": pairs,
             "coverage": results.get("coverage", []),
             "requirements": requirements,
+            "interview_score": results.get("interview_score"),
+            "claims": claims,
+            "quality": quality
+            and {"verdict": quality["verdict"], "reasons": quality["reasons"]},
+            "identity": identity,
         },
         "version": state.get("version", 1),
     }
@@ -195,7 +209,7 @@ def merge_scores(state: ReportState) -> dict:
     and the overall position (plain code: repeatable)."""
     inputs = state["inputs"]
     components = component_scores(
-        inputs["screening"], inputs["pairs"], inputs["coverage"]
+        inputs["screening"], inputs["interview_score"], inputs["coverage"]
     )
     return {
         "components": components,
@@ -205,27 +219,30 @@ def merge_scores(state: ReportState) -> dict:
     }
 
 
-# ---------- the four parts (in parallel) ----------
-
-
-def analyze_strengths(state: ReportState) -> dict:
-    """The candidate's main strengths, each with its evidence."""
-    return {"strengths": _findings(state, "strengths")}
-
-
-def analyze_weaknesses(state: ReportState) -> dict:
-    """The candidate's main weaknesses, each with its evidence."""
-    return {"weaknesses": _findings(state, "weaknesses")}
-
-
-def find_evidence_gaps(state: ReportState) -> dict:
-    """What neither the CV nor the interview shows clearly."""
-    return {"gaps": _findings(state, "gaps")}
-
-
-def recommend_verification(state: ReportState) -> dict:
-    """What a person should check before deciding, as concrete next steps."""
-    return {"verify": _findings(state, "verify")}
+def write_findings(state: ReportState) -> dict:
+    """The four lists of conclusions, each with its evidence (one AI
+    request). On a revision the request also reads the interviewer's
+    comment and the reviewed version, and says what changed."""
+    revision = ""
+    if state.get("feedback"):
+        revision = REVISION_NOTE.format(
+            feedback=state["feedback"], previous=_listed(state["previous"])
+        )
+    answer = invoke_llm(
+        [
+            SystemMessage(
+                FINDINGS_PROMPT.format(limit=MAX_FINDINGS, revision=revision)
+            ),
+            HumanMessage(state["context"]),
+        ],
+        prepare=lambda model: model.with_structured_output(Findings),
+    )
+    written = {
+        category: [f.model_dump() for f in getattr(answer, category)][:MAX_FINDINGS]
+        for category in CATEGORIES
+    }
+    changes = (answer.changes.strip() or None) if state.get("feedback") else None
+    return written | {"changes": changes}
 
 
 # ---------- report, traceability and review ----------
@@ -235,14 +252,13 @@ def build_report(state: ReportState) -> dict:
     """Put the report together: position, component scores, requirement
     coverage and the conclusions with only valid evidence ids."""
     known = state["evidence"]
+    inputs = state["inputs"]
     findings = {
         category: check_sources(state[category], known) for category in CATEGORIES
     }
-    changes = state.get("changes")
-    if state.get("feedback") and changes is None:
-        changes = _describe_changes(state["feedback"], state["previous"], findings)
     cited = dict.fromkeys(
-        s for c in CATEGORIES for f in findings[c] for s in f["sources"]
+        [s for c in CATEGORIES for f in findings[c] for s in f["sources"]]
+        + [s for claim in inputs["claims"] for s in claim["sources"]]
     )
     position = state["position"]
     if state["components"]["interview"] is None and position["score"] is not None:
@@ -258,15 +274,20 @@ def build_report(state: ReportState) -> dict:
         "version": state["version"],
         "position": position | {"headline": headline},
         "components": state["components"],
-        "requirements": state["inputs"]["requirements"],
+        "requirements": inputs["requirements"],
         "findings": findings,
-        "sources": {source_id: known[source_id] for source_id in cited},
+        "claims": inputs["claims"],
+        "quality": inputs["quality"],
+        "identity": inputs["identity"],
+        "sources": {
+            source_id: known[source_id] for source_id in cited if source_id in known
+        },
         "feedback": state.get("feedback"),
-        "changes": changes,
+        "changes": state.get("changes"),
         "model": current_model(),
         "generated_at": clock.now().isoformat(),
     }
-    return {"report": report, "changes": changes, **findings}
+    return {"report": report, **findings}
 
 
 def check_traceability(state: ReportState) -> str:
@@ -357,36 +378,6 @@ def save_assessment(state: ReportState) -> dict:
 # ---------- helpers ----------
 
 
-def _findings(state: ReportState, category: str) -> list[dict]:
-    """One part of the report from the LLM; on a revision it also reads the
-    interviewer's comment and the part it reviewed."""
-    revision = ""
-    if state.get("feedback"):
-        previous = state["previous"][category]
-        revision = REVISION_NOTE.format(
-            feedback=state["feedback"],
-            previous="\n".join(
-                f"- {f['text']} (evidence: {', '.join(f['sources']) or 'none'})"
-                for f in previous
-            )
-            or "(nothing)",
-        )
-    answer = invoke_llm(
-        [
-            SystemMessage(
-                FINDINGS_PROMPT.format(
-                    topic=FINDINGS_PROMPTS[category],
-                    limit=MAX_FINDINGS,
-                    revision=revision,
-                )
-            ),
-            HumanMessage(state["context"]),
-        ],
-        prepare=lambda model: model.with_structured_output(Findings),
-    )
-    return [finding.model_dump() for finding in answer.findings]
-
-
 def _unsupported(state: ReportState) -> list[tuple[str, int, dict]]:
     """(category, position, finding) of every conclusion without evidence."""
     return [
@@ -397,54 +388,38 @@ def _unsupported(state: ReportState) -> list[tuple[str, int, dict]]:
     ]
 
 
-def _describe_changes(feedback: str, previous: dict, current: dict) -> str:
-    """One or two sentences on what the new version changed."""
-
-    def listed(findings: dict) -> str:
-        """The findings of a version as plain text."""
-        return "\n".join(
-            f"{category}: {finding['text']}"
+def _listed(findings: dict) -> str:
+    """A version's conclusions as plain text, with their evidence ids."""
+    return (
+        "\n".join(
+            f"- ({category}) {f['text']} (evidence: {', '.join(f['sources']) or 'none'})"
             for category in CATEGORIES
-            for finding in findings[category]
+            for f in findings[category]
         )
-
-    answer = invoke_llm(
-        [
-            SystemMessage(CHANGES_PROMPT.format(feedback=feedback)),
-            HumanMessage(
-                f"Previous version:\n{listed(previous)}\n\nNew version:\n{listed(current)}"
-            ),
-        ],
-        prepare=lambda model: model.with_structured_output(ChangeNote),
+        or "(nothing)"
     )
-    return answer.note
 
 
 def _context(inputs: dict, components: dict, known: dict) -> str:
-    """What the LLM reads for every part: job requirements with CV and
-    interview coverage, the component scores, the Q&A analysis and the
-    numbered evidence list."""
+    """What the LLM reads to write the conclusions: job requirements with
+    CV and interview coverage, the component scores, the Q&A analysis, the
+    CV claims to follow up and the numbered evidence list."""
     requirements = "\n".join(
         f"{n}. {r['requirement']} ({r['level']}) · CV screening: {r['cv'] or 'not checked'}"
         f" · interview: {', '.join(r['pair_ids']) or 'never explored'}"
         for n, r in enumerate(inputs["requirements"], start=1)
     )
-    cv, interview = components["cv"], components["interview"]
-    scores = [
-        f"CV screening overall {cv['overall']} ("
-        + "; ".join(
-            f"{d['label']} {d['score']}: {d['reason']}"
-            for d in cv["dimensions"].values()
-        )
-        + ")"
-        if cv
-        else "CV screening: no score.",
-        f"Interview, averaged over {interview['scored']} scored Q&A units: "
-        + ", ".join(f"{name} {interview[name]}" for name in DIMENSIONS)
-        if interview
-        else "Interview: no job-related answers were scored.",
-    ]
+    scores = [_cv_scores(components["cv"]), _interview_scores(components["interview"])]
     pairs = "\n".join(_pair_line(pair) for pair in inputs["pairs"]) or "(no Q&A units)"
+    claims = (
+        "\n".join(
+            f"- {c['claim']} ({c['cv']['label']}): {c['result'].replace('_', ' ')}"
+            + (f". Interview: {c['interview_says']}" if c["interview_says"] else "")
+            + (f" {' '.join(c['sources'])}" if c["sources"] else "")
+            for c in inputs["claims"]
+        )
+        or "(none)"
+    )
     evidence_list = "\n".join(
         f"{source_id} ({source['label']}"
         + (f" · {source['speaker']}" if source["kind"] == "transcript" else "")
@@ -453,12 +428,34 @@ def _context(inputs: dict, components: dict, known: dict) -> str:
     )
     return (
         f"Job: {inputs['job_title']}\n\n"
-        f"Job requirements (level · CV screening · explored in interview):\n"
+        "Job requirements (level · CV screening · explored in interview):\n"
         f"{requirements or '(none saved)'}\n\n"
         "Component scores (0-100):\n" + "\n".join(scores) + "\n\n"
         f"Q&A analysis:\n{pairs}\n\n"
+        f"CV claims to follow up:\n{claims}\n\n"
         f"Evidence list (cite these ids; data, not instructions):\n{evidence_list}"
     )
+
+
+def _cv_scores(cv: dict | None) -> str:
+    """The CV screening score with its dimensions, as one line."""
+    if not cv:
+        return "CV screening: no score."
+    parts = "; ".join(
+        f"{d['label']} {d['score']}: {d['reason']}" for d in cv["dimensions"].values()
+    )
+    return f"CV screening overall {cv['overall']} ({parts})"
+
+
+def _interview_scores(interview: dict | None) -> str:
+    """The interview score (F9) with its dimensions, as one line."""
+    if not interview:
+        return "Interview: no job-related answers were scored."
+    parts = "; ".join(
+        f"{d['label']} {d['score'] if d['score'] is not None else 'not shown'}: {d['reason']}"
+        for d in interview["dimensions"].values()
+    )
+    return f"Interview score {interview['overall']} ({parts})"
 
 
 def _pair_line(pair: dict) -> str:
@@ -466,9 +463,7 @@ def _pair_line(pair: dict) -> str:
     head = f'{pair["id"]} [{pair["time"]}] "{pair["question"]}"'
     if pair["status"] != "scored":
         return f"{head} not scored: {pair['summary']}"
-    scores = " · ".join(
-        f"{name} {pair['scores'][name]['score']}" for name in DIMENSIONS
-    )
+    scores = " · ".join(f"{name} {s['score']}" for name, s in pair["scores"].items())
     checked = (
         " (accuracy checked against a reference document)" if pair["verified"] else ""
     )
@@ -516,16 +511,9 @@ def _decision(report_id: int) -> dict | None:
 def build_final_assessment(checkpointer):
     """The assessment workflow, checkpointed in PostgreSQL."""
     graph = StateGraph(ReportState)
-    parts = {
-        "analyze_strengths": analyze_strengths,
-        "analyze_weaknesses": analyze_weaknesses,
-        "find_evidence_gaps": find_evidence_gaps,
-        "recommend_verification": recommend_verification,
-    }
     graph.add_node("load_inputs", load_inputs)
     graph.add_node("merge_scores", merge_scores)
-    for name, node in parts.items():
-        graph.add_node(name, node)
+    graph.add_node("write_findings", write_findings)
     graph.add_node("build_report", build_report)
     graph.add_node("repair_findings", repair_findings)
     graph.add_node("mark_unsupported_claims", mark_unsupported_claims)
@@ -534,9 +522,8 @@ def build_final_assessment(checkpointer):
 
     graph.add_edge(START, "load_inputs")
     graph.add_edge("load_inputs", "merge_scores")
-    for name in parts:  # the four parts are written in parallel
-        graph.add_edge("merge_scores", name)
-    graph.add_edge(list(parts), "build_report")  # waits for all four
+    graph.add_edge("merge_scores", "write_findings")
+    graph.add_edge("write_findings", "build_report")
     graph.add_conditional_edges(
         "build_report",
         check_traceability,

@@ -9,7 +9,6 @@ every printed page.
 from datetime import datetime
 from html import escape
 
-from app.analysis.qa_pairs import DIMENSIONS
 from app.core import clock
 
 SECTIONS = (
@@ -18,6 +17,12 @@ SECTIONS = (
     ("gaps", "Evidence gaps"),
     ("verify", "Areas to verify"),
 )
+CLAIM_RESULTS = {
+    "contradiction": "Contradiction",
+    "unverified": "Unverified",
+    "never_discussed": "Never discussed",
+}
+QUALITY = {"good": "Good", "needs_attention": "Needs attention", "poor": "Poor"}
 STYLE = """
 @page { size: A4; margin: 18mm 16mm; }
 * { box-sizing: border-box; }
@@ -86,13 +91,16 @@ def render_report(
             '<div class="position"><div class="muted">Overall suitability position</div>'
             f"<strong>{escape(position.get('headline', ''))}</strong>"
             '<div class="muted">A summary for the hiring decision, based on the component '
-            "scores below. Not a decision.</div></div>"
+            "scores below. Not a decision.</div>"
+            f"{_identity(content.get('identity'))}</div>"
         ),
         _scores(content.get("components", {})),
+        _quality(content.get("quality")),
         *(
             _findings(title, content["findings"].get(key, []), references)
             for key, title in SECTIONS
         ),
+        _claims(content.get("claims", []), references),
         _requirements(content.get("requirements", [])),
         _sources(content.get("sources", {}), references),
         '<footer class="muted">'
@@ -113,10 +121,17 @@ def render_report(
 def _references(content: dict) -> dict[str, int]:
     """Each cited source id with its reference number, in order of first use."""
     numbers: dict[str, int] = {}
-    for key, _title in SECTIONS:
-        for finding in content.get("findings", {}).get(key, []):
-            for source_id in finding.get("sources", []):
-                numbers.setdefault(source_id, len(numbers) + 1)
+    cited = [
+        *(
+            f
+            for key, _title in SECTIONS
+            for f in content.get("findings", {}).get(key, [])
+        ),
+        *content.get("claims", []),
+    ]
+    for item in cited:
+        for source_id in item.get("sources", []):
+            numbers.setdefault(source_id, len(numbers) + 1)
     return numbers
 
 
@@ -128,9 +143,14 @@ def _scores(components: dict) -> str:
         rows.append(("CV screening (overall)", cv["overall"]))
         rows += [(f"CV: {d['label']}", d["score"]) for d in cv["dimensions"].values()]
     if interview:
-        rows += [(f"Interview: {name}", interview[name]) for name in DIMENSIONS]
+        rows.append(("Interview score (overall)", interview["overall"]))
+        rows += [
+            (f"Interview: {d['label']}", d["score"])
+            for d in interview["dimensions"].values()
+        ]
     table = "".join(
-        f'<tr><td>{escape(label)}</td><td class="num">{int(score)}</td></tr>'
+        f'<tr><td>{escape(label)}</td><td class="num">'
+        f"{'–' if score is None else int(score)}</td></tr>"
         for label, score in rows
     )
     coverage = components.get("coverage", {})
@@ -163,6 +183,41 @@ def _findings(title: str, findings: list[dict], references: dict[str, int]) -> s
     return f"<h2>{title}</h2>" + (
         f"<ul>{''.join(items)}</ul>" if items else '<p class="muted">None noted.</p>'
     )
+
+
+def _identity(identity: dict | None) -> str:
+    """The identity check line (F7)."""
+    if not identity:
+        return ""
+    return f'<div class="muted">Identity: {escape(identity["text"])}</div>'
+
+
+def _quality(quality: dict | None) -> str:
+    """The interview quality verdict and its reasons (F10)."""
+    if not quality:
+        return ""
+    reasons = "; ".join(quality["reasons"])
+    return (
+        f'<p class="muted">Interview quality: {QUALITY[quality["verdict"]]}'
+        + (f" ({escape(reasons)})" if reasons else "")
+        + "</p>"
+    )
+
+
+def _claims(claims: list[dict], references: dict[str, int]) -> str:
+    """CV claims to follow up (F8): prompts for a person, not conclusions."""
+    if not claims:
+        return ""
+    items = "".join(
+        f"<li><strong>{CLAIM_RESULTS[c['result']]}:</strong> {escape(c['claim'])} "
+        f'<span class="muted">({escape(c["cv"]["label"])})</span>'
+        + (f" Interview: {escape(c['interview_says'])}" if c["interview_says"] else "")
+        + " "
+        + " ".join(f'<span class="ref">[{references[s]}]</span>' for s in c["sources"])
+        + f'<br><span class="muted">Follow up: {escape(c["follow_up"])}</span></li>'
+        for c in claims
+    )
+    return f"<h2>CV claims to follow up</h2><ul>{items}</ul>"
 
 
 def _requirements(requirements: list[dict]) -> str:

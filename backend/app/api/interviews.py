@@ -12,7 +12,9 @@ makes a new link; the previous one stops working.
 In the room: the interviewer's page sends a heartbeat (presence) and sees
 whether the candidate waits; "Let in" admits them (the candidate's ticket
 needs it). The chat with the candidate, the candidate's CV panel and the
-live transcript (F4, written by the transcriber service) are here too.
+live transcript (F4, written by the transcriber service) are here too, and
+the identity check (F7): the state and, on a confident match only, a short
+profile; "Check again" starts it afresh.
 """
 
 import logging
@@ -30,6 +32,8 @@ from app.db.database import get_db
 from app.db.models import Candidate, InterviewSession, Job, TranscriptTurn, User
 from app.db.models.interview import InvitationStatus, SessionStatus, Speaker
 from app.graphs import qa_analysis
+from app.identity import references
+from app.identity.matching import identity_view
 from app.interviews import calendar_sync, chat, cv_view, emails, planning, room
 
 logger = logging.getLogger(__name__)
@@ -231,6 +235,31 @@ def transcript(
         status=state,
         problem=problem,
     )
+
+
+@router.get("/{interview_id}/identity")
+def identity(interview_id: int, db: Annotated[Session, Depends(get_db)]) -> dict:
+    """The identity check (F7): who is in the call, as far as the face
+    shows; the profile only on a confident match."""
+    return identity_view(db, _found(db, interview_id), references.is_set_up())
+
+
+@router.post("/{interview_id}/identity/recheck")
+def recheck_identity(
+    interview_id: int, db: Annotated[Session, Depends(get_db)]
+) -> dict:
+    """Check the identity again with fresh pictures (e.g. after a bad
+    light or a camera change)."""
+    session = _active(db, interview_id)
+    session.identity_recheck_at = clock.now()
+    session.identity_result = (session.identity_result or {}) | {
+        "state": "checking",
+        "similarity": None,
+        "other": None,
+        "checked_at": clock.now().isoformat(),
+    }
+    db.commit()
+    return identity_view(db, session, references.is_set_up())
 
 
 @router.get("/{interview_id}/messages")

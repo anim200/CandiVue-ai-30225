@@ -1,18 +1,33 @@
-"""Post-interview analysis (F5) and the consolidated assessment (F6) with the
-real graphs, database and checkpointer; the LLM and the knowledge-base
-search are fakes. Covers: Q&A units and their evaluations, RAG for job and
-company answers, requirement coverage, continuing after a failure without
-sending finished units again, the evidence check with its repair loop, the
-review (request changes → version 2 → approve) and the API rules.
+"""Post-interview analysis (F5, F8-F10) and the consolidated assessment (F6)
+with the real graphs, database and checkpointer; the LLM and the
+knowledge-base search are fakes. Covers: Q&A units and their batched
+evaluations, RAG for job and company answers, requirement coverage, the
+interview review (CV claims, interview score, interview quality), the
+number of AI requests, continuing after a failure without sending finished
+steps again, the evidence check with its repair loop, the review (request
+changes → version 2 → approve) and the API rules.
 """
 
+import re
 import time
 from datetime import timedelta
 
 import pytest
 
 from app.ai.errors import AIServiceError
-from app.analysis.qa_pairs import DimensionScore, Evaluation, QAUnit, Segmentation
+from app.analysis.qa_pairs import (
+    DimensionScore,
+    Evaluation,
+    Evaluations,
+    QAUnit,
+    Segmentation,
+)
+from app.analysis.review import (
+    ClaimCheck,
+    InterviewReview,
+    JudgedDimension,
+    QuestionNote,
+)
 from app.auth.security import Role, create_access_token, hash_password
 from app.core import clock
 from app.db.database import SessionLocal
@@ -31,13 +46,7 @@ from app.db.models.assessment import ReviewStatus
 from app.db.models.interview import InvitationStatus, SessionStatus, Speaker
 from app.db.models.run import RunStatus
 from app.graphs import final_assessment, qa_analysis
-from app.graphs.final_assessment import (
-    ChangeNote,
-    Finding,
-    Findings,
-    Repair,
-    RepairedFinding,
-)
+from app.graphs.final_assessment import Finding, Findings, Repair, RepairedFinding
 from app.interviews import planning
 from app.knowledge.search import Passage
 from app.runs import runner
@@ -94,26 +103,77 @@ def score(value: int) -> DimensionScore:
     return DimensionScore(score=value, reason="Reason.")
 
 
-def asked(messages) -> str:
-    """The question an evaluation request is about (without the follow-up or
-    multi-part note that may follow it in brackets)."""
-    line = messages[1].content.split("Question: ")[1].splitlines()[0]
-    return line.split(" (")[0]
+def units_asked(messages) -> dict[str, str]:
+    """The units of an evaluation request: {unit id: question}."""
+    return dict(
+        re.findall(
+            r"^Unit (\S+) .*\nQuestion: (.*)$", messages[1].content, re.MULTILINE
+        )
+    )
 
 
-def evaluation(messages) -> Evaluation:
-    """An evaluation citing the answer lines; a question naming Laravel
-    explores requirement 2 (Laravel)."""
-    question = asked(messages)
-    return Evaluation(
-        relevance=score(90),
-        accuracy=score(70 if "Hybrid" in question else 80),
-        completeness=score(60),
-        articulation=score(80),
-        summary="Concrete and correct.",
-        evidence_lines=[4, 5, 7, 9],
-        requirements=[2] if "Laravel" in question else [],
-        sources=[1],
+def evaluations(messages) -> Evaluations:
+    """An evaluation of every unit asked, citing the answer lines; a question
+    naming Laravel explores requirement 2 (Laravel)."""
+    return Evaluations(
+        evaluations=[
+            Evaluation(
+                unit=unit,
+                relevance=score(90),
+                accuracy=score(70 if "Hybrid" in question else 80),
+                completeness=score(60),
+                articulation=score(80),
+                summary="Concrete and correct.",
+                evidence_lines=[4, 5, 7, 9],
+                requirements=[2] if "Laravel" in question else [],
+                sources=[1],
+            )
+            for unit, question in units_asked(messages).items()
+        ]
+    )
+
+
+def review(messages) -> InterviewReview:
+    """The interview review: a contradiction on a real CV item, a claim on
+    an invented item (dropped), a "supported" claim citing only the
+    interviewer (shown as never discussed); one judged dimension with
+    evidence, one without; a real and an invented low-signal question."""
+    return InterviewReview(
+        claims=[
+            ClaimCheck(
+                claim="Laravel since 2019",
+                cv_item="CV1",
+                result="contradiction",
+                interview_says="Mentions only the last year.",
+                lines=[7],
+                follow_up="When did you start with Laravel?",
+            ),
+            ClaimCheck(
+                claim="Invented",
+                cv_item="CV99",
+                result="supported",
+                interview_says="",
+                lines=[4],
+                follow_up="?",
+            ),
+            ClaimCheck(
+                claim="PHPUnit",
+                cv_item="CV2",
+                result="supported",
+                interview_says="The interviewer asked.",
+                lines=[3],
+                follow_up="Which test was hardest?",
+            ),
+        ],
+        problem_solving=JudgedDimension(
+            score=70, reason="Profiled the leak.", lines=[7]
+        ),
+        experience_depth=JudgedDimension(score=90, reason="No lines.", lines=[]),
+        low_signal_questions=[
+            QuestionNote(unit="Q3", problem="Too broad."),
+            QuestionNote(unit="Q99", problem="Invented."),
+        ],
+        suggestions=["Ask for one concrete example per skill.", " "],
     )
 
 
@@ -152,27 +212,27 @@ SEGMENTATION = Segmentation(
 )
 
 
-def findings(*items):
-    """A Findings answer from (text, sources) pairs."""
-    return lambda messages: Findings(
-        findings=[Finding(text=text, sources=list(sources)) for text, sources in items]
-    )
+ANALYSIS_ANSWERS = {
+    Segmentation: lambda m: SEGMENTATION,
+    Evaluations: evaluations,
+    InterviewReview: review,
+}
 
 
-def by_part(**parts):
-    """Answer each of the four report parts from its own prompt."""
-    topics = {
-        "strengths": "main strengths",
-        "weaknesses": "main weaknesses",
-        "gaps": "evidence gaps",
-        "verify": "areas a person should verify",
-    }
+def report_answer(changes="", **lists):
+    """A Findings answer: each list from (text, sources) pairs."""
 
     def answer(messages):
-        """The answer for whichever part is asked."""
-        prompt = messages[0].content
-        part = next(name for name, topic in topics.items() if topic in prompt)
-        return parts[part](messages)
+        """The four lists (and what changed, on a revision)."""
+        return Findings(
+            **{
+                name: [
+                    Finding(text=t, sources=list(src)) for t, src in lists.get(name, ())
+                ]
+                for name in ("strengths", "weaknesses", "gaps", "verify")
+            },
+            changes=changes,
+        )
 
     return answer
 
@@ -330,22 +390,23 @@ def report_of(session_id: int) -> AssessmentReport:
 
 
 def good_findings():
-    """Report parts that all cite valid evidence."""
-    return by_part(
-        strengths=findings(("Builds Laravel APIs", ["T4", "CV1"])),
-        weaknesses=findings(("Little testing depth", ["T5"])),
-        gaps=findings(("AWS certification never discussed", ["R3"])),
-        verify=findings(("Ask for a queue debugging example", ["T7"])),
+    """Report lists that all cite valid evidence."""
+    return report_answer(
+        changes="The testing point now cites the answer.",
+        strengths=[("Builds Laravel APIs", ["T4", "CV1"])],
+        weaknesses=[("Little testing depth", ["T5"])],
+        gaps=[("AWS certification never discussed", ["R3"])],
+        verify=[("Ask for a queue debugging example", ["T7"])],
     )
 
 
-# ---------- Q&A analysis (F5) ----------
+# ---------- Q&A analysis (F5, F8-F10) ----------
 
 
 def test_the_analysis_scores_job_and_company_answers_and_maps_requirements(
     ended, monkeypatch, background_runs
 ):
-    llm = FakeLLM({Segmentation: lambda m: SEGMENTATION, Evaluation: evaluation})
+    llm = FakeLLM(ANALYSIS_ANSWERS)
     monkeypatch.setattr(qa_analysis, "invoke_llm", llm)
 
     analysis = analyse(ended["session"])
@@ -366,30 +427,97 @@ def test_the_analysis_scores_job_and_company_answers_and_maps_requirements(
     assert set(ended["searches"]) == {"reference_library", "company_policies"}
     assert results["scored"] == 4 and (analysis.processed, analysis.total) == (4, 4)
     coverage = {c["requirement"]: c["pair_ids"] for c in results["coverage"]}
-    assert coverage["Laravel"] == ["Q2a"]  # only that prompt names Laravel
+    assert coverage["Laravel"] == ["Q2a"]  # only that question names Laravel
     assert results["unexplored"] == ["PHP", "AWS Certification"]
     # Names are removed from what the LLM reads (N18).
     transcript_sent = llm.calls[0][1][1].content
     assert "Alex" not in transcript_sent and "[name]" in transcript_sent
-    assert llm.count("Segmentation") == 1 and llm.count("Evaluation") == 4
+    # Three AI requests for the whole interview: split, evaluate, review.
+    assert [name for name, _messages in llm.calls] == [
+        "Segmentation",
+        "Evaluations",
+        "InterviewReview",
+    ]
     # The report starts as soon as the analysis is done (B5).
     assert background_runs[-1][0] == final_assessment.RUN_KIND
 
 
-def test_a_failed_analysis_continues_without_evaluating_finished_units_again(
+def test_the_review_checks_cv_claims_and_scores_the_interview(ended, monkeypatch):
+    monkeypatch.setattr(qa_analysis, "invoke_llm", FakeLLM(ANALYSIS_ANSWERS))
+
+    results = analyse(ended["session"]).results
+
+    # F8: only claims on real CV items; "supported" without the candidate's
+    # own words is shown as never discussed; follow-ups first.
+    claims = results["claims"]
+    assert [(c["claim"], c["result"]) for c in claims] == [
+        ("Laravel since 2019", "contradiction"),
+        ("PHPUnit", "never_discussed"),
+    ]
+    assert (
+        claims[0]["cv"]["label"] == "CV · Work history"
+        and len(claims[0]["turn_ids"]) == 1
+    )
+    assert claims[1]["turn_ids"] == [] and claims[1]["interview_says"] == ""
+    # F9: four dimensions from the evaluations, two from the review; one
+    # without evidence is shown as such and left out of the average.
+    score = results["interview_score"]
+    dimensions = {key: d["score"] for key, d in score["dimensions"].items()}
+    assert dimensions == {
+        "technical": 80,  # accuracy of the three job answers
+        "communication": 80,
+        "relevance": 90,
+        "problem_solving": 70,
+        "experience_depth": None,
+        "job_alignment": 70,  # Laravel: (accuracy 80 + completeness 60) / 2
+    }
+    assert score["overall"] == 78  # (80 + 80 + 90 + 70 + 70) / 5
+    # F10: a mandatory requirement never explored → needs attention.
+    quality = results["quality"]
+    assert quality["verdict"] == "needs_attention"
+    assert quality["reasons"] == ["Not explored: PHP."]
+    assert quality["talk"] == {"interviewer": 44, "candidate": 56}
+    assert [n["pair_id"] for n in quality["low_signal"]] == ["Q3"]
+    assert quality["suggestions"] == [
+        "Ask about PHP next time.",
+        "Ask for one concrete example per skill.",
+    ]
+
+
+def test_answers_are_evaluated_in_batches(ended, monkeypatch):
+    monkeypatch.setattr(qa_analysis, "EVALUATE_BATCH", 3)
+
+    def skip_company(messages):
+        """Evaluates every unit except the company question."""
+        answer = evaluations(messages)
+        answer.evaluations = [e for e in answer.evaluations if e.unit != "Q4"]
+        return answer
+
+    llm = FakeLLM(ANALYSIS_ANSWERS | {Evaluations: skip_company})
+    monkeypatch.setattr(qa_analysis, "invoke_llm", llm)
+
+    results = analyse(ended["session"]).results
+
+    assert llm.count("Evaluations") == 2  # 4 answers in batches of 3
+    q4 = next(p for p in results["pairs"] if p["id"] == "Q4")
+    assert q4["status"] == "not_scored" and "Analyse again" in q4["reason"]
+    assert results["scored"] == 3
+
+
+def test_a_failed_analysis_continues_without_repeating_finished_steps(
     ended, monkeypatch
 ):
     failing = {"left": 1}
 
     def flaky(messages):
-        """The company answer fails once (after the others are done)."""
-        if "Hybrid" in asked(messages) and failing["left"]:
+        """The review fails once (after the answers were evaluated)."""
+        if failing["left"]:
             failing["left"] -= 1
             time.sleep(0.3)
             raise AIServiceError("The AI model test-model has reached its usage limit.")
-        return evaluation(messages)
+        return review(messages)
 
-    llm = FakeLLM({Segmentation: lambda m: SEGMENTATION, Evaluation: flaky})
+    llm = FakeLLM(ANALYSIS_ANSWERS | {InterviewReview: flaky})
     monkeypatch.setattr(qa_analysis, "invoke_llm", llm)
 
     failed = analyse(ended["session"])
@@ -403,8 +531,8 @@ def test_a_failed_analysis_continues_without_evaluating_finished_units_again(
     with SessionLocal() as db:
         done = db.get(QAAnalysis, failed.id)
     assert done.status == RunStatus.COMPLETED and done.results["scored"] == 4
-    assert llm.count("Segmentation") == 1  # not split again
-    assert llm.count("Evaluation") == 5  # 4 units + the one that failed, once more
+    assert llm.count("Segmentation") == 1 and llm.count("Evaluations") == 1
+    assert llm.count("InterviewReview") == 2  # only the failed step again
 
 
 def test_an_interview_without_a_transcript_is_analysed_as_empty(ended, monkeypatch):
@@ -418,31 +546,23 @@ def test_an_interview_without_a_transcript_is_analysed_as_empty(ended, monkeypat
     analysis = analyse(ended["session"])
 
     assert analysis.status == RunStatus.COMPLETED
-    assert analysis.results["pairs"] == [] and analysis.results["scored"] == 0
-    assert len(analysis.results["unexplored"]) == 3
+    results = analysis.results
+    assert results["pairs"] == [] and results["scored"] == 0
+    assert len(results["unexplored"]) == 3
+    assert results["interview_score"] is None and results["claims"] == []
+    assert results["quality"]["verdict"] == "poor"
+    assert "There is no transcript of this interview." in results["quality"]["reasons"]
     assert llm.calls == []  # nothing to send
 
 
 # ---------- assessment report (F6) ----------
 
 
-def prepare_report(ended, monkeypatch, parts, repair=None) -> FakeLLM:
+def prepare_report(ended, monkeypatch, answer, repair=None) -> FakeLLM:
     """Analyse the interview, then write its report up to the review."""
-    monkeypatch.setattr(
-        qa_analysis,
-        "invoke_llm",
-        FakeLLM({Segmentation: lambda m: SEGMENTATION, Evaluation: evaluation}),
-    )
+    monkeypatch.setattr(qa_analysis, "invoke_llm", FakeLLM(ANALYSIS_ANSWERS))
     analyse(ended["session"])
-    llm = FakeLLM(
-        {
-            Findings: parts,
-            Repair: repair or (lambda m: Repair(findings=[])),
-            ChangeNote: lambda m: ChangeNote(
-                note="The testing point now cites the answer."
-            ),
-        }
-    )
+    llm = FakeLLM({Findings: answer, Repair: repair or (lambda m: Repair(findings=[]))})
     monkeypatch.setattr(final_assessment, "invoke_llm", llm)
     with SessionLocal() as db:
         report_id = final_assessment.start_report(db, ended["session"]).id
@@ -451,31 +571,27 @@ def prepare_report(ended, monkeypatch, parts, repair=None) -> FakeLLM:
 
 
 def test_the_report_merges_scores_and_waits_for_review(ended, monkeypatch):
-    prepare_report(ended, monkeypatch, good_findings())
+    llm = prepare_report(ended, monkeypatch, good_findings())
 
     report = report_of(ended["session"])
     assert report.status == RunStatus.WAITING_FOR_REVIEW
     assert report.review_status == ReviewStatus.PENDING_REVIEW
+    assert llm.count("Findings") == 1  # one AI request for the report
     content = report.content
     assert content["version"] == 1
     components = content["components"]
     assert components["cv"]["overall"] == 84
-    assert (
-        components["interview"]["scored"] == 4
-        and components["interview"]["relevance"] == 90
-    )
+    assert components["interview"]["overall"] == 78  # the interview score (F9)
     assert components["coverage"] == {
         "explored": 1,
         "total": 3,
         "unexplored": ["PHP", "AWS Certification"],
     }
-    # Interview: relevance 90, accuracy 78, completeness 60, articulation 80
-    # → 77; with the CV's 84 → 80.5, rounded to 80: the "Strong fit" step.
-    assert components["interview"]["overall"] == 77
+    # CV 84 and interview 78 → 81: the "Strong fit" step.
     assert content["position"] | {"headline": None} == {
         "key": "strong_fit",
         "label": "Strong fit",
-        "score": 80,
+        "score": 81,
         "headline": None,
     }
     assert content["position"]["headline"] == "Strong fit, with gaps to verify"
@@ -493,6 +609,17 @@ def test_the_report_merges_scores_and_waits_for_review(ended, monkeypatch):
     assert requirements["PHP"]["cv"] == "met" and requirements["Laravel"][
         "pair_ids"
     ] == ["Q2a"]
+    # CV claims to follow up (F8) cite the transcript; supported ones are left out.
+    assert [(c["claim"], c["sources"]) for c in content["claims"]] == [
+        ("Laravel since 2019", ["T7"]),
+        ("PHPUnit", []),
+    ]
+    assert "T7" in content["sources"]
+    assert content["quality"] == {
+        "verdict": "needs_attention",
+        "reasons": ["Not explored: PHP."],
+    }
+    assert content["identity"]["state"] == "not_checked"
 
 
 def test_without_scored_answers_the_report_says_it_rests_on_the_cv(ended, monkeypatch):
@@ -500,13 +627,10 @@ def test_without_scored_answers_the_report_says_it_rests_on_the_cv(ended, monkey
         for turn in db.query(TranscriptTurn).filter_by(session_id=ended["session"]):
             db.delete(turn)
         db.commit()
-    gaps = findings(("The interview was not transcribed", ["R1", "R2", "R3"]))
     prepare_report(
         ended,
         monkeypatch,
-        by_part(
-            strengths=findings(), weaknesses=findings(), gaps=gaps, verify=findings()
-        ),
+        report_answer(gaps=[("The interview was not transcribed", ["R1", "R2", "R3"])]),
     )
 
     content = report_of(ended["session"]).content
@@ -529,13 +653,12 @@ def test_unsupported_conclusions_are_repaired_then_marked(ended, monkeypatch):
             )
         return Repair(findings=fixes)
 
-    parts = by_part(
-        strengths=findings(("Builds Laravel APIs", ["T4"])),
-        weaknesses=findings(("Little testing depth", ["T99"])),  # no such line
-        gaps=findings(),
-        verify=findings(("Invented claim", ["made-up"])),
+    answer = report_answer(
+        strengths=[("Builds Laravel APIs", ["T4"])],
+        weaknesses=[("Little testing depth", ["T99"])],  # no such line
+        verify=[("Invented claim", ["made-up"])],
     )
-    prepare_report(ended, monkeypatch, parts, repair)
+    prepare_report(ended, monkeypatch, answer, repair)
 
     content = report_of(ended["session"]).content
     assert len(attempts) == final_assessment.MAX_REPAIRS  # then it stops trying
@@ -575,12 +698,11 @@ def test_changes_requested_then_approved(ended, monkeypatch, interviewer, client
     assert content["version"] == 2
     assert content["feedback"] == "The testing point ignores 00:20."
     assert content["changes"] == "The testing point now cites the answer."
-    # Each part was written again with the comment and the reviewed version.
-    revisions = [m[0].content for name, m in llm.calls if name == "Findings"][-4:]
-    assert all(
-        "ignores 00:20" in prompt and "Previous version" in prompt
-        for prompt in revisions
-    )
+    # Written again in one request with the comment and the reviewed version,
+    # which also said what changed.
+    revisions = [m[0].content for name, m in llm.calls if name == "Findings"]
+    assert len(revisions) == 2
+    assert "ignores 00:20" in revisions[1] and "Previous version" in revisions[1]
 
     approved = client.post(
         f"{url}/review", json={"action": "approve"}, headers=interviewer
@@ -622,6 +744,9 @@ def test_the_export_is_a_printable_html_file(ended, monkeypatch, interviewer, cl
     assert "attachment" in answer.headers["content-disposition"]
     assert "Alex Strong" in answer.text and "Not yet approved" in answer.text
     assert "Transcript 00:15" in answer.text
+    assert (
+        "CV claims to follow up" in answer.text and "Interview quality" in answer.text
+    )
 
 
 def test_the_reports_of_a_job_list_every_ended_interview(

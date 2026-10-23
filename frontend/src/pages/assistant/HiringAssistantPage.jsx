@@ -11,7 +11,7 @@ import { Button } from '@mantine/core';
 import { useDocumentTitle } from '@mantine/hooks';
 import { IconPlus, IconSparkles } from '@tabler/icons-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useLocation, useNavigate, useParams } from 'react-router';
 
 import { apiGet, apiPost, apiPostAi, apiPut } from '../../api/client';
 import { EmptyState, ErrorBanner } from '../../components/Feedback';
@@ -170,7 +170,15 @@ export default function HiringAssistantPage() {
   const [models, setModels] = useState(null); // { models, usage_url } for the picker
   const [modelBusy, setModelBusy] = useState(false);
   const endRef = useRef(null);
+  const location = useLocation();
   const job = jobs?.find((j) => j.id === id);
+
+  // A request prepared by another page (e.g. "Reschedule with Hiring
+  // Assistant" after a poor interview): put it in the message box to check
+  // and send; nothing is sent by itself.
+  useEffect(() => {
+    if (location.state?.draft) setDraft(location.state.draft);
+  }, [location.state]);
   useDocumentTitle(`${job?.title ?? 'Hiring Assistant'} · CandiVue AI`);
 
   // Load all jobs for the thread list (also refreshes their stage lines).

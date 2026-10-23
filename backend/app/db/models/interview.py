@@ -1,10 +1,10 @@
-"""Interview sessions and transcripts (F3, F4)."""
+"""Interview sessions, transcripts and face references (F3, F4, F7)."""
 
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, LargeBinary, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -26,6 +26,13 @@ class InvitationStatus(StrEnum):
     PENDING = "pending"  # waiting for the interviewer to confirm
     SENT = "sent"
     FAILED = "failed"
+
+
+class IdentityConsent(StrEnum):
+    """The candidate's choice about face identification (F7)."""
+
+    GIVEN = "given"
+    DECLINED = "declined"  # declined, or withdrawn later
 
 
 class InterviewSession(TimestampMixin, Base):
@@ -77,6 +84,29 @@ class InterviewSession(TimestampMixin, Base):
         DateTime(timezone=True)
     )
     transcript_problem: Mapped[str | None] = mapped_column(String(200))
+    # Email access code: opening the link sends a one-time code to the
+    # candidate's email; only its keyed hash is stored.
+    access_code_hash: Mapped[str | None] = mapped_column(String(64))
+    access_code_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    access_code_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    access_code_tries: Mapped[int] = mapped_column(default=0, server_default="0")
+    # Identity check (F7): the candidate's consent, the latest live result
+    # ({"state", "similarity", "other", "checked_at", "confirmed_at_ms"})
+    # and when the interviewer last asked to check again.
+    identity_consent: Mapped[IdentityConsent | None] = mapped_column(
+        status_column(IdentityConsent)
+    )
+    identity_consent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    identity_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    identity_recheck_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
 
 
 class Speaker(StrEnum):
@@ -115,3 +145,22 @@ class InterviewMessage(TimestampMixin, Base):
     )
     sender: Mapped[Speaker] = mapped_column(status_column(Speaker))
     text: Mapped[str] = mapped_column(Text)
+
+
+class FaceReference(TimestampMixin, Base):
+    """The face reference a candidate gave with consent before the interview
+    (F7): only the encrypted face embedding (128 numbers), never a photo.
+    Deleted when the candidate withdraws, RETENTION days after the
+    interview, when it is cancelled, and with the interview or candidate
+    (N17, N19)."""
+
+    __tablename__ = "face_references"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("interview_sessions.id", ondelete="CASCADE"), unique=True
+    )
+    candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("candidates.id", ondelete="CASCADE"), index=True
+    )
+    embedding: Mapped[bytes] = mapped_column(LargeBinary)  # Fernet-encrypted

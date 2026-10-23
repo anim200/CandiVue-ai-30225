@@ -203,10 +203,13 @@ width.
     certificates and how each requirement was met in screening. No name,
     email, phone number, address or links (they are removed first).
   - CV screening: nothing (it runs locally, see "CV screening").
-  - Interview analysis (F5): the job title and requirements, the interview
-    transcript with **names, email addresses, phone numbers and links
-    removed**, and the knowledge-base passages found for each answer
-    (Reference library, Company policies).
+  - Interview analysis (F5, F8-F10): the job title and requirements, the
+    interview transcript with **names, email addresses, phone numbers and
+    links removed**, the knowledge-base passages found for each answer
+    (Reference library, Company policies) and, for the CV claims check,
+    the reduced CV facts (as above).
+  - Identity check (F7): **nothing**. Faces are compared locally (see
+    "Identity check").
   - Assessment report (F6): the same transcript lines, the reduced CV facts
     (as above), the CV screening scores and reasons, the Q&A evaluations,
     and the interviewer's comment when they request changes.
@@ -217,7 +220,7 @@ Other external services (N18):
 |---|---|
 | Deepgram, through the `transcriber` | The interview audio of both people while the interview is live (streamed, not stored by CandiVue; `mip_opt_out=true` asks Deepgram not to use it for training). It returns the text. |
 | Blogger (Google), through `jobboard-mcp` | The approved job description (title, text, requirements) and the Google Form link. No candidate data. |
-| Gmail (Google), through `email-mcp` | Interview invitations and cancellations: the candidate's name and email address, the job title, the interview date and time, and the private interview link (also in the attached calendar invite). While `EMAIL_TEST_RECIPIENT` is set, every email goes to that test address instead. |
+| Gmail (Google), through `email-mcp` | The candidate's one-time access code (their email address, the job title and the code). Interview invitations and cancellations: the candidate's name and email address, the job title, the interview date and time, and the private interview link (also in the attached calendar invite). While `EMAIL_TEST_RECIPIENT` is set, every email goes to that test address instead. |
 | Google Calendar, through `calendar-mcp` | The interviewer's own calendar: one event per interview with the candidate's name, the job title, the time and the interviewer's room link (no email address, no scores). To find busy times only the start and end of events are read, never their titles. |
 | Google Forms, Google Drive and Google Sheets | Applicants send their name, email address, the job they apply for and their CV file through the form; Google stores the file in Drive and the answers in the response Sheet. The `cv-collector` only **reads** them. |
 
@@ -232,7 +235,7 @@ chat box the interviewer can switch the AI model (only models in
 `LLM_MODELS`). The choice is saved (table `llm_models`) and used for every
 AI call. Gemini's free tier has a daily request limit **per model** (for
 example 20 a day for `gemini-3.5-flash`), and one job needs about 5-8
-requests.
+requests; an interview's analysis and report need about 4 (see "AI usage").
 
 - Google has no API that tells how much quota is left, so CandiVue counts
   its own requests per model and day (the count restarts at midnight
@@ -498,55 +501,92 @@ background, one after the other; the report is usually ready to review
 within a minute. Nothing is shown to the candidate (N9: interviewer-only
 routes, candidates get 403).
 
-**Q&A analysis (F5, LangGraph 3, `backend/app/graphs/qa_analysis.py`).**
+**Q&A analysis (F5, F8-F10, LangGraph 3, `backend/app/graphs/qa_analysis.py`).**
 
-- Waits a few seconds for the transcriber's last words, then the LLM splits
-  the transcript into question–answer units. Multi-part questions become
-  `Q6a` / `Q6b`, follow-ups are linked to the question they follow. The LLM
-  only points at numbered transcript lines; the code checks every number
-  (it must exist and come from the right person).
+- Waits a few seconds for the transcriber's last words, then **one AI
+  request** splits the transcript into question–answer units. Multi-part
+  questions become `Q6a` / `Q6b`, follow-ups are linked to the question they
+  follow. The LLM only points at numbered transcript lines; the code checks
+  every number (it must exist and come from the right person).
 - Greetings, small talk and unanswered questions are kept but not scored.
-  Each job- or company-related answer is scored 0-100 on relevance,
-  accuracy, completeness and articulation, with a reason per dimension and
-  the transcript lines it rests on.
-- **Accuracy is checked against documents (RAG):** job answers against the
-  knowledge base's *Reference library*, company answers against *Company
-  policies* (user decision 17-10-2026; see `docs/requirement.md` §4B-5).
-  Passages scoring below 0.5 are ignored (measured: on-topic 0.6-0.7,
-  off-topic under 0.25). Without a matching passage the answer is marked
-  "not checked against a reference document".
+- **Accuracy is checked against documents (RAG, local, no AI request):** job
+  answers against the knowledge base's *Reference library*, company answers
+  against *Company policies* (user decision 17-10-2026, `docs/requirement.md`
+  §4B-5). Passages scoring below 0.5 are ignored (measured: on-topic
+  0.6-0.7, off-topic under 0.25). Without a matching passage the answer is
+  marked "not checked against a reference document".
+- **One AI request scores a batch of up to 20 answers** (a typical interview
+  is one batch): relevance, accuracy, completeness and articulation, 0-100
+  with a reason each and the transcript lines it rests on. An answer the AI
+  skips is shown as not scored ("use Analyse again"), never invented.
 - Requirement coverage (which units explored each job requirement) and the
   requirements never explored are computed in code.
-- Units are evaluated four at a time, which stays under Gemini's
-  per-minute limit. One analysis costs one request plus one per scored unit.
+- **One more AI request reviews the whole interview** (`app/analysis/review.py`):
+  - **CV claims check (F8):** important CV claims, each *supported*,
+    *contradiction*, *unverified* (came up, no concrete detail) or *never
+    discussed*, with what the interview showed and a neutral follow-up
+    question. A claim must point to a real CV item; every result except
+    "never discussed" must cite the candidate's own lines, otherwise it is
+    shown as never discussed. Flags are prompts for a person, never
+    accusations, and change no score.
+  - **Two judgement dimensions for F9:** problem-solving approach and
+    experience depth, each with the candidate's lines as evidence (without
+    evidence: "not enough evidence", left out of the average).
+  - **For F10:** questions that gave little evidence (yes/no, leading, too
+    broad, off-topic) and up to three suggestions for the interviewer.
+- **Interview score (F9, `app/analysis/interview_score.py`, plain code):**
+  six dimensions with evidence, separate from the CV score. Technical
+  competency (accuracy of the job answers), communication (articulation),
+  response relevance, job alignment (best answer per explored
+  requirement), plus the two judged ones. The overall interview score is
+  their average.
+- **Interview quality (F10, `app/analysis/interview_quality.py`, plain code):**
+  the interview as evidence, not the candidate. *Poor* when fewer than 3 job
+  questions were answered, less than half of the mandatory requirements
+  were explored, or the interviewer did more than 75% of the talking;
+  *needs attention* when a mandatory requirement was not explored, the
+  interviewer talked more than 60%, or two questions gave little evidence;
+  otherwise *good*. The page also compares the interview with the job's
+  other analysed interviews (answered questions, requirements explored,
+  requirements usually explored but not here). A poor interview offers
+  **Reschedule with Hiring Assistant**: the job's chat opens with the
+  request filled in; the interviewer checks and sends it, and the
+  assistant invites the candidate again (`invite_again`) after the usual
+  confirmation (trainer clarification: a poor interview is not enough
+  evidence).
 
 **Assessment report (F6, LangGraph 4, `backend/app/graphs/final_assessment.py`).**
 
 - Component scores are computed in code: the CV screening score and its
-  four dimensions (F2), the interview's four dimensions averaged over the
-  scored units (F5), and the requirement coverage. The overall position is
-  the average of the CV and interview scores on a 4-step scale (Not yet
-  suitable < 50 ≤ Partial fit < 65 ≤ Good fit < 80 ≤ Strong fit). Without
-  scored answers the headline says it rests on the CV alone. It is a
-  summary for a person, never a decision.
-- Four LLM requests run in parallel: strengths, weaknesses, evidence gaps
-  and areas to verify. Every conclusion must cite evidence ids: CV items
-  (`CV3`), transcript lines (`T12`) or a requirement's coverage record
+  dimensions (F2), the interview score with its six dimensions (F9), and
+  the requirement coverage. The overall position is the average of the CV
+  and interview scores on a 4-step scale (Not yet suitable < 50 ≤ Partial
+  fit < 65 ≤ Good fit < 80 ≤ Strong fit). Without scored answers the
+  headline says it rests on the CV alone. It is a summary for a person,
+  never a decision.
+- **One AI request** writes the four lists: strengths, weaknesses, evidence
+  gaps and areas to verify. Every conclusion must cite evidence ids: CV
+  items (`CV3`), transcript lines (`T12`) or a requirement's coverage record
   (`R2`, for what was never discussed). Ids are checked; a conclusion
-  without valid evidence is sent back for repair (at most twice) and then
-  shown as unsupported.
+  without valid evidence is sent back for repair (at most twice, rarely
+  needed) and then shown as unsupported.
+- The report also shows the CV claims to follow up (F8, with their
+  transcript sources), the interview quality (F10) and the identity check
+  (F7), copied from the analysis and the interview: no extra AI request.
 - **Review (HITL):** the report waits for the interviewer. *Approve* makes
   it final; *Request changes* with a comment writes the next version with
-  that comment, says what changed, and waits again.
+  that comment in one request, which also says what changed, and waits
+  again.
 - **Export:** "Export / print" downloads one self-contained HTML file or
   prints it (the print dialog also saves it as PDF). Drafts are marked "Not
   yet approved" on every page; sources become numbered references.
 - **Compare candidates:** up to three assessed candidates of the same job
-  side by side.
+  side by side (CV and interview scores, claims to follow up, interview
+  quality, identity).
 
 | Page | Address |
 |---|---|
-| Interview analysis (Q&A analysis, transcript, session details) | `/interviews/<id>/analysis` |
+| Interview analysis (Q&A analysis, transcript, CV claims check, interview score, interview quality, session details) | `/interviews/<id>/analysis` |
 | Assessment report (report, compare candidates) | `/interviews/<id>/report` |
 | Reports of a job | `/reports` |
 
@@ -554,7 +594,89 @@ API (interviewers only): `GET/POST /api/interviews/{id}/analysis`,
 `GET/POST /api/interviews/{id}/report`, `POST /api/interviews/{id}/report/review`,
 `GET /api/interviews/{id}/report/export`, `GET /api/jobs/{id}/reports`.
 `POST` starts a run, continues a failed one, or with `{"again": true}`
-replaces it (analysing again also replaces the report).
+replaces it (analysing again also replaces the report). Analyses made
+before F8-F10 show "Analyse again" on those tabs.
+
+## AI usage (Gemini free tier)
+
+Every Gemini request counts against a small free daily quota, so the AI
+work is batched and everything that can be worked out in code is (counts
+come from the request log in the tests, `tests/test_post_interview.py`,
+and a live run on 17-10-2026).
+
+| Step | Before | Now | How |
+|---|---|---|---|
+| Split the transcript into Q&A units | 1 | 1 | unchanged |
+| Score the answers (F5) | 1 per answer | 1 per 20 answers | all answers in one structured request |
+| CV claims (F8), 2 judged dimensions (F9), interview advice (F10) | (+3 if built separately) | 1 | one review request for the whole interview |
+| Interview score (F9), interview quality (F10), coverage | – | 0 | plain code from the evaluations and the transcript |
+| Report: strengths, weaknesses, gaps, verify (F6) | 4 | 1 | one request returns the four lists |
+| "What changed" on a revision | 1 | 0 | returned by the revision request itself |
+| Hiring Assistant after "Post" / "Don't post" / confirming invitations | 1 each | 0 | the chat card already shows the result |
+
+**Per interview** (a 45-minute interview has about 12 answers):
+before `1 + 12 + 4 = 17` requests (`20` with F8-F10 as separate requests),
+now `1 + 1 + 1 + 1 = 4` (a repair adds 1, rarely). Each report revision:
+before `4 + 1 = 5`, now `1`. Measured live: interview 102 (5 answers) took
+exactly 4 requests for analysis and report (35 s).
+
+**What fits in a day:** with a daily quota of `Q` requests, interviews per
+day = `Q / 4` instead of `Q / 17`, about 4× as many. On the 20-request quota
+measured for `gemini-3.5-flash`: 5 interviews instead of 1. Per-minute
+limits are no longer a problem either: one analysis sends its requests one
+after another instead of 4 at a time.
+
+## Identity check (F7) and the candidate access code
+
+**Access code.** Opening the interview link emails a one-time 6-digit code
+to the address the candidate applied with; the link and the code together
+open the interview (a forwarded link alone is not enough). The code works
+once, for 10 minutes, with at most 5 wrong tries; a new one can be sent
+after 60 seconds. Only an HMAC of it (keyed with `JWT_SECRET`) is stored. A
+reload in the same tab keeps the candidate signed in. API:
+`POST /api/auth/candidate` (sends the code), `POST /api/auth/candidate/verify`.
+
+**Identity check (face only).** Before the interview the candidate decides
+(design: Enrolment). With consent, three camera pictures are turned into a
+face embedding (128 numbers) and stored **encrypted** (Fernet,
+`FACE_REFERENCE_KEY`); the pictures themselves are not kept. "Continue
+without identification" has no effect on the interview. During the call
+the transcriber service (hidden, listen-only) takes one picture from the
+candidate's camera every 5 seconds, in memory only, and compares it with
+the references of the job's candidates who consented
+(`app/identity/`):
+
+- **Models:** OpenCV Model Zoo, run locally on the CPU (nothing leaves the
+  machine): YuNet finds faces (MIT), SFace makes the embedding (Apache 2.0).
+  Pinned by commit and SHA-256 in the backend Dockerfile.
+- **Decision (never assumed):** the last 3 pictures together. *Confident
+  match* when at least two clearly match (cosine similarity ≥ 0.40; SFace's
+  own threshold is 0.363) and none clearly does not; *no match* below 0.28
+  or when another applicant of the job clearly matches better; otherwise
+  *low confidence*. Also *no face*, *several faces*, *camera off*, *no
+  reference* (no consent: the face is never checked).
+- **Interviewer only:** the identity panel at the top of the CV column
+  shows the state and the face similarity; the profile (name, headline
+  experience, key skills, CV score and rank, areas to probe) only on a
+  confident match. "Check again" starts with fresh pictures. The report
+  says whether and when the identity was confirmed.
+- **Retention and deletion (N17, N19):** deleted 30 days after the interview
+  (`FACE_RETENTION_DAYS`; checked every hour), at once when the candidate
+  withdraws, when the interview is cancelled (within the hour), and with
+  the interview or candidate.
+- **Setup:** put a key in `.env` (see `.env.example`), then
+  `docker compose up -d --build backend transcriber`. Without the key the
+  check is off and candidates are not asked.
+- **Limit:** the reference is given through the private link and the
+  emailed code, so the check shows that the person in the call is the
+  person who enrolled; it is not an ID-document check. Tested with
+  public-domain paintings as fake cameras (Mona Lisa vs Mona Lisa: match,
+  similarity 0.96; Rembrandt on the same link: no match, 0.17); never with
+  real candidates' faces (N13).
+
+API: candidates `POST/DELETE /api/candidate/identity` (give / decline or
+withdraw; they never see results); interviewers
+`GET /api/interviews/{id}/identity`, `POST /api/interviews/{id}/identity/recheck`.
 
 ## Email (interview invitations)
 

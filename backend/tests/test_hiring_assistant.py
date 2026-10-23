@@ -111,7 +111,6 @@ def test_profile_then_jd_pauses_for_review_then_approve(
     scripted += [
         call("save_job_profile", {"profile": PROFILE}),
         call("write_job_description", {}),
-        AIMessage(content="Thanks, the job description is approved."),
     ]
 
     thread = say(client, headers, job_id).json()
@@ -139,10 +138,12 @@ def test_profile_then_jd_pauses_for_review_then_approve(
 
     thread = decide(client, headers, job_id, "skip").json()
 
-    # "Don't post": nothing is posted; the assistant answers.
+    # "Don't post": nothing is posted, and the turn ends without another AI
+    # request (the review note says it all).
     assert thread["pending_review"] is None
-    assert [i["kind"] for i in thread["items"][-2:]] == ["review", "assistant"]
-    assert thread["items"][-2]["action"] == "skip"
+    assert thread["items"][-1]["kind"] == "review"
+    assert thread["items"][-1]["action"] == "skip"
+    assert scripted == []  # every scripted answer was used, none more
     assert not [i for i in thread["items"] if i["kind"] == "posting"]
     job = client.get(f"/api/jobs/{job_id}", headers=headers).json()
     assert job["stage"] == "jd_approved"
@@ -474,7 +475,6 @@ def test_dont_post_then_ask_in_the_chat_to_post(
     client, headers, scripted, drafts, job_board
 ):
     job_id = approved_flow(client, headers, scripted)
-    scripted += [AIMessage(content="Fine, I will not post it.")]
     review(client, headers, job_id, action="approve")
     decide(client, headers, job_id, "skip")
     scripted += [call("request_job_posting", {}, "cp")]
@@ -484,7 +484,6 @@ def test_dont_post_then_ask_in_the_chat_to_post(
     # The assistant cannot post by itself: it asks again.
     assert thread["pending_review"]["kind"] == "post_confirmation"
     assert job_board.posts == []
-    scripted += [AIMessage(content="It is posted.")]
 
     thread = decide(client, headers, job_id, "post").json()
 
@@ -594,7 +593,6 @@ def test_a_new_deadline_updates_the_posted_job(
     client, headers, scripted, drafts, job_board
 ):
     job_id = approved_flow(client, headers, scripted)
-    scripted += [AIMessage(content="Posted.")]
     review(client, headers, job_id, action="approve")
     decide(client, headers, job_id, "post")
     scripted += [

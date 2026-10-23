@@ -1,4 +1,6 @@
-"""Post-interview API (F5, F6): the Q&A analysis of an ended interview, its
+"""Post-interview API (F5, F6, F8-F10): the Q&A analysis of an ended
+interview (with the CV claims check, interview score and interview quality),
+its
 assessment report with the interviewer's review (HITL), the report as a
 printable HTML file, and the reports of a job for the Reports page and the
 side-by-side comparison. Interviewers only (N9): candidates never see
@@ -19,6 +21,7 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.analysis.interview_quality import consistency
 from app.analysis.report_html import render_report
 from app.auth.dependencies import CurrentUser, require_interviewer
 from app.db.database import get_db
@@ -67,7 +70,9 @@ class RunOut(BaseModel):
 
 class AnalysisOut(BaseModel):
     """The interview's Q&A analysis: its run and, when done, the results
-    (Q&A units with evaluations, requirement coverage, unexplored ones)."""
+    (Q&A units with evaluations, requirement coverage, unexplored ones, CV
+    claims, interview score, interview quality with the comparison to the
+    job's other interviews)."""
 
     run: RunOut | None
     results: dict[str, Any] | None
@@ -136,11 +141,11 @@ def get_analysis(
     interview_id: int, db: Annotated[Session, Depends(get_db)]
 ) -> AnalysisOut:
     """The interview's Q&A analysis: progress while it runs, results after."""
-    _session(db, interview_id)
+    session = _session(db, interview_id)
     analysis = _analysis(db, interview_id)
     return AnalysisOut(
         run=_run(analysis) if analysis else None,
-        results=analysis.results if analysis else None,
+        results=_with_consistency(db, session, analysis.results) if analysis else None,
     )
 
 
@@ -296,6 +301,26 @@ def _session(db: Session, interview_id: int) -> InterviewSession:
 def _analysis(db: Session, interview_id: int) -> QAAnalysis | None:
     """The interview's Q&A analysis, if any."""
     return db.scalar(select(QAAnalysis).where(QAAnalysis.session_id == interview_id))
+
+
+def _with_consistency(
+    db: Session, session: InterviewSession, results: dict | None
+) -> dict | None:
+    """The results with the interview quality compared to the job's other
+    analysed interviews (worked out now, so it uses the latest ones)."""
+    if not results or not results.get("quality"):
+        return results
+    others = db.scalars(
+        select(QAAnalysis.results)
+        .join(InterviewSession, InterviewSession.id == QAAnalysis.session_id)
+        .where(
+            InterviewSession.job_id == session.job_id,
+            InterviewSession.id != session.id,
+            QAAnalysis.results.is_not(None),
+        )
+    ).all()
+    quality = results["quality"] | {"consistency": consistency(results, list(others))}
+    return results | {"quality": quality}
 
 
 def _run(analysis: QAAnalysis) -> RunOut:

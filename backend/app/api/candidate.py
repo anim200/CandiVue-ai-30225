@@ -1,10 +1,15 @@
 """Candidate API: the invited candidate's own interview, reached through the
-private link (POST /api/auth/candidate gives a token for that one session).
+private link and the code emailed to them (POST /api/auth/candidate/verify
+gives a token for that one session).
 
 Candidates only, and only their own interview: the token says which
 session. They see the job, the time, the interviewer's name, the call and
 the chat with the interviewer; never scores, rankings, transcripts, the CV
 panel, the assistant or reports (N9).
+
+Identity check (F7): before the interview the candidate can give a face
+reference with consent (three pictures; only an encrypted embedding is
+kept) or decline; they can withdraw later. They never see the result.
 
 Waiting room: the candidate's page sends a heartbeat while they wait; they
 get a call ticket only after the interviewer let them in (checked here, not
@@ -16,15 +21,22 @@ import logging
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import CurrentUser, require_candidate
 from app.core import clock
+from app.core.config import get_settings
 from app.db.database import get_db
 from app.db.models import Candidate, InterviewSession, Job, User
-from app.db.models.interview import InvitationStatus, SessionStatus, Speaker
+from app.db.models.interview import (
+    IdentityConsent,
+    InvitationStatus,
+    SessionStatus,
+    Speaker,
+)
+from app.identity import references
 from app.interviews import chat, room
 
 logger = logging.getLogger(__name__)
@@ -37,6 +49,7 @@ router = APIRouter(
 
 NOT_INVITED = "Your invitation has not been sent yet. Please use the link in the email."
 NOT_LET_IN = "The interviewer has not let you in yet. Please wait in the waiting room."
+IDENTITY_OFF = "The identity check is not available for this interview."
 OVER = {
     SessionStatus.ENDED: "The interview has ended.",
     SessionStatus.CANCELLED: "This interview was cancelled.",
@@ -50,6 +63,14 @@ class LobbyOut(BaseModel):
     admitted: bool  # let in: the call can start
 
 
+class IdentityOut(BaseModel):
+    """The candidate's identity-check choice (never the result, N9)."""
+
+    available: bool  # the identity check is set up
+    consent: IdentityConsent | None  # None: not asked yet
+    retention_days: int
+
+
 class MyInterviewOut(BaseModel):
     """What the candidate may see about their interview."""
 
@@ -60,6 +81,7 @@ class MyInterviewOut(BaseModel):
     started_at: datetime | None
     status: SessionStatus
     lobby: LobbyOut
+    identity: IdentityOut
 
 
 class TicketOut(BaseModel):
@@ -114,6 +136,35 @@ def join_room(
     except room.RoomError as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from None
     return TicketOut(token=token)
+
+
+@router.post("/identity", response_model=MyInterviewOut)
+def give_face_reference(
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_candidate)],
+    pictures: Annotated[list[UploadFile], File()],
+) -> MyInterviewOut:
+    """Consent given: store the face reference from three camera pictures."""
+    session = _open(db, user.id)
+    if not references.is_set_up():
+        raise HTTPException(status.HTTP_409_CONFLICT, IDENTITY_OFF)
+    try:
+        references.enrol(db, session, [p.file.read() for p in pictures])
+    except references.EnrolError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    return _out(db, session)
+
+
+@router.delete("/identity", response_model=MyInterviewOut)
+def decline_identity_check(
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_candidate)],
+) -> MyInterviewOut:
+    """No identity check: declined, or consent withdrawn (the reference is
+    deleted at once). The interview goes ahead as normal."""
+    session = _open(db, user.id)
+    references.decline(db, session)
+    return _out(db, session)
 
 
 @router.get("/messages")
@@ -171,5 +222,10 @@ def _out(db: Session, session: InterviewSession) -> MyInterviewOut:
         status=session.status,
         lobby=LobbyOut(
             interviewer_present=lobby["interviewer_present"], admitted=lobby["admitted"]
+        ),
+        identity=IdentityOut(
+            available=references.is_set_up(),
+            consent=session.identity_consent,
+            retention_days=get_settings().face_retention_days,
         ),
     )

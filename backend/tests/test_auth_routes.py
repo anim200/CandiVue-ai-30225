@@ -17,7 +17,8 @@ from app.main import app
 OPEN_ROUTES = {
     "/api/health",  # used by Docker and the status badge
     "/api/auth/login",  # how an interviewer gets a token
-    "/api/auth/candidate",  # how a candidate gets a token from the link
+    "/api/auth/candidate",  # opening the link emails the candidate a code
+    "/api/auth/candidate/verify",  # the link and the code give a token
     "/api/auth/me",  # any signed-in user may ask who they are
     "/api/livekit/webhook",  # the video server; checked by its signature instead
 }
@@ -27,6 +28,7 @@ CANDIDATE_ROUTES = {
     "/api/candidate/room",
     "/api/candidate/waiting",
     "/api/candidate/messages",
+    "/api/candidate/identity",
 }
 
 

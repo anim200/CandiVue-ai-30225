@@ -39,6 +39,7 @@ def evaluation(score=80, evidence=(4,), requirements=(2,), sources=()):
     """An evaluation as the LLM would return it."""
     dimension = DimensionScore(score=score, reason="Clear and correct.")
     return Evaluation(
+        unit="Q1",
         relevance=dimension,
         accuracy=dimension,
         completeness=dimension,

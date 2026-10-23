@@ -4,6 +4,7 @@ which Alembic compares with the database."""
 from app.db.models.assessment import AssessmentReport, QAAnalysis
 from app.db.models.candidate import Candidate
 from app.db.models.interview import (
+    FaceReference,
     InterviewMessage,
     InterviewSession,
     TranscriptTurn,
@@ -20,6 +21,7 @@ __all__ = [
     "Candidate",
     "CandidateScore",
     "CvPassage",
+    "FaceReference",
     "InterviewMessage",
     "InterviewSession",
     "Job",

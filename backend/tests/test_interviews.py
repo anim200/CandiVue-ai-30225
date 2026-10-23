@@ -477,7 +477,9 @@ def test_an_unreachable_calendar_never_blocks_interviews(screened, calendar):
 # ---------- the whole flow through the chat and the API ----------
 
 
-def test_shortlist_then_invite_through_the_chat(screened, client, scripted, mailbox):
+def test_shortlist_then_invite_through_the_chat(
+    candidate_login, screened, client, scripted, mailbox
+):
     headers = {
         "Authorization": f"Bearer {create_access_token(screened['user_id'], Role.INTERVIEWER)}"
     }
@@ -544,7 +546,7 @@ def test_shortlist_then_invite_through_the_chat(screened, client, scripted, mail
     # The emailed link works; cancelling stops it.
     link = mailbox.sent[-1]["text"].split("/join/")[1].split()[0]
     token = {"link_token": link}
-    joined = client.post("/api/auth/candidate", json=token)
+    joined = candidate_login(link)
     assert joined.status_code == 200
     candidate = {"Authorization": f"Bearer {joined.json()['access_token']}"}
     assert client.get("/api/interviews", headers=candidate).status_code == 403
@@ -740,7 +742,9 @@ def test_a_failed_email_keeps_the_interview(screened, mailbox):
     assert sorted(errors) == ["No email address.", "The email address was refused."]
 
 
-def test_send_again_from_the_interviews_page(screened, client, mailbox, calendar):
+def test_send_again_from_the_interviews_page(
+    candidate_login, screened, client, mailbox, calendar
+):
     headers = {
         "Authorization": f"Bearer {create_access_token(screened['user_id'], Role.INTERVIEWER)}"
     }
@@ -757,9 +761,7 @@ def test_send_again_from_the_interviews_page(screened, client, mailbox, calendar
 
     assert answer == {"sent": True, "message": "Invitation sent", "calendar": "added"}
     link = mailbox.sent[-1]["text"].split("/join/")[1].split()[0]
-    assert (
-        client.post("/api/auth/candidate", json={"link_token": link}).status_code == 200
-    )
+    assert candidate_login(link).status_code == 200
 
 
 def test_html_is_escaped_and_the_link_always_included(screened):
