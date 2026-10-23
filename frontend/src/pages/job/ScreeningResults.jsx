@@ -112,8 +112,10 @@ function RequirementRow({ match }) {
   if (match.decided_by === 'related') how = `“${match.matched_name}” is a close substitute, so partly met.`;
   if (match.decided_by === 'meaning' && match.evidence)
     how = `Closest line by meaning (similarity ${match.similarity}).`;
-  if (match.decided_by === 'local_model')
-    how = 'Not found by the rules; the local AI model found this line when checking again before excluding.';
+  // An AI check before excluding: 'ai_model' names the model (Gemini or the
+  // local one); 'local_model' is from runs before Gemini was used.
+  if (match.decided_by === 'ai_model' || match.decided_by === 'local_model')
+    how = `Not found by the rules; the AI model (${match.model ?? 'local'}) found this line when checking again before excluding.`;
   return (
     <div className={classes.requirement}>
       <div className={classes.requirementTop}>

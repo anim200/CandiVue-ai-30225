@@ -91,6 +91,14 @@ def _read_rate_limit(error: Exception) -> tuple[int | None, int | None, bool]:
     return limit, wait, daily
 
 
+def is_blocked(name: str) -> bool:
+    """True while the model is known to be over its limit (no request is
+    sent then: it would only fail again)."""
+    with SessionLocal() as db:
+        row = db.get(LlmModel, name)
+        return bool(row and row.blocked_until and row.blocked_until > datetime.now(UTC))
+
+
 def record_rate_limit(name: str, error: Exception) -> int:
     """Save that the model hit a limit; return the seconds until it works again."""
     limit, wait, daily = _read_rate_limit(error)
