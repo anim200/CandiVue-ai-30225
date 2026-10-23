@@ -5,8 +5,8 @@
 
 .composer {
   padding: 12px 24px 14px;
-  border-top: 1px solid #e9ecee;
-  background: linear-gradient(180deg, #ffffff 0%, #fafcfc 100%);
+  border-top: 1px solid var(--cv-border-light);
+  background: linear-gradient(180deg, var(--cv-surface) 0%, var(--cv-subtle-4) 100%);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -16,9 +16,9 @@
 
 .hint {
   font-size: 13px;
-  color: #7a5000;
-  background: #fff7e6;
-  border: 1px solid #f0d9a6;
+  color: var(--cv-warning-text);
+  background: var(--cv-warning-tint-3);
+  border: 1px solid var(--cv-warning-border);
   border-radius: 8px;
   padding: 6px 10px;
   display: flex;
@@ -34,8 +34,8 @@
   align-items: flex-end;
   gap: 8px;
   padding: 6px 6px 6px 16px;
-  background: #fff;
-  border: 1px solid #c9d0d4;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border-strong);
   border-radius: 16px;
   box-shadow: 0 1px 2px rgba(26, 34, 39, 0.04);
   transition:
@@ -44,7 +44,7 @@
 }
 
 .card:hover {
-  border-color: #a9b4ba;
+  border-color: var(--cv-border-stronger);
 }
 
 .card:focus-within {
@@ -55,7 +55,7 @@
 }
 
 .locked {
-  background: #f5f7f8;
+  background: var(--cv-page);
   border-style: dashed;
 }
 
@@ -63,11 +63,11 @@
   font-size: 15px;
   line-height: 1.5;
   padding: 7px 0 !important;
-  color: #1a2227;
+  color: var(--cv-text);
 }
 
 .textarea::placeholder {
-  color: #8a959c;
+  color: var(--cv-text-faint);
 }
 
 .actions {
@@ -79,12 +79,12 @@
 
 .charCount {
   font: 500 12px var(--mantine-font-family-monospace);
-  color: #8a959c;
+  color: var(--cv-text-faint);
   animation: fadeIn 0.2s ease-out;
 }
 
 .charCountHigh {
-  color: #b03a2e;
+  color: var(--cv-danger-text);
 }
 
 /* ---- Send button ---- */
@@ -97,8 +97,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #e9eef0;
-  color: #9aa5ab;
+  background: var(--cv-hover-5);
+  color: var(--cv-text-faint-4);
   cursor: not-allowed;
   transition:
     transform 0.15s,
@@ -140,7 +140,7 @@
   width: 16px;
   height: 16px;
   border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #fff;
+  border-top-color: var(--cv-border-surface);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -149,7 +149,7 @@
 
 .keyHint {
   font-size: 12px;
-  color: #8a959c;
+  color: var(--cv-text-faint);
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -164,11 +164,11 @@
 .kbd {
   font: 600 11px var(--mantine-font-family-monospace);
   padding: 1px 5px;
-  border: 1px solid #dee3e6;
+  border: 1px solid var(--cv-border);
   border-bottom-width: 2px;
   border-radius: 4px;
-  background: #fff;
-  color: #48535b;
+  background: var(--cv-surface);
+  color: var(--cv-text-secondary);
 }
 
 /* ---- Model picker ---- */
@@ -179,16 +179,16 @@
   gap: 10px;
   flex-wrap: wrap;
   font-size: 13px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .modelInput {
   height: 30px;
   min-height: 30px;
   border-radius: 999px;
-  border: 1px solid #d5e9eb;
-  background: #f4f9f9;
-  color: #1c5d65;
+  border: 1px solid var(--cv-primary-border);
+  background: var(--cv-subtle-8);
+  color: var(--cv-primary-text-strong);
   font-size: 13px;
   font-weight: 600;
   transition:
@@ -198,8 +198,8 @@
 }
 
 .modelInput:hover {
-  background: #edf5f6;
-  border-color: #a9d2d6;
+  background: var(--cv-primary-tint);
+  border-color: var(--cv-primary-border-strong);
 }
 
 .modelInput:focus {
@@ -208,7 +208,7 @@
 }
 
 .modelIcon {
-  color: #23717a;
+  color: var(--cv-primary-text);
 }
 
 /* Usage: replays a short highlight when the model changes (new key). */
@@ -225,7 +225,7 @@
   width: 72px;
   height: 6px;
   border-radius: 999px;
-  background: #e9eef0;
+  background: var(--cv-hover-5);
   overflow: hidden;
 }
 
@@ -246,7 +246,7 @@
 }
 
 .blocked {
-  color: #7a5000;
+  color: var(--cv-warning-text);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -264,12 +264,12 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   transition: color 0.15s;
 }
 
 .googleLink:hover {
-  color: #1c5d65;
+  color: var(--cv-primary-text-strong);
 }
 
 /* ---- Narrow chat and phones ---- */
@@ -329,7 +329,7 @@
 
 @keyframes flash {
   from {
-    background: #d5e9eb;
+    background: var(--cv-primary-tint-strong);
   }
   to {
     background: transparent;

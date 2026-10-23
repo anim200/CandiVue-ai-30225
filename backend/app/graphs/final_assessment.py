@@ -157,7 +157,7 @@ def load_inputs(state: ReportState) -> dict:
         lines = load_lines(db, session)
         known = evidence(db, session, lines, matches, requirements)
         job_title = job.title
-        identity = identity_summary(session)
+        identity = identity_summary(db, session)
     line_ids = {line.turn_id: f"T{line.number}" for line in lines}
     pairs = [
         {

@@ -129,9 +129,25 @@ The interviewer and candidate screens are a single-page web app in
 | Components | Mantine 9 | Ready-made, accessible components (tables, forms, date pickers, charts, notifications) that fit a data-heavy tool, with no CSS framework to learn. |
 | Navigation | React Router 8 | One address per screen, so pages can be bookmarked and shared between tabs. |
 | Icons / fonts | Tabler Icons, Public Sans, IBM Plex Mono | Installed as npm packages, so the app loads no files from external sites. |
+| Charts | Mantine Charts (Recharts) | Same look and colours as the other Mantine parts, light and dark. |
 
 How it runs:
 
+- **Start page:** after sign-in the interviewer sees *Home*: counts (open
+  jobs, applications this week, CVs to screen, interviews today, reports to
+  review, selected this month), "Needs you" (live interviews, interviews
+  today, reports to review, jobs with CVs to screen, jobs waiting in the
+  chat), the next interviews and applications per day for the last 14 days,
+  all from `GET /api/dashboard` (interviewer only). The job page shows the
+  screening as a *Ranking* (with a score distribution chart) or as a
+  read-only *Pipeline* (Screened → Shortlisted → Invited → Interviewed →
+  Selected); the report and the comparison show the interview dimensions
+  as a radar chart.
+- **Light or dark:** *Appearance* in the user menu (and a sun/moon button
+  on the login and candidate pages). The choice is remembered in the browser
+  and all its tabs follow it; the default is light. All colours of our own
+  CSS are tokens in `frontend/src/styles/tokens.css` (a light and a dark
+  value each); emails and the printed report always stay light.
 - **Docker:** the `frontend` image builds the app with Node and serves the
   result with nginx. nginx forwards every `/api/...` request to the backend,
   so the browser uses one address for both and no CORS is needed.
@@ -170,7 +186,7 @@ width.
 | `calendar-mcp` | built from `calendar-mcp/Dockerfile` (target `runtime`) | Our small MCP server for the interviewer's Google Calendar (busy times, interview events). The only service that holds the calendar sign-in. Not exposed to the host. |
 | `calendar-tests` | built from `calendar-mcp/Dockerfile` (target `test`) | Only runs on demand (see below). |
 | `livekit` | `livekit/livekit-server:v1.13.9` | Open-source video server for the interviews. Signalling through nginx (`/rtc`); video and audio on ports 7881/tcp and 7882/udp, bound to `127.0.0.1`. Nothing is recorded. |
-| `cv-collector` | built from `backend/Dockerfile` (target `runtime`), command `python -m app.collector` | Copies new CVs from the Google Form into the `cv_intake` volume every few minutes. The only service that holds the Google key (read-only). No ports. |
+| `cv-collector` | built from `backend/Dockerfile` (target `runtime`), command `python -m app.collector` | Copies new CVs from the Google Form into the `cv_intake` volume every few minutes, and processes the face photos of newly invited applicants (F7, encrypted). The only service that holds the Google key (read-only). No ports. |
 | `frontend` | built from `frontend/Dockerfile` | React app served by nginx 1.31 (HTTP, and HTTPS when `certs/` has a certificate); forwards `/api` to the backend. |
 
 ## AI provider and data sent to it
@@ -307,8 +323,13 @@ Approved JDs are posted to a **private Blogger blog** (free, no paid API),
 through our own small MCP server in `jobboard-mcp/`:
 
 ```
-backend --MCP (create_job_post)--> jobboard-mcp --HTTPS--> Blogger API v3
+backend --MCP (create_job_post, update_job_post, delete_job_post)--> jobboard-mcp --HTTPS--> Blogger API v3
 ```
+
+Deleting a job in CandiVue also removes its post (`delete_job_post`; a
+post that is already gone counts as removed). If the blog cannot be
+reached, the job is still deleted and a message asks you to delete the
+post on the blog yourself.
 
 The backend only knows the MCP address; the Google credentials stay in
 the `jobboard-mcp` container. Without them the app still works and the
@@ -636,47 +657,74 @@ after 60 seconds. Only an HMAC of it (keyed with `JWT_SECRET`) is stored. A
 reload in the same tab keeps the candidate signed in. API:
 `POST /api/auth/candidate` (sends the code), `POST /api/auth/candidate/verify`.
 
-**Identity check (face only).** Before the interview the candidate decides
-(design: Enrolment). With consent, three camera pictures are turned into a
-face embedding (128 numbers) and stored **encrypted** (Fernet,
-`FACE_REFERENCE_KEY`); the pictures themselves are not kept. "Continue
-without identification" has no effect on the interview. During the call
-the transcriber service (hidden, listen-only) takes one picture from the
-candidate's camera every 5 seconds, in memory only, and compares it with
-the references of the job's candidates who consented
-(`app/identity/`):
+**Identity check (face only, §4B-15).** The reference is the photo the
+applicant sends with the application, and the candidate checks in with
+their camera before the interview (`app/identity/`):
+
+1. **Application photo.** The Google Form has two optional questions: a
+   photo of the applicant's face (file upload) and a separate tick box
+   allowing its use at the interview (see "CV Collector"). The CV Collector
+   records both but downloads the photo **only once the applicant is
+   invited** (most applicants are never interviewed). It checks the file by
+   content (JPEG, PNG, WebP, HEIC from iPhones; at most 10 MB), turns phone
+   photos upright (EXIF) and looks for exactly one clear face. It keeps the
+   face embedding (128 numbers) and a small copy of the photo (320 px,
+   cropped around the face), both **encrypted** (Fernet,
+   `FACE_REFERENCE_KEY`); never the original file. An unusable photo keeps
+   only the reason (no face, more than one person, face too small,
+   unreadable, too large); a failed download is tried again in later
+   rounds. The Interviews page shows the photo state under each upcoming
+   interview.
+2. **Check-in.** After the emailed code the candidate agrees (or skips: no
+   effect on the interview) and takes three camera pictures. Each must show
+   exactly one face, large and light enough; otherwise they are told what
+   to change ("only you in view", "move closer", "turn on a light") and try
+   again, up to 10 times; then the check-in is recorded as failed and they
+   continue. The pictures are compared with the application photo in
+   memory and never stored. The candidate only sees "You're checked in".
+3. **What the interviewer sees.** In the waiting-room banner (before "Let
+   in") and at the top of the room's CV column: the **application photo**
+   to compare with the video, and the check-in result with a **match
+   score**:
+
+   | State | When |
+   |---|---|
+   | Matches the application photo | the three pictures match (similarity ≥ `FACE_MATCH_FROM`, 0.363 = SFace's own same-person line, shown as 60 %) and none is clearly lower |
+   | Not confirmed | in between: compare the photo with the video |
+   | Different person | below `FACE_UNSURE_FROM` (0.28, shown as 40 %), or clearly closer to another invited applicant of the job (named) |
+   | Check-in failed / skipped / not checked in / no comparison | with the reason (e.g. no photo sent, photo shows two people) |
+
+   The match score is a fixed scale on the face similarity (0 → 0 %, 0.28 →
+   40 %, 0.363 → 60 %, 0.70 and above → 100 %), so it reads at a glance; it
+   is **not a probability**. The profile (name, headline experience, key
+   skills, CV score and rank, areas to probe) shows only on a match. The
+   report and the final ranking show the result too. There is no automatic
+   check during the call (removed in §4B-15): the interviewer compares the
+   photo with the video. Nothing is ever decided automatically.
 
 - **Models:** OpenCV Model Zoo, run locally on the CPU (nothing leaves the
   machine): YuNet finds faces (MIT), SFace makes the embedding (Apache 2.0).
   Pinned by commit and SHA-256 in the backend Dockerfile.
-- **Decision (never assumed):** the last 3 pictures together. *Confident
-  match* when at least two clearly match (cosine similarity ≥ 0.40; SFace's
-  own threshold is 0.363) and none clearly does not; *no match* below 0.28
-  or when another applicant of the job clearly matches better; otherwise
-  *low confidence*. Also *no face*, *several faces*, *camera off*, *no
-  reference* (no consent: the face is never checked).
-- **Interviewer only:** the identity panel at the top of the CV column
-  shows the state and the face similarity; the profile (name, headline
-  experience, key skills, CV score and rank, areas to probe) only on a
-  confident match. "Check again" starts with fresh pictures. The report
-  says whether and when the identity was confirmed.
-- **Retention and deletion (N17, N19):** deleted 30 days after the interview
-  (`FACE_RETENTION_DAYS`; checked every hour), at once when the candidate
-  withdraws, when the interview is cancelled (within the hour), and with
-  the interview or candidate.
-- **Setup:** put a key in `.env` (see `.env.example`), then
-  `docker compose up -d --build backend transcriber`. Without the key the
-  check is off and candidates are not asked.
-- **Limit:** the reference is given through the private link and the
-  emailed code, so the check shows that the person in the call is the
-  person who enrolled; it is not an ID-document check. Tested with
-  public-domain paintings as fake cameras (Mona Lisa vs Mona Lisa: match,
-  similarity 0.96; Rembrandt on the same link: no match, 0.17); never with
-  real candidates' faces (N13).
+- **Retention and deletion (N17, N19):** the embedding and the small copy
+  are deleted 30 days after the applicant's last interview
+  (`FACE_RETENTION_DAYS`; checked every hour), at once when all their
+  interviews are cancelled or the candidate withdraws, and with the
+  candidate or job. The **original photo stays in the form owner's Google
+  Drive** (CandiVue's access is read-only): delete it there after the job.
+- **Setup:** put a key in `.env` (see `.env.example`), add the two
+  questions to the form, then `docker compose up -d --build backend
+  cv-collector`. Without the key the check is off and candidates are not
+  asked.
+- **Limits:** the applicant chooses the photo, so the check shows that the
+  person at the interview matches the photo sent with the application; it
+  is not an ID-document check, and a real-time face-swap ("deepfake") is
+  not detected. Tested with public-domain paintings as faces: the same
+  painting matches (similarity 0.92, 100 %), another painting is named as
+  the other applicant; never with real candidates' faces (N13).
 
-API: candidates `POST/DELETE /api/candidate/identity` (give / decline or
+API: candidates `POST/DELETE /api/candidate/identity` (check in / skip or
 withdraw; they never see results); interviewers
-`GET /api/interviews/{id}/identity`, `POST /api/interviews/{id}/identity/recheck`.
+`GET /api/interviews/{id}/identity` and `GET /api/interviews/{id}/identity/photo`.
 
 ## Email (interview invitations)
 
@@ -708,6 +756,32 @@ Setup (once):
 3. In `.env`: `SMTP_USER` = that Gmail address, `SMTP_PASSWORD` = the app
    password (no spaces), and `EMAIL_TEST_RECIPIENT` = your own address.
 4. `docker compose up -d --build`
+
+**Selection email (§4B-14).** On an **approved** assessment report,
+"Send selection email" opens the email to check: the text comes from an
+Email templates document **without** `{interview_link}` (e.g.
+`selection-congratulations.md`, placeholders `{candidate_name}` and
+`{job_title}`), or a professional standard text. Subject and text can be
+edited, **Preview** shows the email exactly as the candidate will see it,
+and a confirmation step comes before sending; a warning shows when the
+identity check did not confirm the candidate. It is sent through the same
+email MCP (no button, no calendar invite, no offer details: HR sends the
+offer outside CandiVue). The candidate is then shown as **Selected** in
+the ranking and on the report, and cannot be emailed twice. It is never
+sent automatically, and the route refuses it before the report is
+approved (needs trainer approval: `docs/requirement.md` §14).
+
+**Final ranking (§4B-15 f).** The Reports page starts with the job's
+candidates whose report is **approved**, ranked by the overall score (the
+average of the CV and interview scores, as in the report; on the same
+overall score the higher interview score first; candidates equal on both
+share a rank). Each row shows the CV and interview scores, the identity
+check result and whether the candidate was selected. Tick two or three
+candidates and **Compare** shows them side by side; **Send selection
+email** opens the dialog above for the candidate you choose. Interviews
+not ranked yet are listed with the reason (report being prepared, waiting
+for your review, changes requested, earlier interview of the same
+candidate). API: `GET /api/jobs/{job}/reports` (`rank`, `not_ranked`).
 
 Keep `EMAIL_TEST_RECIPIENT` set: every email then goes to you, with
 "[Test for <candidate address>]" in the subject, so no real person is
@@ -782,6 +856,13 @@ Google Form ─► Drive (CV file) + response Sheet (name, email, job, CV link)
   consent or without a CV are skipped; a CV already collected is never
   downloaded again. The optional talent-pool question is recorded too
   (see "Innovation Feature (F11)").
+- **Face photo (F7, optional):** two questions: a file upload titled
+  **"Photo of your face"** (images only, 1 file, up to 10 MB) and a tick
+  box titled **"Photo consent"** (e.g. "Photo consent: you may use my photo
+  to confirm my identity at the interview"). The collector finds them by
+  these words. It records the photo's Drive link and the consent (only
+  together with a photo); the photo is downloaded only once the applicant
+  is invited (see "Identity check (F7)").
 - **Checks (N8):** PDF or Word (DOCX) only, decided by the file's content,
   and at most `MAX_CV_MB` (checked before downloading). A rejected file is
   not saved; the reason is recorded. One bad answer never stops the others.
@@ -1066,32 +1147,40 @@ in development and the demo (N13).
 
 | Data | Kept until |
 |---|---|
-| Application: name, email, the CV file, the text read from it (parsed CV, passages and their embeddings), screening scores and reasons | The applicant is deleted (`DELETE /api/jobs/{job}/cvs/{candidate}`) |
+| Application: name, email, the CV file, the text read from it (parsed CV, passages and their embeddings), screening scores and reasons | The applicant or the job is deleted (`DELETE /api/jobs/{job}/cvs/{candidate}`, `DELETE /api/jobs/{job}`) |
 | Interview: time, link (hash only), chat messages, the **written transcript**, Q&A analysis, CV claims check, interview score and quality, assessment report | The interview or the applicant is deleted |
-| Face reference (F7): one encrypted embedding, never a photo; consent and its time | 30 days after the interview (`FACE_RETENTION_DAYS`), on cancellation, on withdrawal, or when the applicant is deleted |
+| Application photo (F7, §4B-15), only for invited applicants: one encrypted face embedding and an encrypted small copy (320 px), never the original file; the check-in result and consent time | 30 days after the applicant's last interview (`FACE_RETENTION_DAYS`), when all their interviews are cancelled, on withdrawal, or when the applicant or job is deleted. The original photo stays in the form owner's Google Drive: delete it there after the job |
 | Saved workflow state (LangGraph checkpoints) | Deleted when the run finishes; kept only to continue a failed run or a report waiting for review; the rest is cleaned up every hour |
 | Talent pool consent (F11) | Applications older than `REDISCOVERY_MAX_AGE_DAYS` (365) are no longer matched |
 
 **Not stored:** audio and video. The call is never recorded; speech is
-streamed to Deepgram and only the text is kept; camera pictures for the
-identity check are compared in memory and dropped (N16). Uploaded
+streamed to Deepgram and only the text is kept; the check-in camera
+pictures are compared in memory and dropped (N16). Uploaded
 knowledge-base files keep only their text. Logs contain ids, never names,
 email addresses, CV or transcript text (checked in all services).
 
 **Deleting a candidate** (N19) removes, in one request: the application,
 its scores and passages, its interviews with transcripts, chat, analyses,
-reports and face reference (database cascades), the CV file, and the
+reports and application photo (database cascades), the CV file, and the
 saved workflow state that held copies of their data
 (`tests/test_privacy.py`). An application added from the talent pool to
 another job is that person's separate application and is deleted on its
 own. Data already sent to an external provider (below) cannot be recalled
 by CandiVue.
 
+**Deleting a job** ("Delete job" on the job page, after a confirmation
+that lists what goes) does the same for every applicant of the job, and
+also removes the job profile, JDs, screening and rediscovery runs, the
+job's chat, the CV folder and the job-board post. Scheduled interviews are
+cancelled first (cancellation email, calendar event removed). It is
+refused while a screening, talent rediscovery, analysis or report of the
+job is running, or an interview is live (`tests/test_job_deletion.py`).
+
 **External providers:** see "AI provider and data sent to it" for exactly
 what each one receives: Gemini (job data, transcripts and reduced CV facts
 with names and contacts removed), Deepgram (interview audio, streamed),
-Google Forms / Drive / Sheets (what applicants submit), Gmail (invitations
-and access codes), Google Calendar (the interviewer's events), Blogger (job
+Google Forms / Drive / Sheets (what applicants submit), Gmail (invitations,
+access codes and selection emails), Google Calendar (the interviewer's events), Blogger (job
 posts, no candidate data). Face recognition, CV screening and embeddings
 run locally.
 
@@ -1109,7 +1198,9 @@ run locally.
   tell the AI that an odd word is probably a recognition error); face
   recognition models can be less accurate for some groups and in poor
   light, which is why a face result is never used for scoring, never
-  assumed, and "low confidence" asks the interviewer to check; the AI can
+  assumed, and "not confirmed" asks the interviewer to check; the
+  application photo is chosen by the applicant, so a match is not an ID
+  check; the AI can
   be wrong, so every conclusion shows its evidence.
 
 ## Signing in and roles

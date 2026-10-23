@@ -14,6 +14,7 @@ from app.api import (
     assistant,
     auth,
     candidate,
+    dashboard,
     health,
     interviews,
     jobs,
@@ -40,7 +41,7 @@ CLEAN_UP_EVERY_SECONDS = 3600
 
 
 def clean_up_personal_data() -> None:
-    """Delete personal data whose time is up: face references after their
+    """Delete personal data whose time is up: application photos after their
     retention (F7, N17) and saved workflow state that is no longer needed
     (N16, N19)."""
     with SessionLocal() as db:
@@ -94,6 +95,7 @@ app.add_middleware(
 
 register_error_handlers(app)
 app.include_router(health.router)
+app.include_router(dashboard.router)
 app.include_router(auth.router)
 app.include_router(knowledge.router)
 app.include_router(jobs.router)

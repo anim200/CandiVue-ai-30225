@@ -35,7 +35,7 @@ export function ScreeningNotice({ job }) {
   const date = new Date(job.screened_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   return (
     <div className={classes.screeningNotice}>
-      <IconListNumbers size={17} color="#23717A" />
+      <IconListNumbers size={17} color="var(--cv-primary-text)" />
       <span className={classes.screeningText}>
         <b>CV screening finished</b> on the job page, {date}: {job.ranked_count} ranked, {job.excluded_count}{' '}
         excluded.
@@ -204,7 +204,7 @@ export function InvitationConfirmCard({ plan, busy, onDecide }) {
       {plan.calendar_checked && (
         <div className={classes.cardNotes}>
           <span className={classes.noteLine}>
-            <IconCalendarCheck size={15} color="#2D7A4E" />
+            <IconCalendarCheck size={15} color="var(--cv-success-text)" />
             {editing ? 'Changed times are checked against your calendar when you confirm.' : 'Free in your calendar.'}
           </span>
         </div>
@@ -261,7 +261,7 @@ export function InvitationResultsCard({ result }) {
       <ul className={classes.people}>
         {result.results.map((r) => (
           <li key={r.name} className={classes.person}>
-            {r.done ? <IconCheck size={16} color="#2D7A4E" /> : <IconX size={16} color="#B03A2E" />}
+            {r.done ? <IconCheck size={16} color="var(--cv-success-text)" /> : <IconX size={16} color="var(--cv-danger-text)" />}
             <span className={classes.personName}>{r.name}</span>
             <span className={classes.personTime}>{r.starts_at && whenText(r.starts_at)}</span>
             {!r.done && <span className={`${classes.personMeta} ${classes.problemText}`}>{r.reason}</span>}

@@ -199,7 +199,8 @@
 /* ---- Form side (right) ---- */
 
 .formSide {
-  background: #fff;
+  position: relative; /* for the appearance button in the corner */
+  background: var(--cv-surface);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -230,7 +231,7 @@
 
 .subtitle {
   font-size: 16px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 /* Message box: tint + icon + text. Errors shake once. */
@@ -244,30 +245,30 @@
 }
 
 .error {
-  background: #fbe9e7;
-  color: #5a2620;
+  background: var(--cv-danger-tint);
+  color: var(--cv-danger-text-deep);
   animation: shake 0.4s ease-in-out;
 }
 
 .error svg {
-  color: #b03a2e;
+  color: var(--cv-danger-text);
   flex: none;
 }
 
 .info {
-  background: #e7eef9;
-  color: #1f3b66;
+  background: var(--cv-info-tint);
+  color: var(--cv-info-text-deep);
 }
 
 .info svg {
-  color: #2b5fa8;
+  color: var(--cv-info-text);
   flex: none;
 }
 
 .input {
   height: 42px;
   border-radius: 6px;
-  border-color: #c9d0d4;
+  border-color: var(--cv-border-strong);
   font-size: 16px;
   transition:
     border-color 0.15s,
@@ -283,12 +284,12 @@
 /* Invalid email: red border and a small red hint (design colours). */
 .input[data-error] {
   border-color: #b03a2e;
-  color: #1a2227;
+  color: var(--cv-text);
 }
 
 .fieldError {
   font-size: 13px;
-  color: #932e24;
+  color: var(--cv-danger-text-strong);
   margin-top: 6px;
   animation: fade 0.2s;
 }
@@ -319,7 +320,7 @@
   width: 15px;
   height: 15px;
   border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #fff;
+  border-top-color: var(--cv-border-surface);
   border-radius: 50%;
   display: inline-block;
   animation: spin 0.8s linear infinite;
@@ -331,20 +332,20 @@
 
 .signedIn {
   font-size: 15px;
-  color: #245f3e;
+  color: var(--cv-success-text-strong);
   text-align: center;
   animation: fadeUp 0.3s ease-out;
 }
 
 .candidateNote {
-  border-top: 1px solid #e9ecee;
+  border-top: 1px solid var(--cv-border-light);
   padding-top: 18px;
   display: flex;
   gap: 12px;
   align-items: flex-start;
   font-size: 14px;
   line-height: 1.5;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .candidateIcon {
@@ -352,8 +353,8 @@
   height: 32px;
   flex: none;
   border-radius: 8px;
-  background: #edf5f6;
-  color: #23717a;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -361,7 +362,7 @@
 
 .candidateNote b {
   font-weight: 600;
-  color: #1a2227;
+  color: var(--cv-text);
 }
 
 /* ---- Animations (values from the design) ---- */
@@ -427,4 +428,11 @@
   80% {
     transform: translateX(5px);
   }
+}
+
+/* Light/dark button in the top-right corner of the form side. */
+.themeToggle {
+  position: absolute;
+  top: 16px;
+  right: 16px;
 }

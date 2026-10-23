@@ -1,5 +1,5 @@
-/* Identity check before the interview (F7): consent, photo, done. Same
-   card look as the waiting room. */
+/* Check-in before the interview (F7, §4B-15): consent, pictures, done.
+   Same card look as the waiting room. */
 
 .wrap {
   max-width: 620px;
@@ -16,8 +16,8 @@
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #dee3e6;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
   border-radius: 12px;
   padding: 24px;
   display: flex;
@@ -35,7 +35,7 @@
 .lead {
   margin: 0;
   font-size: 15px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
   line-height: 1.55;
 }
 
@@ -55,13 +55,13 @@
   gap: 10px;
   padding: 10px 12px;
   border-radius: 8px;
-  background: #f5f7f8;
+  background: var(--cv-page);
 }
 
 .facts svg {
   flex: none;
   margin-top: 2px;
-  color: #23717a;
+  color: var(--cv-primary-text);
 }
 
 .actions {
@@ -122,8 +122,8 @@
 .error {
   padding: 8px 12px;
   border-radius: 6px;
-  background: #fbe9e7;
-  color: #932e24;
+  background: var(--cv-danger-tint);
+  color: var(--cv-danger-text-strong);
   font-size: 14px;
 }
 
@@ -136,8 +136,8 @@
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: #e7f3ec;
-  color: #2d7a4e;
+  background: var(--cv-success-tint);
+  color: var(--cv-success-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -151,11 +151,11 @@
   flex-wrap: wrap;
   gap: 8px;
   font-size: 14px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .choice svg {
-  color: #23717a;
+  color: var(--cv-primary-text);
 }
 
 .linkButton {
@@ -165,7 +165,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: #932e24;
+  color: var(--cv-danger-text-strong);
   font: inherit;
   font-weight: 600;
   cursor: pointer;

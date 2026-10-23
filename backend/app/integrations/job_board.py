@@ -24,6 +24,11 @@ def update_job_post(post_id: str, title: str, html: str) -> dict:
     return _call("update_job_post", {"post_id": post_id, "title": title, "html": html})
 
 
+def delete_job_post(post_id: str) -> None:
+    """Remove a post (the job was deleted); retry, then JobBoardError."""
+    _call("delete_job_post", {"post_id": post_id})
+
+
 def _call(tool: str, arguments: dict) -> dict:
     """Call a job board tool; a failure becomes JobBoardError."""
     try:

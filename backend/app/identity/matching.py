@@ -1,138 +1,149 @@
-"""Who is in the call? (F7) The decision rules, and what the interviewer
-sees: the identity state and, on a confident match only, a short profile.
+"""Does the person at check-in match the application photo? (F7, §4B-15)
+The decision rules, the match score, and what the interviewer sees.
 
-The live check (app/identity/watcher.py) compares a camera picture every
-few seconds with the face references. decide() looks at the last WINDOW
-pictures together, so one bad frame never decides anything, and never
-assumes identity:
+At check-in the candidate's three camera pictures are compared with the
+photo sent with the application (checkin.py). decide() turns the face
+similarities into a state:
 
-- matched: at least two pictures clearly show the invited candidate
-  (MATCH_FROM) and none clearly does not (LOW_FROM);
-- low_confidence: somewhere in between (the profile stays hidden);
-- no_match: clearly not them, or clearly another applicant of the job;
-- no_face / too_small / several_faces / camera_off: nothing usable to
-  compare (too_small: the face has too few pixels, e.g. sitting far back,
-  poor light, or the browser lowering the video quality on a busy computer);
-- checking: not enough pictures yet; no_reference: no consent given.
+- matched: the pictures clearly match the photo (MATCH_FROM on average and
+  none clearly below);
+- not_confirmed: in between: the interviewer compares the photo with the
+  video;
+- no_match: clearly a different person;
+- other_applicant: clearly closer to another invited applicant of the job.
+Before that: waiting (not checked in), declined, failed (no usable
+pictures after several tries), no_photo (nothing to compare with) or off.
 
-SFace's own same-person threshold is a cosine similarity of 0.363
-(OpenCV); MATCH_FROM keeps a margin above it.
+The match score (0-100 %) is a fixed scale on the face similarity, so the
+interviewer can read it at a glance: the "unsure" line is 40 %, SFace's
+same-person line 60 %, and FULL_MATCH and above 100 %. It is not a
+probability. The candidate never sees the result (N9) and is never
+blocked by it: the interviewer decides.
 """
 
-from dataclasses import dataclass
+from itertools import pairwise
 from statistics import mean
 
 from sqlalchemy.orm import Session
 
-from app.analysis.transcript import clock_text
-from app.db.models import InterviewSession
-from app.db.models.interview import IdentityConsent
+from app.core.config import get_settings
+from app.db.models import Candidate, InterviewSession
+from app.db.models.interview import IdentityConsent, PhotoStatus
+from app.identity import references
+from app.identity.photos import TEXTS as PHOTO_TEXTS
 from app.interviews import cv_view
 
-MATCH_FROM = 0.40
-LOW_FROM = 0.28
-WINDOW = 3  # pictures looked at together
+FULL_MATCH = 0.70  # similarities from here on show as 100 %
 OTHER_MARGIN = 0.10  # another applicant must be clearly closer
 MAX_SKILLS = 8
 TEXTS = {
-    "matched": "Identity confirmed",
-    "low_confidence": "Low confidence: the face is not clear enough to confirm",
-    "no_match": "No match with the invited candidate's reference",
-    "no_face": "No face in view",
-    "too_small": "Face too small or unclear: ask the candidate to sit closer or improve the light",
-    "several_faces": "More than one face in view",
-    "camera_off": "Camera off or no picture",
-    "checking": "Checking…",
-    "no_reference": "No face reference: the candidate did not consent",
-    "off": "Identity check is not set up",
+    "matched": "Matches the application photo",
+    "not_confirmed": "Not confirmed: compare the application photo with the video",
+    "no_match": "Different person: does not match the application photo",
+    "other_applicant": "Different person: looks like {other}, another applicant for this job",
+    "failed": "The check-in did not work (the pictures could not be used): compare the application photo with the video",
+    "waiting": "The candidate has not checked in yet",
+    "declined": "The candidate chose to continue without the face check",
+    "no_photo": "No comparison: {reason}",
+    "off": "The identity check is not set up",
 }
+PHOTO_REASONS = {
+    "missing": "no photo was sent with the application.",
+    "no_consent": "the applicant did not agree to the use of their photo.",
+    "pending": "the application photo has not been processed yet.",
+} | {str(status): text[0].lower() + text[1:] for status, text in PHOTO_TEXTS.items()}
 
 
-@dataclass(frozen=True)
-class Sample:
-    """One camera picture compared with the references: the similarity to
-    the invited candidate, the closest other applicant (name, similarity),
-    or the problem that made the picture unusable."""
+def score(similarity: float) -> int:
+    """The match score in % for a face similarity (see the module
+    docstring): 0 → 0, unsure line → 40, match line → 60, FULL_MATCH → 100."""
+    match, unsure = _thresholds()
+    points = ((0.0, 0.0), (unsure, 40.0), (match, 60.0), (FULL_MATCH, 100.0))
+    if similarity <= 0:
+        return 0
+    for (low, low_score), (high, high_score) in pairwise(points):
+        if similarity <= high:
+            return round(
+                low_score + (similarity - low) / (high - low) * (high_score - low_score)
+            )
+    return 100
 
-    own: float | None = None
-    other: tuple[str, float] | None = None
-    problem: str | None = None  # no_face, several_faces, too_small, camera_off
 
-
-def decide(samples: list[Sample]) -> dict:
-    """The identity state from the last WINDOW pictures (see the module
-    docstring): {"state", "similarity", "other"}."""
-    recent = samples[-WINDOW:]
-    usable = [s for s in recent if s.own is not None]
-    if len(usable) < 2:
-        if len(recent) == WINDOW:  # most pictures were unusable
-            return _result(recent[-1].problem or "no_face")
-        return _result("checking")
-    own = mean(s.own for s in usable)
-    best_other = max(
-        (s.other for s in usable if s.other), key=lambda o: o[1], default=None
+def decide(similarities: list[float], others: list[tuple[str, list[float]]]) -> dict:
+    """The check-in result from the similarities of the camera pictures to
+    the application photo, and to the other applicants' photos
+    ([(name, similarities)]): {"state", "score", "similarity", "other"}."""
+    match, unsure = _thresholds()
+    own = mean(similarities)
+    closest = max(
+        ((name, mean(s)) for name, s in others), key=lambda o: o[1], default=None
     )
-    if (
-        best_other
-        and best_other[1] >= MATCH_FROM
-        and best_other[1] > own + OTHER_MARGIN
-    ):
-        return _result("no_match", own, best_other[0])
-    clear = sum(s.own >= MATCH_FROM for s in usable)
-    if clear >= 2 and min(s.own for s in usable) >= LOW_FROM:
-        return _result("matched", own)
-    if own < LOW_FROM:
-        return _result("no_match", own)
-    return _result("low_confidence", own)
-
-
-def identity_view(db: Session, session: InterviewSession, set_up: bool) -> dict:
-    """What the interviewer's identity panel shows: the state in words, the
-    similarity, when it was checked and, only on a confident match, the
-    candidate's profile."""
-    result = session.identity_result or {}
-    if not set_up:
-        state = "off"
-    elif session.identity_consent != IdentityConsent.GIVEN:
-        state = "no_reference"
+    if closest and closest[1] >= match and closest[1] > own + OTHER_MARGIN:
+        state, other = "other_applicant", closest[0]
+    elif own >= match and min(similarities) >= unsure:
+        state, other = "matched", None
+    elif own < unsure:
+        state, other = "no_match", None
     else:
-        state = result.get("state", "checking")
-    text = TEXTS[state]
-    if state == "no_match" and result.get("other"):
-        text += f": looks like {result['other']}, another applicant for this job"
+        state, other = "not_confirmed", None
+    return {
+        "state": state,
+        "score": score(own),
+        "similarity": round(own, 3),
+        "other": other,
+    }
+
+
+def identity_view(db: Session, session: InterviewSession) -> dict:
+    """What the interviewer sees (room panel, waiting-room banner): the
+    state in words, the match score, whether the application photo can be
+    shown and, on a match only, the candidate's profile."""
+    candidate = db.get(Candidate, session.candidate_id)
+    photo = references.photo_state(db, candidate)
+    result = session.identity_result or {}
+    state = _state(session, photo)
+    text = TEXTS[state].format(
+        other=result.get("other") or "another applicant",
+        reason=PHOTO_REASONS.get(photo, "the application photo cannot be used."),
+    )
+    checked = state in ("matched", "not_confirmed", "no_match", "other_applicant")
     return {
         "state": state,
         "text": text,
-        "similarity": result.get("similarity"),
-        "checked_at": result.get("checked_at"),
-        "confirmed_at_ms": result.get("confirmed_at_ms"),
-        "consent_at": session.identity_consent_at,
+        "score": result.get("score") if checked else None,
+        "checked_at": result.get("checked_at") if checked else None,
+        "photo": {
+            "state": photo,
+            "available": photo == PhotoStatus.READY,
+            "text": None if photo == PhotoStatus.READY else PHOTO_REASONS.get(photo),
+        },
         "profile": profile(db, session) if state == "matched" else None,
     }
 
 
-def identity_summary(session: InterviewSession) -> dict:
+def identity_summary(db: Session, session: InterviewSession) -> dict:
     """The identity line of the assessment report (F6)."""
-    result = session.identity_result or {}
-    if session.identity_consent != IdentityConsent.GIVEN:
-        return {
-            "state": "not_checked",
-            "text": "Not checked: no face reference was given.",
-        }
-    confirmed = result.get("confirmed_at_ms")
-    if confirmed is not None and result.get("state") == "matched":
+    view = identity_view(db, session)
+    state = view["state"]
+    if state == "matched":
         return {
             "state": "confirmed",
-            "text": f"Confirmed by face recognition at {clock_text(confirmed)} "
-            "against the reference given with consent.",
+            "text": f"Matched the application photo at check-in (match score {view['score']}%).",
         }
-    state = result.get("state", "checking")
-    return {"state": "not_confirmed", "text": f"Not confirmed: {TEXTS[state].lower()}."}
+    if state in ("not_confirmed", "no_match", "other_applicant"):
+        return {
+            "state": "not_confirmed",
+            "text": f"{view['text']} (match score {view['score']}% at check-in).",
+        }
+    return {
+        "state": "not_checked",
+        "text": f"Not checked: {view['text'][0].lower()}{view['text'][1:]}.",
+    }
 
 
 def profile(db: Session, session: InterviewSession) -> dict:
-    """The compact profile shown on a confident match: name, headline
-    experience, key skills, pre-interview score and areas to probe."""
+    """The compact profile shown on a match: name, headline experience, key
+    skills, pre-interview score and areas to probe."""
     cv = cv_view.overview(db, session)
     screening = cv["screening"] or {}
     latest = next((j["title"] for j in cv["jobs"] if j.get("title")), None)
@@ -168,12 +179,20 @@ def profile(db: Session, session: InterviewSession) -> dict:
     }
 
 
-def _result(
-    state: str, similarity: float | None = None, other: str | None = None
-) -> dict:
-    """A decision as stored and shown."""
-    return {
-        "state": state,
-        "similarity": None if similarity is None else round(similarity, 2),
-        "other": other,
-    }
+def _state(session: InterviewSession, photo: str) -> str:
+    """The identity state before any wording."""
+    if not references.is_set_up():
+        return "off"
+    if session.identity_consent == IdentityConsent.DECLINED:
+        return "declined"
+    if photo != PhotoStatus.READY:
+        return "no_photo"
+    result = session.identity_result or {}
+    return result.get("state") if result.get("state") in TEXTS else "waiting"
+
+
+def _thresholds() -> tuple[float, float]:
+    """The match line and the (lower) unsure line from the settings."""
+    settings = get_settings()
+    match = settings.face_match_from
+    return match, min(settings.face_unsure_from, match - 0.01)

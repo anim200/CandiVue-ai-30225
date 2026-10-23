@@ -100,7 +100,7 @@ export default function AppLayout() {
                           </span>
                         )
                       }
-                      active={pathname.startsWith(path)}
+                      active={path === '/' ? pathname === '/' : pathname.startsWith(path)}
                       classNames={{ root: classes.navLink, section: classes.navIcon }}
                       onClick={closeMenu} // on phones, close the menu after choosing
                     />
@@ -123,7 +123,7 @@ export default function AppLayout() {
         )}
       </AppShell.Navbar>
 
-      <AppShell.Main bg="#F5F7F8">
+      <AppShell.Main bg="var(--cv-page)">
         <Box px={fullBleed ? 0 : { base: 16, sm: 32 }} py={fullBleed ? 0 : { base: 16, sm: 24 }}>
           <Outlet />
         </Box>

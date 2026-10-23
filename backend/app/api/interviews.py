@@ -13,15 +13,16 @@ In the room: the interviewer's page sends a heartbeat (presence) and sees
 whether the candidate waits; "Let in" admits them (the candidate's ticket
 needs it). The chat with the candidate, the candidate's CV panel and the
 live transcript (F4, written by the transcriber service) are here too, and
-the identity check (F7): the state and, on a confident match only, a short
-profile; "Check again" starts it afresh.
+the identity check (F7, §4B-15): the application photo, the check-in result
+with its match score and, on a match only, a short profile. The waiting
+room's heartbeat carries the same result, so it is seen before "Let in".
 """
 
 import logging
 from datetime import datetime, timedelta
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -32,8 +33,8 @@ from app.db.database import get_db
 from app.db.models import Candidate, InterviewSession, Job, TranscriptTurn, User
 from app.db.models.interview import InvitationStatus, SessionStatus, Speaker
 from app.graphs import qa_analysis
-from app.identity import references
 from app.identity.matching import identity_view
+from app.identity.references import photo_state, thumbnail
 from app.interviews import calendar_sync, chat, cv_view, emails, planning, room
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,7 @@ router = APIRouter(
 )
 
 NOT_FOUND = "This interview no longer exists."
+NO_PHOTO = "There is no usable application photo for this candidate."
 # A live interview without the transcriber for this long: it is not running.
 TRANSCRIBER_GRACE_SECONDS = 30
 # Turns changed shortly before `since` are sent again (clocks and slow
@@ -74,15 +76,18 @@ class InterviewOut(BaseModel):
     ended_at: datetime | None
     interviewer_name: str | None  # who took part (or was planned)
     admitted: bool  # the candidate was let in from the waiting room
+    photo: str  # the application photo (F7): ready, missing, pending, ...
 
 
 class LobbyOut(BaseModel):
-    """The waiting room: is the candidate waiting, were they let in."""
+    """The waiting room: is the candidate waiting, were they let in, and
+    their check-in result (F7) for the "Let in" banner."""
 
     interviewer_present: bool
     candidate_waiting: bool
     admitted: bool
     status: SessionStatus
+    identity: dict | None = None  # {"state", "text", "score"} while waiting
 
 
 class TurnOut(BaseModel):
@@ -190,7 +195,12 @@ def presence(interview_id: int, db: Annotated[Session, Depends(get_db)]) -> Lobb
     if session.status in planning.ACTIVE:
         session.interviewer_seen_at = clock.now()
         db.commit()
-    return LobbyOut(**room.lobby(session), status=session.status)
+    lobby = room.lobby(session)
+    waiting = None
+    if lobby["candidate_waiting"]:
+        view = identity_view(db, session)
+        waiting = {key: view[key] for key in ("state", "text", "score")}
+    return LobbyOut(**lobby, status=session.status, identity=waiting)
 
 
 @router.post("/{interview_id}/admit", response_model=LobbyOut)
@@ -239,27 +249,24 @@ def transcript(
 
 @router.get("/{interview_id}/identity")
 def identity(interview_id: int, db: Annotated[Session, Depends(get_db)]) -> dict:
-    """The identity check (F7): who is in the call, as far as the face
-    shows; the profile only on a confident match."""
-    return identity_view(db, _found(db, interview_id), references.is_set_up())
+    """The identity check (F7): the check-in result against the application
+    photo, with its match score; the profile only on a match."""
+    return identity_view(db, _found(db, interview_id))
 
 
-@router.post("/{interview_id}/identity/recheck")
-def recheck_identity(
+@router.get("/{interview_id}/identity/photo")
+def identity_photo(
     interview_id: int, db: Annotated[Session, Depends(get_db)]
-) -> dict:
-    """Check the identity again with fresh pictures (e.g. after a bad
-    light or a camera change)."""
-    session = _active(db, interview_id)
-    session.identity_recheck_at = clock.now()
-    session.identity_result = (session.identity_result or {}) | {
-        "state": "checking",
-        "similarity": None,
-        "other": None,
-        "checked_at": clock.now().isoformat(),
-    }
-    db.commit()
-    return identity_view(db, session, references.is_set_up())
+) -> Response:
+    """The small copy of the application photo, for the interviewer to
+    compare with the video (never cached by the browser)."""
+    session = _found(db, interview_id)
+    jpeg = thumbnail(db, session.candidate_id)
+    if jpeg is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, NO_PHOTO)
+    return Response(
+        jpeg, media_type="image/jpeg", headers={"Cache-Control": "no-store"}
+    )
 
 
 @router.get("/{interview_id}/messages")
@@ -373,6 +380,7 @@ def _out(db: Session, session: InterviewSession) -> InterviewOut:
         ended_at=session.ended_at,
         interviewer_name=interviewer.full_name if interviewer else None,
         admitted=session.admitted_at is not None,
+        photo=photo_state(db, candidate),
     )
 
 

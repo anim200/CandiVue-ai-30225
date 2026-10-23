@@ -8,7 +8,9 @@ import {
   componentRows,
   coverageLine,
   generatingStep,
+  identityWarning,
   listStatus,
+  radarData,
   reportState,
 } from './reportFormat';
 
@@ -97,5 +99,46 @@ describe('reportFormat', () => {
   it('summarises the CV claims to follow up', () => {
     expect(claimsSummary([{ result: 'unverified' }, { result: 'unverified' }])).toBe('2 unverified');
     expect(claimsSummary([])).toBe('None');
+  });
+
+  it('warns before the selection email when the identity was not confirmed', () => {
+    expect(identityWarning({ state: 'confirmed', text: 'Matched' })).toBeNull();
+    expect(identityWarning({ state: 'matched', text: 'Matches the application photo' })).toBeNull();
+    expect(identityWarning({ state: 'off', text: 'Not set up' })).toBeNull();
+    expect(identityWarning(null)).toBeNull();
+    expect(identityWarning({ state: 'no_match', text: 'Different person: does not match the application photo' })).toBe(
+      'The face check did not confirm this candidate: different person: does not match the application photo.',
+    );
+    expect(identityWarning({ state: 'no_photo', text: 'No comparison: no photo was sent with the application.' })).toBe(
+      'The face check was not done: no photo was sent with the application. Make sure you are emailing the right person.',
+    );
+    expect(identityWarning({ state: 'not_checked', text: 'Not checked: the candidate has not checked in yet.' })).toBe(
+      'The face check was not done: the candidate has not checked in yet. Make sure you are emailing the right person.',
+    );
+  });
+
+  it('builds the radar of the interview dimensions per candidate', () => {
+    const content = (scores) => ({
+      components: {
+        interview: {
+          dimensions: Object.fromEntries(
+            Object.entries(scores).map(([key, score]) => [key, { label: key.toUpperCase(), score }]),
+          ),
+        },
+      },
+    });
+    const a = { name: 'Rina', content: content({ tech: 80, comm: 70, depth: 60, align: null }) };
+    const b = { name: 'Sami', content: content({ tech: 50, comm: 90, depth: 40, align: null }) };
+
+    expect(radarData([a, b])).toEqual([
+      { dimension: 'TECH', Rina: 80, Sami: 50 },
+      { dimension: 'COMM', Rina: 70, Sami: 90 },
+      { dimension: 'DEPTH', Rina: 60, Sami: 40 },
+    ]); // ALIGN has no score for anyone
+    expect(radarData([{ name: 'X', content: content({ tech: 80, comm: 70 }) }])).toEqual([]); // too few
+    expect(radarData([{ name: 'Y', content: { components: { interview: null } } }])).toEqual([]);
+    const named = { name: 'Z', content: content({ a: 1, b: 2, c: 3 }) };
+    named.content.components.interview.dimensions.a.label = 'Experience depth';
+    expect(radarData([named])[0].dimension).toBe('Depth'); // short corner names
   });
 });

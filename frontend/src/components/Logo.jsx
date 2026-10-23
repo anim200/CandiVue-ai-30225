@@ -62,7 +62,7 @@ const SIZES = {
 
 // Colours for a light background (header) and a dark one (login brand panel).
 const COLORS = {
-  light: { word: '#1A2227', vue: '#23717A', chip: '#1C5D65', chipBg: '#EDF5F6', chipBorder: '#CFE5E8' },
+  light: { word: 'var(--cv-text)', vue: 'var(--cv-primary-text)', chip: 'var(--cv-primary-text-strong)', chipBg: 'var(--cv-primary-tint)', chipBorder: 'var(--cv-primary-border)' },
   dark: {
     word: '#FFFFFF',
     vue: '#7FD0D8',

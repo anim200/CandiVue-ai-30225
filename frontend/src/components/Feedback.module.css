@@ -6,25 +6,25 @@
   gap: 12px;
   padding: 12px 16px;
   border-radius: 8px;
-  background: #fbe9e7;
+  background: var(--cv-danger-tint);
   align-items: center;
 }
 
 .errorIcon {
   flex: none;
-  color: #b03a2e;
+  color: var(--cv-danger-text);
 }
 
 .errorText {
   flex: 1;
   font-size: 15px;
   line-height: 1.5;
-  color: #5a2620;
+  color: var(--cv-danger-text-deep);
 }
 
 .errorText b {
   font-weight: 600;
-  color: #932e24;
+  color: var(--cv-danger-text-strong);
 }
 
 .retry {
@@ -32,9 +32,9 @@
   height: 32px;
   padding: 0 14px;
   border-radius: 4px;
-  background: #fff;
-  border: 1px solid #e3b7b1;
-  color: #932e24;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-danger-border);
+  color: var(--cv-danger-text-strong);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -42,7 +42,7 @@
 }
 
 .retry:hover {
-  background: #fbe9e7;
+  background: var(--cv-danger-tint);
 }
 
 /* Centered icon, title, text and action (e.g. "No jobs yet"). */
@@ -59,8 +59,8 @@
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: #edf5f6;
-  color: #23717a;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -73,7 +73,7 @@
 
 .emptyText {
   font-size: 15px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
   max-width: 440px;
   line-height: 1.55;
 }
@@ -89,7 +89,7 @@
 
 .bar {
   height: 14px;
-  background: #edf0f2;
+  background: var(--cv-muted);
   border-radius: 4px;
 }
 

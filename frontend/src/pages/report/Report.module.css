@@ -22,17 +22,17 @@
   align-items: center;
   gap: 6px;
   font-size: 14px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   min-width: 0;
 }
 
 .breadcrumb a {
-  color: #48535b;
+  color: var(--cv-text-secondary);
   text-decoration: none;
 }
 
 .breadcrumb a:hover {
-  color: #1c5d65;
+  color: var(--cv-primary-text-strong);
   text-decoration: underline;
 }
 
@@ -72,11 +72,11 @@
   gap: 6px 12px;
   flex-wrap: wrap;
   font-size: 15px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .sep {
-  color: #c9d0d4;
+  color: var(--cv-text-ghost);
 }
 
 .actions {
@@ -106,13 +106,28 @@
 }
 
 .bannerChanges {
-  background: #edf5f6;
-  color: #103a40;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text-deep);
 }
 
 .bannerApproved {
-  background: #e7f3ec;
-  color: #1e4a31;
+  background: var(--cv-success-tint);
+  color: var(--cv-success-text-deep);
+}
+
+/* "Send selection email" under the Approved banner (§4B-14). */
+.selectionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border: 1px solid var(--cv-border-2);
+  border-radius: 8px;
+  background: var(--cv-surface);
+  font-size: 15px;
+  color: var(--cv-text-secondary);
 }
 
 .versionNote {
@@ -121,8 +136,8 @@
   gap: 4px;
   padding: 12px 16px;
   border-radius: 8px;
-  background: #fbf0d9;
-  color: #5a3d00;
+  background: var(--cv-warning-tint);
+  color: var(--cv-warning-text-deep);
   font-size: 15px;
   line-height: 1.5;
 }
@@ -164,8 +179,8 @@
 /* ---- Cards ---- */
 
 .card {
-  background: #fff;
-  border: 1px solid #dee3e6;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
   border-radius: 8px;
   padding: 18px;
   display: flex;
@@ -176,7 +191,7 @@
 .label {
   font-size: 13px;
   font-weight: 600;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .headline {
@@ -195,7 +210,7 @@
 .step {
   height: 8px;
   border-radius: 2px;
-  background: #dee3e6;
+  background: var(--cv-line-3);
 }
 
 .stepOn {
@@ -204,11 +219,11 @@
 
 .stepLabels {
   font-size: 12px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .stepLabelOn {
-  color: #1c5d65;
+  color: var(--cv-primary-text-strong);
   font-weight: 700;
 }
 
@@ -218,19 +233,19 @@
   align-items: center;
   gap: 6px;
   padding-top: 8px;
-  border-top: 1px solid #e9ecee;
+  border-top: 1px solid var(--cv-border-light);
   font-size: 13.5px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .identityConfirmed {
-  color: #245f3e;
+  color: var(--cv-success-text-strong);
 }
 
 .note {
   font-size: 14px;
   line-height: 1.5;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .scoreRow {
@@ -253,7 +268,7 @@
 
 .scoreTrack {
   height: 8px;
-  background: #edf0f2;
+  background: var(--cv-muted);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -271,29 +286,29 @@
 
 .coverage {
   font-size: 13px;
-  color: #48535b;
-  border-top: 1px solid #e9ecee;
+  color: var(--cv-text-secondary);
+  border-top: 1px solid var(--cv-border-light);
   padding-top: 8px;
   line-height: 1.5;
 }
 
 .coverage a {
   font-weight: 600;
-  color: #1c5d65;
+  color: var(--cv-primary-text-strong);
 }
 
 /* ---- Findings ---- */
 
 .findings {
-  background: #fff;
-  border: 1px solid #dee3e6;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
   border-radius: 8px;
   overflow: hidden;
 }
 
 .section {
   padding: 16px 20px;
-  border-bottom: 1px solid #e9ecee;
+  border-bottom: 1px solid var(--cv-border-light);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -315,7 +330,7 @@
 .none {
   padding-left: 26px;
   font-size: 14px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .finding {
@@ -346,9 +361,9 @@
   align-items: center;
   gap: 5px;
   cursor: pointer;
-  background: #edf5f6;
-  color: #1c5d65;
-  border: 1px solid #d5e9eb;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text-strong);
+  border: 1px solid var(--cv-primary-border);
   transition:
     background 0.15s,
     color 0.15s;
@@ -366,7 +381,7 @@
   align-items: center;
   gap: 4px;
   font-size: 13px;
-  color: #932e24;
+  color: var(--cv-danger-text-strong);
 }
 
 /* ---- Source panel ---- */
@@ -374,15 +389,15 @@
 .panel {
   position: sticky;
   top: 16px;
-  background: #fff;
-  border: 1px solid #dee3e6;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
   border-radius: 8px;
   overflow: hidden;
 }
 
 .panelHead {
   padding: 12px 16px;
-  border-bottom: 1px solid #dee3e6;
+  border-bottom: 1px solid var(--cv-border);
   font-size: 16px;
   font-weight: 600;
 }
@@ -403,7 +418,7 @@
   text-align: center;
   font-size: 15px;
   line-height: 1.5;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .panelLabel {
@@ -411,7 +426,7 @@
   align-items: center;
   gap: 6px;
   font: 500 13px var(--mantine-font-family-monospace);
-  color: #1c5d65;
+  color: var(--cv-primary-text-strong);
 }
 
 .line {
@@ -419,13 +434,13 @@
   padding: 8px 10px;
   font-size: 14px;
   line-height: 1.5;
-  border: 1px solid #e9ecee;
+  border: 1px solid var(--cv-border-light);
   animation: fadeUp 0.3s ease-out;
 }
 
 .lineCited {
-  background: #fff8e6;
-  border-color: #f0d9a6;
+  background: var(--cv-warning-tint-4);
+  border-color: var(--cv-warning-border);
 }
 
 .lineWho {
@@ -433,7 +448,7 @@
   gap: 8px;
   font-size: 12px;
   font-weight: 700;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   margin-bottom: 2px;
 }
 
@@ -444,7 +459,7 @@
 
 .panelNote {
   font-size: 13px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   line-height: 1.5;
 }
 
@@ -454,7 +469,7 @@
   padding: 0;
   font: inherit;
   font-weight: 600;
-  color: #1c5d65;
+  color: var(--cv-primary-text-strong);
   cursor: pointer;
 }
 
@@ -470,8 +485,8 @@
   z-index: 2;
   margin: 0 -32px;
   padding: 14px 32px;
-  background: #fff;
-  border-top: 1px solid #dee3e6;
+  background: var(--cv-surface);
+  border-top: 1px solid var(--cv-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -493,12 +508,12 @@
   gap: 8px 12px;
   flex-wrap: wrap;
   font-size: 15px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .modalText {
   font-size: 15px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
   line-height: 1.5;
   margin-bottom: 12px;
 }
@@ -527,8 +542,8 @@
   height: 30px;
   padding: 0 6px 0 10px;
   border-radius: 999px;
-  background: #edf5f6;
-  color: #1c5d65;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text-strong);
   font-size: 14px;
   font-weight: 600;
   display: inline-flex;
@@ -538,8 +553,8 @@
 
 .compareScroll {
   overflow-x: auto;
-  background: #fff;
-  border: 1px solid #dee3e6;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
   border-radius: 8px;
 }
 
@@ -551,7 +566,7 @@
 
 .compareRow {
   display: grid;
-  border-bottom: 1px solid #e9ecee;
+  border-bottom: 1px solid var(--cv-border-light);
 }
 
 .compareRow:last-child {
@@ -567,25 +582,25 @@
 }
 
 .compareRow > div + div {
-  border-left: 1px solid #e9ecee;
+  border-left: 1px solid var(--cv-border-light);
 }
 
 .compareHead {
-  background: #f8f9fa;
+  background: var(--cv-subtle-2);
   font-weight: 600;
 }
 
 .compareHead > div:first-child {
   font-size: 13px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .compareHead a {
-  color: #1a2227;
+  color: var(--cv-text);
 }
 
 .compareFirst {
-  background: #fafbfb;
+  background: var(--cv-subtle);
   font-weight: 600;
 }
 
@@ -594,7 +609,7 @@
 }
 
 .subLabel {
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   padding-left: 28px !important;
 }
 
@@ -625,8 +640,8 @@
 }
 
 .listCard {
-  background: #fff;
-  border: 1px solid #dee3e6;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
   border-radius: 8px;
   overflow: hidden;
   container-type: inline-size;
@@ -644,17 +659,17 @@
 .listHead {
   padding-top: 10px;
   padding-bottom: 10px;
-  border-bottom: 1px solid #dee3e6;
+  border-bottom: 1px solid var(--cv-border);
   font-size: 13px;
   font-weight: 600;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .listRow {
   width: 100%;
   min-height: 52px;
   border: 0;
-  border-bottom: 1px solid #e9ecee;
+  border-bottom: 1px solid var(--cv-border-light);
   background: none;
   font: inherit;
   font-size: 15px;
@@ -669,7 +684,7 @@
 }
 
 .listRow:hover {
-  background: #f1f4f5;
+  background: var(--cv-hover);
 }
 
 .listName {
@@ -706,4 +721,56 @@
   from {
     width: 0;
   }
+}
+
+/* The selection email preview and the confirmation (§4B-15). */
+.previewBox {
+  border: 1px solid var(--cv-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--cv-subtle-5);
+}
+
+.previewHead {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--cv-border);
+  background: var(--cv-surface);
+  font-size: 14px;
+}
+
+.previewHead span {
+  color: var(--cv-text-dimmed);
+  font-size: 12.5px;
+}
+
+.previewFrame {
+  display: block;
+  width: 100%;
+  height: 420px;
+  border: 0;
+  background: var(--cv-subtle-5);
+}
+
+.confirmRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--cv-warning-tint);
+  color: var(--cv-warning-text-deep);
+  font-size: 14px;
+}
+
+.listSection {
+  margin: 8px 0 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--cv-text-secondary);
 }

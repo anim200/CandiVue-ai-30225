@@ -5,8 +5,10 @@ For every answer (row) in the response Sheet:
 2. skip it without consent, without a CV, if the CV was collected before, or
    if it was sent after the job's closing date (nothing is stored then),
 3. check the CV's size and type, then save it in the intake folder,
-4. record the candidate as "received", or "rejected" with the reason, and
-   whether they ticked the optional talent-pool question (F11).
+4. record the candidate as "received", or "rejected" with the reason,
+   whether they ticked the optional talent-pool question (F11), and the
+   optional face photo with its separate consent (F7, §4B-15; the photo is
+   only downloaded once the applicant is invited, see photo_round.py).
 One bad row never stops the others. Logs never contain names or emails.
 """
 
@@ -42,6 +44,8 @@ COLUMNS = {
 # Questions an older form may not have yet (no error when missing).
 OPTIONAL_COLUMNS = {
     "talent_pool": ("talent pool",),  # F11: "may we consider you for other vacancies?"
+    "photo": ("photo of your face", "face photo"),  # F7: file upload
+    "photo_consent": ("photo consent",),  # F7: separate tick box for the photo
 }
 
 
@@ -67,13 +71,22 @@ def job_reference(job_id: int, title: str) -> str:
 
 def find_columns(header: list[str]) -> dict[str, int]:
     """Find which column holds each question; raise if a required one is
-    missing (an optional one is just left out)."""
+    missing (an optional one is just left out). The specific optional
+    questions are matched first, so "Photo consent" can never be taken for
+    the privacy consent, whatever the order of the questions."""
     lowered = [cell.strip().lower() for cell in header]
     columns = {}
-    for key, words in (COLUMNS | OPTIONAL_COLUMNS).items():
+    for key, words in (OPTIONAL_COLUMNS | COLUMNS).items():
         for word in words:
-            index = next((i for i, cell in enumerate(lowered) if word in cell), None)
-            if index is not None and index not in columns.values():
+            index = next(
+                (
+                    i
+                    for i, cell in enumerate(lowered)
+                    if word in cell and i not in columns.values()  # not taken yet
+                ),
+                None,
+            )
+            if index is not None:
                 columns[key] = index
                 break
         else:
@@ -144,6 +157,7 @@ def _collect_row(source, columns: dict[str, int], row: list, zone: ZoneInfo) -> 
             return "known"
 
         info = source.file_info(file_id)
+        photo_ids = DRIVE_FILE_ID.findall(cell("photo"))  # optional face photo (F7)
         candidate = Candidate(
             job_id=job_id,
             full_name=cell("name")[:200] or None,
@@ -151,6 +165,9 @@ def _collect_row(source, columns: dict[str, int], row: list, zone: ZoneInfo) -> 
             cv_filename=clean_filename(info.get("name", "")),
             drive_file_id=file_id,
             open_to_other_roles=bool(cell("talent_pool")),  # ticked: opted in (F11)
+            photo_file_id=photo_ids[0] if photo_ids else None,
+            # Ticked, with a photo: the photo may be used at the interview.
+            photo_consent=bool(photo_ids and cell("photo_consent")),
         )
         try:
             check_cv_size(int(info.get("size") or 0))  # before downloading

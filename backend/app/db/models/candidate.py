@@ -50,12 +50,20 @@ class Candidate(TimestampMixin, Base):
     # Set when the interviewer shortlists the candidate in the Hiring
     # Assistant; only shortlisted candidates can be invited to an interview.
     shortlisted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Set when the selection email was sent after the approved report
+    # (§4B-14): the candidate was selected, and is not emailed twice.
+    selected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Talent pool (F11): the applicant agreed (form question, or the
     # interviewer when adding the CV by hand) that this application may be
     # matched against other open vacancies. Never matched without it.
     open_to_other_roles: Mapped[bool] = mapped_column(
         default=False, server_default="false"
     )
+    # Identity check (F7, §4B-15): the face photo sent with the form (its
+    # Google Drive file) and the separate consent to use it. Processed only
+    # once the applicant is invited (ApplicationPhoto).
+    photo_file_id: Mapped[str | None] = mapped_column(String(200))
+    photo_consent: Mapped[bool] = mapped_column(default=False, server_default="false")
     # Set when this application was added from another job's talent pool
     # (the original application stays as it was).
     rediscovered_from_id: Mapped[int | None] = mapped_column(

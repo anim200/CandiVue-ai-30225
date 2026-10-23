@@ -1,2 +1,2 @@
-"""Candidate identification (F7): face references given with consent before
-the interview, and the live check during the call."""
+"""Candidate identification (F7, §4B-15): the face photo sent with the
+application, and the check-in that compares the candidate with it."""

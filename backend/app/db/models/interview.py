@@ -1,4 +1,4 @@
-"""Interview sessions, transcripts and face references (F3, F4, F7)."""
+"""Interview sessions, transcripts and application photos (F3, F4, F7)."""
 
 from datetime import datetime
 from enum import StrEnum
@@ -94,9 +94,10 @@ class InterviewSession(TimestampMixin, Base):
         DateTime(timezone=True)
     )
     access_code_tries: Mapped[int] = mapped_column(default=0, server_default="0")
-    # Identity check (F7): the candidate's consent, the latest live result
-    # ({"state", "similarity", "other", "checked_at", "confirmed_at_ms"})
-    # and when the interviewer last asked to check again.
+    # Identity check at check-in (F7, §4B-15): the candidate's choice and
+    # the result of comparing their camera pictures with the application
+    # photo ({"state", "score", "similarity", "other", "checked_at",
+    # "attempts"}). Never shown to the candidate (N9).
     identity_consent: Mapped[IdentityConsent | None] = mapped_column(
         status_column(IdentityConsent)
     )
@@ -104,9 +105,6 @@ class InterviewSession(TimestampMixin, Base):
         DateTime(timezone=True)
     )
     identity_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
-    identity_recheck_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
 
 
 class Speaker(StrEnum):
@@ -147,20 +145,34 @@ class InterviewMessage(TimestampMixin, Base):
     text: Mapped[str] = mapped_column(Text)
 
 
-class FaceReference(TimestampMixin, Base):
-    """The face reference a candidate gave with consent before the interview
-    (F7): only the encrypted face embedding (128 numbers), never a photo.
-    Deleted when the candidate withdraws, RETENTION days after the
-    interview, when it is cancelled, and with the interview or candidate
-    (N17, N19)."""
+class PhotoStatus(StrEnum):
+    """What came of the photo sent with the application (F7, §4B-15)."""
 
-    __tablename__ = "face_references"
+    READY = "ready"  # one clear face: embedding and small copy saved
+    NO_FACE = "no_face"
+    SEVERAL_FACES = "several_faces"
+    TOO_SMALL = "too_small"  # the face is too small to compare
+    UNREADABLE = "unreadable"  # not an image we can read
+    TOO_LARGE = "too_large"
+    DOWNLOAD_FAILED = "download_failed"  # tried again in later rounds
+
+
+class ApplicationPhoto(TimestampMixin, Base):
+    """The face photo an invited applicant sent with the Google Form (F7,
+    §4B-15), processed by the CV Collector: the encrypted face embedding
+    (128 numbers) and a small encrypted copy for the interviewer, never the
+    original file. Deleted RETENTION days after the interview, when it is
+    cancelled, and with the candidate or job (N17, N19)."""
+
+    __tablename__ = "application_photos"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    session_id: Mapped[int] = mapped_column(
-        ForeignKey("interview_sessions.id", ondelete="CASCADE"), unique=True
-    )
     candidate_id: Mapped[int] = mapped_column(
-        ForeignKey("candidates.id", ondelete="CASCADE"), index=True
+        ForeignKey("candidates.id", ondelete="CASCADE"), unique=True
     )
-    embedding: Mapped[bytes] = mapped_column(LargeBinary)  # Fernet-encrypted
+    status: Mapped[PhotoStatus] = mapped_column(status_column(PhotoStatus))
+    embedding: Mapped[bytes | None] = mapped_column(LargeBinary)  # Fernet-encrypted
+    thumbnail: Mapped[bytes | None] = mapped_column(
+        LargeBinary
+    )  # Fernet-encrypted JPEG
+    tries: Mapped[int] = mapped_column(default=0, server_default="0")

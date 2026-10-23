@@ -2,8 +2,10 @@
 
 The Hiring Assistant (LangGraph 1) calls this server's tool create_job_post
 through MCP after the interviewer approved the JD (§4B-2, §4B-6), and
-update_job_post when the post must change (a new closing date). Only this container holds the Blogger credentials, so the backend
-never sees them (least privilege). It has no port on the host: only other
+update_job_post when the post must change (a new closing date). The backend
+calls delete_job_post when the interviewer deletes the job. Only this
+container holds the Blogger credentials, so the backend never sees them
+(least privilege). It has no port on the host: only other
 containers in Docker's network can reach it.
 
 Settings (environment / .env):
@@ -98,9 +100,19 @@ def update_job_post(
     return JobPost(post_id=str(data["id"]), url=data["url"])
 
 
-def send_to_blogger(method: str, post_id: str, body: dict) -> dict:
+@server.tool()
+def delete_job_post(post_id: Annotated[str, Field(pattern=r"^\d{1,30}$")]) -> str:
+    """Remove a job post from the job board (the job was deleted). A post
+    that is already gone counts as removed."""
+    send_to_blogger("delete", post_id)
+    logger.info("Job post deleted: %s", post_id)
+    return "deleted"
+
+
+def send_to_blogger(method: str, post_id: str, body: dict | None = None) -> dict:
     """Send one request to Blogger ("post" = new post, "patch" = change
-    post_id) and return its answer; any failure becomes a safe ToolError."""
+    post_id, "delete" = remove it) and return its answer; any failure
+    becomes a safe ToolError."""
     session = blogger_session()
     url = POSTS_URL.format(blog_id=os.environ["BLOGGER_BLOG_ID"]) + post_id
     # ToolError = an expected failure whose message the caller may see; any
@@ -115,13 +127,15 @@ def send_to_blogger(method: str, post_id: str, body: dict) -> dict:
     except requests.RequestException as exc:
         logger.warning("Blogger could not be reached: %s", type(exc).__name__)
         raise ToolError("The job board could not be reached.") from None
+    if method == "delete" and response.status_code == 404:
+        return {}  # already removed (e.g. by hand on Blogger)
     if response.status_code >= 400:
         # Status only: the body could echo the request.
         logger.warning("Blogger refused the post: HTTP %d", response.status_code)
         raise ToolError(
             f"The job board refused the post (HTTP {response.status_code})."
         )
-    return response.json()
+    return {} if method == "delete" else response.json()
 
 
 # Only accept requests addressed to this service's Docker name (or local

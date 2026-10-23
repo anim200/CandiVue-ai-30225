@@ -5,11 +5,19 @@ import {
   IconBooks,
   IconBriefcase,
   IconFileText,
+  IconLayoutDashboard,
   IconSparkles,
   IconVideo,
 } from '@tabler/icons-react';
 
 export const NAV_ITEMS = [
+  {
+    path: '/',
+    label: 'Home',
+    icon: IconLayoutDashboard,
+    description: 'What needs you now: interviews, reports to review and CVs to screen.',
+    group: 'Workspace',
+  },
   {
     path: '/jobs',
     label: 'Jobs',

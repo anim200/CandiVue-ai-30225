@@ -129,3 +129,42 @@ export function compareRows(rows) {
     { label: 'Review status', cells: rows.map((row) => text(listStatus(row).label)) },
   ];
 }
+
+// A warning for the selection email when the identity check (F7) did not
+// confirm the candidate: from a report ("confirmed", ...) or from the
+// final ranking ("matched", ...). None when it matched or is not set up.
+const NOT_CHECKED = ['no_photo', 'declined', 'waiting', 'not_checked'];
+export function identityWarning(identity) {
+  if (!identity || ['confirmed', 'matched', 'off'].includes(identity.state)) return null;
+  const detail = identity.text.replace(/^(No comparison|Not checked): /, '').replace(/\.$/, '');
+  const said = detail.charAt(0).toLowerCase() + detail.slice(1);
+  return NOT_CHECKED.includes(identity.state)
+    ? `The face check was not done: ${said}. Make sure you are emailing the right person.`
+    : `The face check did not confirm this candidate: ${said}.`;
+}
+
+// Short names for the radar's corners (the full names are in the bars).
+const SHORT = {
+  'Response relevance': 'Relevance',
+  'Technical competency': 'Technical',
+  'Job alignment': 'Alignment',
+  'Problem-solving approach': 'Problem-solving',
+  'Experience depth': 'Depth',
+};
+
+// The radar chart of the interview dimensions (F9): one point per dimension
+// that has a score for at least one candidate, one series per candidate
+// ({ name, content }). Fewer than three dimensions make no radar: [].
+export function radarData(candidates) {
+  const contents = candidates.map((c) => c.content);
+  const points = interviewDimensions(contents)
+    .map(([key, label]) => {
+      const point = { dimension: SHORT[label] ?? label };
+      for (const { name, content } of candidates) {
+        point[name] = content.components.interview?.dimensions?.[key]?.score ?? null;
+      }
+      return point;
+    })
+    .filter((point) => candidates.some(({ name }) => point[name] != null));
+  return points.length >= 3 ? points : [];
+}

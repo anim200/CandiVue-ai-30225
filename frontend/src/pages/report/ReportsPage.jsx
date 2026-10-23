@@ -1,7 +1,10 @@
-// Reports (design: Reports.dc.html): the assessment reports of one job, one
-// row per interviewed candidate, with the suitability position and where
-// the report is (being prepared, waiting for review, approved). A report is
-// prepared automatically after each interview ends. Interviewers only.
+// Reports (design: Reports.dc.html): the assessment reports of one job.
+// First the final ranking of the approved reports, where the interviewer
+// compares candidates and sends the selection email (§4B-15 f); then every
+// report, one row per interviewed candidate, with the suitability position
+// and where the report is (being prepared, waiting for review, approved). A
+// report is prepared automatically after each interview ends. Interviewers
+// only.
 
 import { Select } from '@mantine/core';
 import { useDocumentTitle } from '@mantine/hooks';
@@ -15,6 +18,7 @@ import StatusBadge from '../../components/StatusBadge';
 import { whenText } from '../../utils/dates';
 import { usePolling } from '../../utils/usePolling';
 import classes from './Report.module.css';
+import FinalRanking from './FinalRanking';
 import { listStatus } from './reportFormat';
 
 export default function ReportsPage() {
@@ -86,33 +90,38 @@ export default function ReportsPage() {
       </div>
     );
   } else {
+    const jobTitle = jobs?.find((job) => String(job.id) === jobId)?.title ?? 'this job';
     body = (
-      <div className={classes.listCard}>
-        <div className={classes.listHead}>
-          <div>Candidate</div>
-          <div>Interview</div>
-          <div>Suitability position</div>
-          <div>Status</div>
+      <>
+        <FinalRanking rows={rows} jobTitle={jobTitle} onChanged={loadRows} />
+        <h2 className={classes.listSection}>All reports</h2>
+        <div className={classes.listCard}>
+          <div className={classes.listHead}>
+            <div>Candidate</div>
+            <div>Interview</div>
+            <div>Suitability position</div>
+            <div>Status</div>
+          </div>
+          {rows.map((row) => {
+            const status = listStatus(row);
+            return (
+              <button
+                key={row.interview_id}
+                type="button"
+                className={classes.listRow}
+                onClick={() => navigate(`/interviews/${row.interview_id}/report`)}
+              >
+                <span className={classes.listName}>{row.candidate_name}</span>
+                <span>{whenText(row.interview_at)}</span>
+                <span>{row.report?.content?.position?.headline ?? '—'}</span>
+                <span>
+                  <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+                </span>
+              </button>
+            );
+          })}
         </div>
-        {rows.map((row) => {
-          const status = listStatus(row);
-          return (
-            <button
-              key={row.interview_id}
-              type="button"
-              className={classes.listRow}
-              onClick={() => navigate(`/interviews/${row.interview_id}/report`)}
-            >
-              <span className={classes.listName}>{row.candidate_name}</span>
-              <span>{whenText(row.interview_at)}</span>
-              <span>{row.report?.content?.position?.headline ?? '—'}</span>
-              <span>
-                <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      </>
     );
   }
 

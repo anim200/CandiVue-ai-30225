@@ -6,12 +6,12 @@ import { Badge } from '@mantine/core';
 
 // Tint background and text colour per tone, from the design tokens.
 export const TONES = {
-  neutral: { bg: '#EEF1F3', color: '#3E484F' },
-  info: { bg: '#E7EEF9', color: '#234E8B' },
-  success: { bg: '#E7F3EC', color: '#245F3E' },
-  warning: { bg: '#FBF0D9', color: '#7A5000' },
-  danger: { bg: '#FBE9E7', color: '#932E24' },
-  harbor: { bg: '#EDF5F6', color: '#1C5D65' },
+  neutral: { bg: 'var(--cv-muted)', color: 'var(--cv-text-body)' },
+  info: { bg: 'var(--cv-info-tint)', color: 'var(--cv-info-text-strong)' },
+  success: { bg: 'var(--cv-success-tint)', color: 'var(--cv-success-text-strong)' },
+  warning: { bg: 'var(--cv-warning-tint)', color: 'var(--cv-warning-text)' },
+  danger: { bg: 'var(--cv-danger-tint)', color: 'var(--cv-danger-text-strong)' },
+  harbor: { bg: 'var(--cv-primary-tint)', color: 'var(--cv-primary-text-strong)' },
 };
 
 // A rounded status badge with an icon, in the tone's design colours.

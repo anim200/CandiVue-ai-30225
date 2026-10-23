@@ -75,7 +75,7 @@ class ScreenedCandidate(BaseModel):
     scanned: bool  # read with OCR
     years_unknown: bool  # years of experience could not be read: check the CV
     # Where the candidate is now: new, shortlisted, invitation_pending,
-    # invited, invitation_failed, in_interview or interviewed; and their
+    # invited, invitation_failed, in_interview, interviewed or selected; and their
     # interview time, if any.
     pipeline: str
     interview_at: datetime | None
@@ -204,6 +204,8 @@ def _result(
 
 def _pipeline(candidate: Candidate, session: InterviewSession | None) -> str:
     """The candidate's step after screening (design: candidate pipeline)."""
+    if candidate.selected_at:
+        return "selected"  # the selection email was sent (§4B-14)
     if session is not None and session.status == SessionStatus.LIVE:
         return "in_interview"
     if session is not None and session.status == SessionStatus.ENDED:

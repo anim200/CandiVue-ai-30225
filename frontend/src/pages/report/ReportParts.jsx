@@ -18,6 +18,7 @@ import {
   IconThumbUp,
   IconUserCheck,
 } from '@tabler/icons-react';
+import { RadarChart } from '@mantine/charts';
 import { Link } from 'react-router';
 
 import StatusBadge from '../../components/StatusBadge';
@@ -25,13 +26,13 @@ import { CLAIM_RESULTS, VERDICTS } from '../analysis/insightsFormat';
 
 import { clock } from '../analysis/analysisFormat';
 import classes from './Report.module.css';
-import { componentRows, coverageLine, POSITIONS } from './reportFormat';
+import { componentRows, coverageLine, POSITIONS, radarData } from './reportFormat';
 
 const SECTIONS = [
-  { key: 'strengths', title: 'Strengths', icon: IconThumbUp, color: '#2D7A4E' },
-  { key: 'weaknesses', title: 'Weaknesses', icon: IconThumbDown, color: '#B03A2E' },
-  { key: 'gaps', title: 'Evidence gaps', icon: IconHelpCircle, color: '#C08A1E' },
-  { key: 'verify', title: 'Areas to verify', icon: IconListCheck, color: '#2B5FA8' },
+  { key: 'strengths', title: 'Strengths', icon: IconThumbUp, color: 'var(--cv-success-text)' },
+  { key: 'weaknesses', title: 'Weaknesses', icon: IconThumbDown, color: 'var(--cv-danger-text)' },
+  { key: 'gaps', title: 'Evidence gaps', icon: IconHelpCircle, color: 'var(--cv-warning-text-mid)' },
+  { key: 'verify', title: 'Areas to verify', icon: IconListCheck, color: 'var(--cv-info-text)' },
 ];
 const NEIGHBOURS = 1; // turns shown before and after a cited transcript line
 const SOURCE_KINDS = {
@@ -81,8 +82,44 @@ export function SuitabilityCard({ position, identity }) {
   );
 }
 
+// One corner name of the radar, centred on its corner (above it on the
+// upper half, below it on the lower half) so long names stay inside a
+// narrow card.
+function RadarCorner({ x, y, payload }) {
+  const up = Math.sin((payload.coordinate * Math.PI) / 180);
+  const dy = up > 0.1 ? -3 : up < -0.1 ? 14 : 4;
+  return (
+    <text x={x} y={y} dy={dy} textAnchor="middle" fontSize={12} fill="var(--chart-text-color, var(--mantine-color-dimmed))">
+      {payload.value}
+    </text>
+  );
+}
+
+// The interview dimensions (F9) as a radar: one series per candidate
+// ({ name, content }); nothing when fewer than three have a score.
+export function InterviewRadar({ candidates, height = 260 }) {
+  const data = radarData(candidates);
+  if (data.length === 0) return null;
+  const colours = ['harbor.6', 'orange.6', 'grape.6'];
+  return (
+    <RadarChart
+      h={height}
+      data={data}
+      dataKey="dimension"
+      polarRadiusAxisProps={{ domain: [0, 100] }}
+      polarAngleAxisProps={{ tick: RadarCorner }}
+      radarChartProps={{ outerRadius: '72%' }}
+      withLegend={candidates.length > 1}
+      withTooltip
+      series={candidates.map(({ name }, index) => ({ name, color: colours[index], opacity: 0.22 }))}
+      aria-label="Interview score per dimension"
+    />
+  );
+}
+
 // CV screening and the interview score with its six dimensions, 0-100,
-// with coverage (a dimension without evidence shows a dash).
+// with coverage (a dimension without evidence shows a dash), and the
+// dimensions as a radar.
 export function ComponentScoresCard({ components, analysisLink }) {
   const rows = componentRows(components);
   return (
@@ -101,6 +138,7 @@ export function ComponentScoresCard({ components, analysisLink }) {
         </div>
       ))}
       {rows.length === 0 && <div className={classes.note}>No scores: the CV was not screened and no answer was scored.</div>}
+      <InterviewRadar candidates={[{ name: 'Interview score', content: { components } }]} />
       <div className={classes.coverage}>
         {coverageLine(components.coverage)} · <Link to={analysisLink}>Q&amp;A analysis</Link>
       </div>
@@ -157,7 +195,7 @@ export function FollowUpCard({ claims, quality, sources, selected, onSelect, ana
     <section className={classes.findings}>
       <div className={classes.section}>
         <h2 className={classes.sectionTitle}>
-          <IconArrowsDiff size={18} color="#B03A2E" />
+          <IconArrowsDiff size={18} color="var(--cv-danger-text)" />
           CV claims to follow up
         </h2>
         {claims.length === 0 && <div className={classes.none}>None: the interview supported the CV claims checked.</div>}

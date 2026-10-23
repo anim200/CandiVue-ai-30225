@@ -103,7 +103,7 @@ export function JdEditModal({ opened, onClose, jd, job, onSave, busy }) {
             <Text fz={15} fw={500}>
               Requirements
             </Text>
-            <IconLock size={14} color="#66717A" />
+            <IconLock size={14} color="var(--cv-text-dimmed)" />
           </Group>
           <div className={classes.lockedChips}>
             {requirementChips(job.profile).map((chip) => (
@@ -168,7 +168,7 @@ export function RejectModal({ opened, onClose, onSend, busy }) {
       }
     >
       <Stack gap={12}>
-        <Text fz={15} c="#48535B" lh={1.5}>
+        <Text fz={15} c="var(--cv-text-secondary)" lh={1.5}>
           Tell the assistant what to change. It writes a new version for you to review.
         </Text>
         <Textarea

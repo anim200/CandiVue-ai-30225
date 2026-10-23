@@ -10,8 +10,8 @@
 /* ---- Thread list ---- */
 
 .threads {
-  background: #fafbfb;
-  border-right: 1px solid #dee3e6;
+  background: var(--cv-subtle);
+  border-right: 1px solid var(--cv-border);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -28,24 +28,24 @@
 .threadsTitle {
   font-size: 14px;
   font-weight: 600;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .newThread {
   width: 30px;
   height: 30px;
   border-radius: 4px;
-  border: 1px solid #c9d0d4;
-  background: #fff;
+  border: 1px solid var(--cv-border-strong);
+  background: var(--cv-surface);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #1a2227;
+  color: var(--cv-text);
 }
 
 .newThread:hover {
-  background: #f1f4f5;
+  background: var(--cv-hover);
 }
 
 .threadItems {
@@ -68,13 +68,13 @@
 }
 
 .thread:hover {
-  background: #f1f4f5;
+  background: var(--cv-hover);
 }
 
 .threadActive,
 .threadActive:hover {
-  background: #fff;
-  border-color: #d5e9eb;
+  background: var(--cv-surface);
+  border-color: var(--cv-primary-border);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
@@ -89,14 +89,14 @@
 
 .threadStage {
   font-size: 13px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   display: flex;
   align-items: center;
   gap: 5px;
 }
 
 .attention {
-  color: #7a5000;
+  color: var(--cv-warning-text);
 }
 
 /* ---- Chat column ---- */
@@ -106,13 +106,13 @@
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-  background: #fff;
+  background: var(--cv-surface);
   container-type: inline-size; /* chat parts below follow the chat's width */
 }
 
 .progress {
   padding: 12px 24px;
-  border-bottom: 1px solid #dee3e6;
+  border-bottom: 1px solid var(--cv-border);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -137,7 +137,7 @@
 
 .safeNote {
   font-size: 13px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
   display: flex;
   align-items: center;
   gap: 5px;
@@ -149,7 +149,7 @@
   gap: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   /* Never push the page sideways: scroll inside when the chat is narrow. */
   overflow-x: auto;
   scrollbar-width: none;
@@ -167,17 +167,17 @@
 }
 
 .stepDone {
-  color: #245f3e;
+  color: var(--cv-success-text-strong);
 }
 
 .stepNow {
-  color: #7a5000;
+  color: var(--cv-warning-text);
 }
 
 .stepLine {
   flex: 1;
   height: 2px;
-  background: #dee3e6;
+  background: var(--cv-line-3);
   min-width: 12px;
 }
 
@@ -187,7 +187,7 @@
 
 .backLink {
   display: none;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 /* ---- Messages ---- */
@@ -204,8 +204,8 @@
 .userBubble {
   align-self: flex-end;
   max-width: 70%;
-  background: #edf5f6;
-  color: #103a40;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text-deep);
   border-radius: 10px 10px 2px 10px;
   padding: 10px 14px;
   font-size: 15px;
@@ -260,17 +260,17 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #245f3e;
+  color: var(--cv-success-text-strong);
 }
 
 .working {
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .spinner {
   width: 12px;
   height: 12px;
-  border: 2px solid #d5e9eb;
+  border: 2px solid var(--cv-primary-border);
   border-top-color: #23717a;
   border-radius: 50%;
   display: inline-block;
@@ -280,8 +280,8 @@
 .reviewNote {
   align-self: center;
   font-size: 13px;
-  color: #66717a;
-  background: #f5f7f8;
+  color: var(--cv-text-dimmed);
+  background: var(--cv-page);
   border-radius: 999px;
   padding: 4px 12px;
   animation: fade 0.2s ease-out;
@@ -295,9 +295,9 @@
   flex-wrap: wrap;
   padding: 10px 14px;
   border-radius: 8px;
-  background: #f5f7f8;
+  background: var(--cv-page);
   font-size: 13px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .screeningText {
@@ -307,13 +307,13 @@
 
 .screeningText b {
   font-weight: 600;
-  color: #1a2227;
+  color: var(--cv-text);
 }
 
 /* ---- Cards ---- */
 
 .profileCard {
-  border: 1px solid #dee3e6;
+  border: 1px solid var(--cv-border);
   border-radius: 8px;
   padding: 14px 16px;
   display: grid;
@@ -324,29 +324,29 @@
 }
 
 .weightsNote {
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   font-size: 14px;
 }
 
 .profileLabel {
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   font-size: 14px;
 }
 
 .jdCard {
-  border: 1px solid #dee3e6;
+  border: 1px solid var(--cv-border);
   border-radius: 8px;
   overflow: hidden;
 }
 
 .jdPending {
-  border-color: #f0d9a6;
+  border-color: var(--cv-warning-border);
 }
 
 .jdHead {
   padding: 10px 16px;
-  background: #fafbfb;
-  border-bottom: 1px solid #e9ecee;
+  background: var(--cv-subtle);
+  border-bottom: 1px solid var(--cv-border-light);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -355,7 +355,7 @@
 }
 
 .jdPending .jdHead {
-  background: #fffaef;
+  background: var(--cv-warning-tint-light);
 }
 
 .jdHeadTitle {
@@ -367,7 +367,7 @@
   padding: 12px 16px;
   font-size: 15px;
   line-height: 1.6;
-  color: #1a2227;
+  color: var(--cv-text);
 }
 
 .jdAbout {
@@ -385,7 +385,7 @@
   margin: 12px 0 4px;
   font-size: 14px;
   font-weight: 600;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .jdList {
@@ -398,7 +398,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: #1c5d65;
+  color: var(--cv-primary-text-strong);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -416,7 +416,7 @@
 .sourcesLabel,
 .rejectedNote {
   font-size: 13px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .rejectedNote {
@@ -425,15 +425,15 @@
 
 .sourceChip {
   font: 500 12px var(--mantine-font-family-monospace);
-  color: #1c5d65;
-  background: #edf5f6;
+  color: var(--cv-primary-text-strong);
+  background: var(--cv-primary-tint);
   border-radius: 4px;
   padding: 2px 6px;
 }
 
 .jdActions {
   padding: 10px 16px;
-  border-top: 1px solid #e9ecee;
+  border-top: 1px solid var(--cv-border-light);
   display: flex;
   justify-content: flex-end;
   gap: 8px;
@@ -444,7 +444,7 @@
 
 .postingCard {
   flex: 1;
-  border: 1px solid #dee3e6;
+  border: 1px solid var(--cv-border);
   border-radius: 8px;
   padding: 12px 16px;
   display: flex;
@@ -460,8 +460,8 @@
 
 /* Waiting for the interviewer: amber like a JD to approve. */
 .postConfirm {
-  border-color: #f0d9a6;
-  background: #fffaef;
+  border-color: var(--cv-warning-border);
+  background: var(--cv-warning-tint-light);
 }
 
 /* ---- Shortlist and interview cards ---- */
@@ -478,7 +478,7 @@
   align-items: center;
   gap: 2px 10px;
   padding: 9px 16px;
-  border-bottom: 1px solid #f0f2f4;
+  border-bottom: 1px solid var(--cv-border-faint);
   font-size: 15px;
 }
 
@@ -491,7 +491,7 @@
 }
 
 .personRank {
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
@@ -515,7 +515,7 @@
 .personMeta {
   grid-column: 2 / -1;
   font-size: 13px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .timeInput {
@@ -524,12 +524,12 @@
 
 .cardNotes {
   padding: 10px 16px;
-  border-top: 1px solid #e9ecee;
+  border-top: 1px solid var(--cv-border-light);
   display: flex;
   flex-direction: column;
   gap: 4px;
   font-size: 14px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .noteLine {
@@ -544,11 +544,11 @@
 }
 
 .warningText {
-  color: #7a5000;
+  color: var(--cv-warning-text);
 }
 
 .problemText {
-  color: #932e24;
+  color: var(--cv-danger-text-strong);
 }
 
 .previewToggle {
@@ -560,7 +560,7 @@
   background: none;
   font: inherit;
   font-weight: 600;
-  color: #1c5d65;
+  color: var(--cv-primary-text-strong);
   cursor: pointer;
   align-self: flex-start;
 }
@@ -568,13 +568,13 @@
 /* The email exactly as sent: plain text, line breaks kept. */
 .preview {
   white-space: pre-wrap;
-  background: #f5f7f8;
-  border: 1px solid #e9ecee;
+  background: var(--cv-page);
+  border: 1px solid var(--cv-border-light);
   border-radius: 6px;
   padding: 10px 12px;
   font-size: 14px;
   line-height: 1.55;
-  color: #1a2227;
+  color: var(--cv-text);
   animation: fade 0.2s ease-out;
 }
 
@@ -598,8 +598,8 @@
   font-size: 14px;
   padding: 4px 10px;
   border-radius: 999px;
-  border: 1px solid #c9d0d4;
-  background: #fff;
+  border: 1px solid var(--cv-border-strong);
+  background: var(--cv-surface);
   cursor: pointer;
   transition: background 0.15s;
   font-family: inherit;
@@ -607,7 +607,7 @@
 }
 
 .chip:hover {
-  background: #f1f4f5;
+  background: var(--cv-hover);
 }
 
 /* ---- Loading skeleton (frame 2h) ---- */
@@ -621,7 +621,7 @@
 }
 
 .skeleton div {
-  background: #edf0f2;
+  background: var(--cv-muted);
 }
 
 /* ---- Edit dialog: locked requirements ---- */
@@ -636,12 +636,12 @@
   font-size: 14px;
   padding: 3px 9px;
   border-radius: 999px;
-  background: #f1f4f5;
+  background: var(--cv-hover);
 }
 
 .hint {
   font-size: 13px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 /* ---- Phones and small tablets: list OR chat ---- */

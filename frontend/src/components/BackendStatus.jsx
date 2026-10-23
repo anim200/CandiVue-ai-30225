@@ -14,7 +14,7 @@ const CHECK_EVERY_MS = 30000;
 const STATES = {
   checking: {
     tone: 'neutral',
-    icon: <Loader size={10} color="#3E484F" />,
+    icon: <Loader size={10} color="var(--cv-text-body)" />,
     label: 'Checking connection',
     hint: 'Checking whether the CandiVue server can be reached.',
   },

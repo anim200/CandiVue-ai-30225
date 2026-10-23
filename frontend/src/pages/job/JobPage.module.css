@@ -22,17 +22,17 @@
   align-items: center;
   gap: 6px;
   font-size: 14px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   min-width: 0;
 }
 
 .breadcrumb a {
-  color: #48535b;
+  color: var(--cv-text-secondary);
   text-decoration: none;
 }
 
 .breadcrumb a:hover {
-  color: #1c5d65;
+  color: var(--cv-primary-text-strong);
   text-decoration: underline;
 }
 
@@ -72,11 +72,11 @@
   gap: 8px 12px;
   flex-wrap: wrap;
   font-size: 15px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .dot {
-  color: #c9d0d4;
+  color: var(--cv-text-ghost);
 }
 
 .headerActions {
@@ -93,8 +93,8 @@
 /* ---- Scoring weights (not in the design: user request) ---- */
 
 .weightsCard {
-  background: #fff;
-  border: 1px solid #dee3e6;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
   border-radius: 8px;
   padding: 16px 20px;
   display: flex;
@@ -110,13 +110,13 @@
 }
 
 .weightsIcon {
-  color: #23717a;
+  color: var(--cv-primary-text);
   flex: none;
   margin-top: 2px;
 }
 
 .sparkle {
-  color: #23717a;
+  color: var(--cv-primary-text);
   margin-right: 4px;
   vertical-align: -2px;
 }
@@ -140,16 +140,16 @@
 }
 
 .totalOk {
-  color: #245f3e;
+  color: var(--cv-success-text-strong);
 }
 
 .totalBad {
-  color: #932e24;
+  color: var(--cv-danger-text-strong);
 }
 
 .weightsError {
   font-size: 14px;
-  color: #932e24;
+  color: var(--cv-danger-text-strong);
 }
 
 .staleNote {
@@ -159,8 +159,8 @@
   flex-wrap: wrap;
   padding: 10px 14px;
   border-radius: 8px;
-  background: #fbf0d9;
-  color: #5a3d00;
+  background: var(--cv-warning-tint);
+  color: var(--cv-warning-text-deep);
   font-size: 15px;
   animation: fadeUp 0.25s ease-out;
 }
@@ -174,7 +174,7 @@
 /* Why "Screen CVs" is disabled. */
 .hint {
   font-size: 14px;
-  color: #7a5000;
+  color: var(--cv-warning-text);
 }
 
 @media (max-width: 47.99em) {
@@ -186,8 +186,8 @@
 /* ---- "Add CV" results ---- */
 
 .uploadResults {
-  background: #fff;
-  border: 1px solid #dee3e6;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
   border-radius: 8px;
   padding: 12px 16px;
   animation: fadeUp 0.25s ease-out;
@@ -207,7 +207,7 @@
   border: 0;
   border-radius: 4px;
   background: none;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -215,7 +215,7 @@
 }
 
 .closeButton:hover {
-  background: #f1f4f5;
+  background: var(--cv-hover);
 }
 
 .uploadList {
@@ -236,11 +236,11 @@
 }
 
 .uploadOk {
-  color: #245f3e;
+  color: var(--cv-success-text-strong);
 }
 
 .uploadBad {
-  color: #7a5000;
+  color: var(--cv-warning-text);
 }
 
 .uploadName {
@@ -250,7 +250,7 @@
 
 .progress {
   font-size: 14px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
   font-variant-numeric: tabular-nums;
   animation: fadeIn 0.2s ease-out;
 }
@@ -261,8 +261,8 @@
   margin-right: 8px;
   padding: 1px 7px;
   border-radius: 999px;
-  background: #edf5f6;
-  color: #1c5d65;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text-strong);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -271,8 +271,8 @@
 /* ---- Empty state (design 2c) ---- */
 
 .empty {
-  background: #fff;
-  border: 1px dashed #c9d0d4;
+  background: var(--cv-surface);
+  border: 1px dashed var(--cv-border-strong);
   border-radius: 8px;
   padding: 56px 20px;
   display: flex;
@@ -286,8 +286,8 @@
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: #edf5f6;
-  color: #23717a;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -301,7 +301,7 @@
 
 .emptyText {
   font-size: 15px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
   max-width: 440px;
   line-height: 1.55;
 }
@@ -309,8 +309,8 @@
 /* ---- Applicants card ---- */
 
 .card {
-  background: #fff;
-  border: 1px solid #dee3e6;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
   border-radius: 8px;
   overflow: hidden;
   container-type: inline-size;
@@ -318,7 +318,7 @@
 
 .cardTop {
   padding: 14px 20px;
-  border-bottom: 1px solid #dee3e6;
+  border-bottom: 1px solid var(--cv-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -332,7 +332,7 @@
 
 .cardHint {
   font-size: 14px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   margin-top: 2px;
 }
 
@@ -354,7 +354,7 @@
 .collapseHead > svg {
   flex: none;
   margin-top: 2px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 /* The title text wraps on phones; the Refresh button keeps its size. */
@@ -374,14 +374,14 @@
 .head {
   padding-top: 10px;
   padding-bottom: 10px;
-  border-bottom: 1px solid #dee3e6;
+  border-bottom: 1px solid var(--cv-border);
   font-size: 13px;
   font-weight: 600;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .item {
-  border-bottom: 1px solid #e9ecee;
+  border-bottom: 1px solid var(--cv-border-light);
   animation: fadeUp 0.3s ease-out both;
   transition: background 0.15s;
 }
@@ -391,7 +391,7 @@
 }
 
 .item:hover {
-  background: #fafbfb;
+  background: var(--cv-subtle);
 }
 
 .row {
@@ -414,20 +414,20 @@
 
 .email {
   font-size: 14px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .when {
-  color: #48535b;
+  color: var(--cv-text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
 .file {
   font: 500 13px var(--mantine-font-family-monospace);
-  color: #48535b;
+  color: var(--cv-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -446,7 +446,7 @@
   border: 0;
   border-radius: 4px;
   background: none;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -457,8 +457,8 @@
 }
 
 .iconButton:hover {
-  background: #fbe9e7;
-  color: #932e24;
+  background: var(--cv-danger-tint);
+  color: var(--cv-danger-text-strong);
 }
 
 /* Talent pool in or out (F11): teal while in. */
@@ -467,27 +467,27 @@
 }
 
 .poolButton:hover {
-  background: #edf5f6;
-  color: #1c5d65;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text-strong);
 }
 
 .poolOn {
-  color: #23717a;
+  color: var(--cv-primary-text);
 }
 
 /* "Talent pool" next to the email while the applicant is in it. */
 .poolChip {
   composes: source;
-  background: #e7f3ec;
-  color: #245f3e;
+  background: var(--cv-success-tint);
+  color: var(--cv-success-text-strong);
 }
 
 .problem {
   margin: -6px 20px 12px;
   padding: 6px 10px;
   border-radius: 6px;
-  background: #fff7e6;
-  color: #5a3d00;
+  background: var(--cv-warning-tint-3);
+  color: var(--cv-warning-text-deep);
   font-size: 14px;
 }
 

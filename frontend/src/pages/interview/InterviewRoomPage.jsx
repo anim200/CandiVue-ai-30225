@@ -12,7 +12,7 @@
 // Interviewers only (route guard + backend). The interviewer joins from the
 // Interviews page ("Join now"), any time until the interview is ended.
 
-import { Button, Drawer } from '@mantine/core';
+import { Button, Drawer, Tooltip } from '@mantine/core';
 import { useDocumentTitle, useMediaQuery } from '@mantine/hooks';
 import { IconArrowLeft, IconFileText, IconMessageCircle, IconSparkles, IconTextCaption } from '@tabler/icons-react';
 import { LiveKitRoom } from '@livekit/components-react';
@@ -34,6 +34,33 @@ import RoomChat from './RoomChat';
 import { TranscriptView, useTranscript } from './TranscriptPanel';
 
 const HEARTBEAT_MS = 4000;
+// The check-in result in the "Let in" banner (F7, §4B-15): short label and
+// colour; the full sentence is in the tooltip.
+const CHECK_IN = {
+  matched: ['ok', 'Photo match'],
+  not_confirmed: ['warn', 'Not confirmed'],
+  no_match: ['bad', 'Different person'],
+  other_applicant: ['bad', 'Different person'],
+  failed: ['warn', 'Check-in failed'],
+  waiting: ['plain', 'Not checked in'],
+  declined: ['plain', 'Skipped the face check'],
+  no_photo: ['plain', 'No photo to compare'],
+};
+
+// The candidate's check-in result, before letting them in.
+function CheckInChip({ identity }) {
+  const shown = identity && CHECK_IN[identity.state];
+  if (!shown) return null;
+  const [tone, label] = shown;
+  return (
+    <Tooltip label={identity.text} withArrow multiline w={260}>
+      <span className={`${classes.checkIn} ${classes[`checkIn_${tone}`]}`}>
+        {label}
+        {identity.score != null && ` · ${identity.score}%`}
+      </span>
+    </Tooltip>
+  );
+}
 
 // A short, soft two-note chime (no sound file needed).
 function chime() {
@@ -141,6 +168,7 @@ function Room({ interview, interviewId, onInterview, onEnd, ending }) {
       <span>
         <b>{name}</b> is waiting to join
       </span>
+      <CheckInChip identity={lobby.identity} />
       <Button size="compact-sm" radius="xl" onClick={admit}>
         Let in
       </Button>

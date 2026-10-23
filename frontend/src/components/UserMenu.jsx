@@ -1,8 +1,8 @@
 // The signed-in interviewer in the header, with "Sign out" (design:
 // Jobs.dc.html, UserMenu and frame 2d "User menu open"). Phones show only
 // the initials; the menu itself always shows name and email.
-// Not yet in the menu: "Appearance" (comes with dark mode) and "Help"
-// (no help page yet).
+// The menu also holds "Appearance" (light or dark). Not yet in the menu:
+// "Help" (no help page yet).
 
 import { Avatar, Box, Group, Menu, Text, UnstyledButton } from '@mantine/core';
 import { IconChevronDown, IconChevronUp, IconLogout } from '@tabler/icons-react';
@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { clearSession, loadSession } from '../auth/session';
+import { AppearanceSwitch } from './ThemeToggle';
 import classes from './UserMenu.module.css';
 
 // Opening animation from the design ("cvpop", 0.2s ease-out).
@@ -68,7 +69,7 @@ export default function UserMenu() {
                 {user.email}
               </Text>
             </Box>
-            <Chevron size={16} color="#66717A" className={classes.chevron} />
+            <Chevron size={16} color="var(--cv-text-dimmed)" className={classes.chevron} />
           </Group>
         </UnstyledButton>
       </Menu.Target>
@@ -82,6 +83,13 @@ export default function UserMenu() {
             {user.email}
           </Text>
         </div>
+        <div className={classes.appearance}>
+          <Text fz={13} fw={600} c="dimmed" mb={6}>
+            Appearance
+          </Text>
+          <AppearanceSwitch />
+        </div>
+        <Menu.Divider />
         <Menu.Item
           className={classes.signOut}
           leftSection={<IconLogout size={17} />}

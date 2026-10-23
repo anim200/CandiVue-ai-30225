@@ -37,7 +37,7 @@ class FakeSession:
         self.sent.append((url, json))
         return self.response
 
-    patch = post  # an update is recorded and answered the same way
+    patch = delete = post  # updates and deletions: recorded the same way
 
 
 def call_tool(arguments, tool="create_job_post"):
@@ -100,6 +100,40 @@ def test_an_update_needs_a_numeric_post_id(blog):
 
     assert result.is_error
     assert blog.sent == []  # nothing reached Blogger
+
+
+def test_a_post_is_deleted(blog):
+    blog.response = FakeResponse(204)
+
+    result = call_tool({"post_id": "999"}, tool="delete_job_post")
+
+    assert not result.is_error
+    url, body = blog.sent[0]
+    assert url.endswith("/blogs/123/posts/999") and body is None
+
+
+def test_deleting_a_post_that_is_already_gone_succeeds(blog):
+    blog.response = FakeResponse(404)
+
+    result = call_tool({"post_id": "999"}, tool="delete_job_post")
+
+    assert not result.is_error
+
+
+def test_a_refused_deletion_gives_a_clear_error(blog):
+    blog.response = FakeResponse(403)
+
+    result = call_tool({"post_id": "999"}, tool="delete_job_post")
+
+    assert result.is_error
+    assert "HTTP 403" in result.content[0].text
+
+
+def test_a_deletion_needs_a_numeric_post_id(blog):
+    result = call_tool({"post_id": "../other"}, tool="delete_job_post")
+
+    assert result.is_error
+    assert blog.sent == []
 
 
 def test_refused_post_gives_a_clear_error(blog):

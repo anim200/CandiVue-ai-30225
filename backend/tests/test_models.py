@@ -21,7 +21,7 @@ EXPECTED_TABLES = {
     "cv_passages",
     "rediscovery_runs",
     "rediscovery_matches",
-    "face_references",
+    "application_photos",
 }
 
 # N20: these must never be stored as candidate data.

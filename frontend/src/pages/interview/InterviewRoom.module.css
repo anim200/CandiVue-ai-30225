@@ -11,7 +11,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #f5f7f8;
+  background: var(--cv-page);
 }
 
 .topbar {
@@ -21,8 +21,8 @@
   gap: 10px 14px;
   flex-wrap: wrap;
   padding: 10px 20px;
-  background: #fff;
-  border-bottom: 1px solid #e3e7ea;
+  background: var(--cv-surface);
+  border-bottom: 1px solid var(--cv-border-3);
 }
 
 .back {
@@ -33,14 +33,14 @@
   background: none;
   padding: 4px 8px 4px 2px;
   border-radius: 6px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
   font-size: 14px;
   cursor: pointer;
 }
 
 .back:hover {
-  color: #23717a;
-  background: #edf5f6;
+  color: var(--cv-primary-text);
+  background: var(--cv-primary-tint);
 }
 
 .live {
@@ -49,8 +49,8 @@
   gap: 6px;
   padding: 2px 10px;
   border-radius: 999px;
-  background: #fbe9e7;
-  color: #932e24;
+  background: var(--cv-danger-tint);
+  color: var(--cv-danger-text-strong);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -79,7 +79,7 @@
 }
 
 .job {
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   font-size: 14px;
 }
 
@@ -89,22 +89,22 @@
   gap: 8px;
   font-family: var(--mantine-font-family-monospace);
   font-size: 14px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .over {
   font-family: var(--mantine-font-family);
   font-size: 12px;
   font-weight: 600;
-  color: #7a5000;
-  background: #fbf0d9;
+  color: var(--cv-warning-text);
+  background: var(--cv-warning-tint);
   border-radius: 999px;
   padding: 1px 8px;
 }
 
 .overLong {
-  color: #932e24;
-  background: #fbe9e7;
+  color: var(--cv-danger-text-strong);
+  background: var(--cv-danger-tint);
 }
 
 .spacer {
@@ -124,7 +124,7 @@
 
 .cvColumn {
   min-height: 0;
-  border-right: 1px solid #e3e7ea;
+  border-right: 1px solid var(--cv-border-3);
   animation: slideIn 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -152,8 +152,8 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #fff;
-  border-left: 1px solid #e3e7ea;
+  background: var(--cv-surface);
+  border-left: 1px solid var(--cv-border-3);
 }
 
 .tabs {
@@ -161,7 +161,7 @@
   display: flex;
   gap: 4px;
   padding: 8px 10px 0;
-  border-bottom: 1px solid #e9ecee;
+  border-bottom: 1px solid var(--cv-border-light);
 }
 
 .tab {
@@ -174,7 +174,7 @@
   padding: 9px 10px 11px;
   border: 0;
   background: none;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -195,11 +195,11 @@
 }
 
 .tab:hover {
-  color: #1a2227;
+  color: var(--cv-text);
 }
 
 .tabActive {
-  color: #103a40;
+  color: var(--cv-primary-text-deep);
 }
 
 .tabActive::after {
@@ -221,7 +221,7 @@
   padding: 0 5px;
   border-radius: 999px;
   background: #e0a526;
-  color: #1a2227;
+  color: var(--cv-text);
   font-size: 11px;
   font-weight: 700;
   display: inline-flex;
@@ -246,9 +246,9 @@
   gap: 10px;
   padding: 6px 6px 6px 14px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.96);
+  background: color-mix(in srgb, var(--cv-surface) 96%, transparent);
   box-shadow: 0 8px 24px rgba(16, 22, 25, 0.28);
-  color: #1a2227;
+  color: var(--cv-text);
   font-size: 14px;
   white-space: nowrap;
 }
@@ -290,16 +290,16 @@
   align-items: flex-start;
   gap: 10px;
   padding: 24px;
-  border: 1px solid #dee3e6;
+  border: 1px solid var(--cv-border);
   border-radius: 12px;
-  background: #fff;
-  color: #48535b;
+  background: var(--cv-surface);
+  color: var(--cv-text-secondary);
   font-size: 15px;
   line-height: 1.55;
 }
 
 .messageCard b {
-  color: #1a2227;
+  color: var(--cv-text);
   font-size: 17px;
 }
 
@@ -373,7 +373,7 @@
   .side {
     height: 620px;
     border-left: 0;
-    border-top: 1px solid #e3e7ea;
+    border-top: 1px solid var(--cv-border-3);
   }
 
   .topbar {
@@ -393,4 +393,34 @@
   .cvColumn {
     animation: none;
   }
+}
+
+/* The check-in result in the "Let in" banner (F7). */
+.checkIn {
+  flex: none;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.checkIn_ok {
+  background: var(--cv-success-tint-2);
+  color: var(--cv-success-text-strong-2);
+}
+
+.checkIn_warn {
+  background: var(--cv-warning-tint);
+  color: var(--cv-warning-text-2);
+}
+
+.checkIn_bad {
+  background: var(--cv-danger-tint-2);
+  color: var(--cv-danger-text-strong-2);
+}
+
+.checkIn_plain {
+  background: var(--cv-hover-3);
+  color: var(--cv-text-secondary);
 }

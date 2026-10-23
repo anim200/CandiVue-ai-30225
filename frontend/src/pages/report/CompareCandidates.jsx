@@ -8,6 +8,7 @@ import { Link } from 'react-router';
 
 import { EmptyState } from '../../components/Feedback';
 import classes from './Report.module.css';
+import { InterviewRadar } from './ReportParts';
 import { compareRows } from './reportFormat';
 
 export const MAX_COMPARED = 3;
@@ -62,6 +63,10 @@ export default function CompareCandidates({ rows, chosen, onChoose, jobTitle }) 
         )}
         <span className={classes.note}>Up to {MAX_COMPARED} assessed candidates for {jobTitle}</span>
       </div>
+      <InterviewRadar
+        candidates={compared.map((row) => ({ name: row.candidate_name, content: row.report.content }))}
+        height={300}
+      />
       <div className={classes.compareScroll}>
         <div className={classes.compareTable} role="table">
           <div className={`${classes.compareRow} ${classes.compareHead}`} style={columns} role="row">

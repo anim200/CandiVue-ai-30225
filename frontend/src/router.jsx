@@ -1,6 +1,6 @@
 // Which page is shown for which address.
 
-import { createBrowserRouter, Navigate } from 'react-router';
+import { createBrowserRouter } from 'react-router';
 
 import RequireInterviewer from './auth/RequireInterviewer';
 import AppLayout from './layout/AppLayout';
@@ -10,6 +10,7 @@ import HiringAssistantPage from './pages/assistant/HiringAssistantPage';
 import CandidateJoinPage from './pages/CandidateJoinPage';
 import ComingSoonPage from './pages/ComingSoonPage';
 import ErrorPage from './pages/ErrorPage';
+import HomePage from './pages/home/HomePage';
 import InterviewRoomPage from './pages/interview/InterviewRoomPage';
 import InterviewsPage from './pages/InterviewsPage';
 import JobPage from './pages/job/JobPage';
@@ -51,7 +52,7 @@ export const router = createBrowserRouter([
     ),
     errorElement: <ErrorPage />,
     children: [
-      { index: true, element: <Navigate to="/jobs" replace /> },
+      { index: true, element: <HomePage /> },
       { path: 'assistant', element: <HiringAssistantPage />, handle: FULL_BLEED },
       { path: 'assistant/:jobId', element: <HiringAssistantPage />, handle: FULL_BLEED },
       { path: 'jobs/:jobId', element: <JobPage /> },
@@ -59,7 +60,7 @@ export const router = createBrowserRouter([
       { path: 'interviews/:interviewId/analysis', element: <InterviewAnalysisPage /> },
       { path: 'interviews/:interviewId/report', element: <AssessmentReportPage /> },
       // Each module replaces its "coming soon" page with the real screen.
-      ...NAV_ITEMS.filter((item) => item.path !== '/assistant').map((item) => ({
+      ...NAV_ITEMS.filter((item) => !['/', '/assistant'].includes(item.path)).map((item) => ({
         path: item.path,
         element: BUILT_PAGES[item.path] ?? (
           <ComingSoonPage title={item.label} description={item.description} />

@@ -6,7 +6,7 @@
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .counts {
@@ -29,8 +29,8 @@
   align-items: flex-start;
   gap: 10px;
   padding: 14px 16px;
-  border: 1px solid #e9ecee;
-  border-left: 4px solid #c9d0d4;
+  border: 1px solid var(--cv-border-light);
+  border-left: 4px solid var(--cv-border-strong);
   border-radius: 8px;
   animation: fadeUp 0.3s ease-out both;
 }
@@ -62,7 +62,7 @@
 
 .quote {
   font-size: 13px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .followUp {
@@ -71,8 +71,8 @@
   width: 100%;
   padding: 8px 10px;
   border-radius: 6px;
-  background: #edf5f6;
-  color: #1c5d65;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text-strong);
   font-size: 14px;
 }
 
@@ -99,7 +99,7 @@
 .bigScore span {
   font-size: 14px;
   font-weight: 500;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   margin-left: 2px;
 }
 
@@ -134,25 +134,25 @@
 
 .reason {
   font-size: 13.5px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
   line-height: 1.45;
 }
 
 /* Score and verdict tones: text colour on numbers, fill on bars. */
 .success {
-  color: #245f3e;
+  color: var(--cv-success-text-strong);
 }
 
 .warning {
-  color: #7a5000;
+  color: var(--cv-warning-text);
 }
 
 .danger {
-  color: #932e24;
+  color: var(--cv-danger-text-strong);
 }
 
 .neutral {
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .fill.success {
@@ -188,7 +188,7 @@
 .verdict,
 .verdict p,
 .verdict li {
-  color: #1a2227;
+  color: var(--cv-text);
 }
 
 .verdictHead {
@@ -212,8 +212,8 @@
   gap: 8px 12px;
   padding: 10px 12px;
   border-radius: 6px;
-  background: #fbe9e7;
-  color: #5c1d16;
+  background: var(--cv-danger-tint);
+  color: var(--cv-danger-text-deep-2);
   font-size: 14px;
 }
 
@@ -239,7 +239,7 @@
 }
 
 .talkCandidate {
-  background: #a9d2d6;
+  background: var(--cv-primary-tint-deep);
 }
 
 .talkLegend {
@@ -247,7 +247,7 @@
   flex-wrap: wrap;
   gap: 4px 16px;
   font-size: 13.5px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .talkLegend i {
@@ -263,11 +263,11 @@
   flex-direction: column;
   gap: 4px;
   font-size: 14px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .stats b {
-  color: #1a2227;
+  color: var(--cv-text);
   font-variant-numeric: tabular-nums;
 }
 

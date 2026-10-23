@@ -2,8 +2,8 @@
 
 .header {
   height: 56px;
-  background: #fff;
-  border-bottom: 1px solid #dee3e6;
+  background: var(--cv-surface);
+  border-bottom: 1px solid var(--cv-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -18,8 +18,11 @@
 }
 
 .help {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
   font-size: 14px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 /* Phones: a short "Help" link; tablets and up: the full sentence. */
@@ -47,7 +50,7 @@
 .spinner {
   width: 28px;
   height: 28px;
-  border: 3px solid #d5e9eb;
+  border: 3px solid var(--cv-primary-border);
   border-top-color: #23717a;
   border-radius: 50%;
   display: inline-block;

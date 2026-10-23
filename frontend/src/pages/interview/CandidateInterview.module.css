@@ -10,7 +10,7 @@
   background:
     radial-gradient(900px 420px at 10% -10%, rgba(35, 113, 122, 0.12), transparent 70%),
     radial-gradient(700px 380px at 100% 0%, rgba(224, 165, 38, 0.1), transparent 70%),
-    #f5f7f8;
+    var(--cv-page);
 }
 
 .lobbyIntro {
@@ -26,14 +26,14 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #23717a;
+  color: var(--cv-primary-text);
 }
 
 .headline {
   margin: 0;
   font-size: clamp(24px, 3vw, 32px);
   line-height: 1.2;
-  color: #103a40;
+  color: var(--cv-primary-text-deep);
 }
 
 .sub {
@@ -41,7 +41,7 @@
   max-width: 640px;
   font-size: 15.5px;
   line-height: 1.55;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .lobbyGrid {
@@ -55,8 +55,8 @@
 
 .card,
 .previewCard {
-  background: #fff;
-  border: 1px solid #e3e7ea;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border-3);
   border-radius: 16px;
   box-shadow: 0 10px 30px rgba(16, 58, 64, 0.06);
 }
@@ -95,7 +95,7 @@
   gap: 10px;
   padding: 24px 15%;
   text-align: center;
-  color: #d4dadd;
+  color: #d4dadd /* on the dark camera preview in both modes */;
   font-size: 15px;
   line-height: 1.5;
 }
@@ -143,14 +143,14 @@
   align-items: center;
   gap: 8px;
   margin: 12px 4px 0;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .levelTrack {
   flex: 1;
   height: 6px;
   border-radius: 3px;
-  background: #e9ecee;
+  background: var(--cv-line);
   overflow: hidden;
 }
 
@@ -196,7 +196,7 @@
   gap: 12px;
   font-size: 15px;
   font-weight: 600;
-  color: #1a2227;
+  color: var(--cv-text);
 }
 
 .facts svg {
@@ -205,8 +205,8 @@
   padding: 6px;
   box-sizing: content-box;
   border-radius: 8px;
-  background: #edf5f6;
-  color: #23717a;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text);
 }
 
 .facts span {
@@ -219,7 +219,7 @@
 .facts small {
   font-size: 12px;
   font-weight: 500;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .statusCard {
@@ -231,7 +231,7 @@
 .consent {
   font-size: 14px;
   line-height: 1.5;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .waitingLine {
@@ -239,7 +239,7 @@
   align-items: center;
   gap: 12px;
   font-size: 16px;
-  color: #103a40;
+  color: var(--cv-primary-text-deep);
 }
 
 .dots {
@@ -267,7 +267,7 @@
   margin: 0;
   font-size: 14.5px;
   line-height: 1.55;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .textButton {
@@ -275,7 +275,7 @@
   border: 0;
   background: none;
   padding: 0;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   font-size: 13.5px;
   text-decoration: underline;
   cursor: pointer;
@@ -283,7 +283,7 @@
 
 .error {
   font-size: 13.5px;
-  color: #932e24;
+  color: var(--cv-danger-text-strong);
 }
 
 .tips {
@@ -300,13 +300,13 @@
   gap: 10px;
   font-size: 13.5px;
   line-height: 1.5;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .tips svg {
   flex: none;
   margin-top: 2px;
-  color: #23717a;
+  color: var(--cv-primary-text);
 }
 
 /* ---------- in the call ---------- */
@@ -319,7 +319,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #f5f7f8;
+  background: var(--cv-page);
 }
 
 .callBar {
@@ -329,8 +329,8 @@
   gap: 10px 14px;
   flex-wrap: wrap;
   padding: 10px 20px;
-  background: #fff;
-  border-bottom: 1px solid #e3e7ea;
+  background: var(--cv-surface);
+  border-bottom: 1px solid var(--cv-border-3);
 }
 
 .callTitle {
@@ -342,14 +342,14 @@
 }
 
 .callTitle span {
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   font-size: 14px;
 }
 
 .callTimer {
   font-family: var(--mantine-font-family-monospace);
   font-size: 14px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .notRecorded {
@@ -357,7 +357,7 @@
   align-items: center;
   gap: 5px;
   font-size: 12.5px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .spacer {
@@ -387,8 +387,8 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #fff;
-  border-left: 1px solid #e3e7ea;
+  background: var(--cv-surface);
+  border-left: 1px solid var(--cv-border-3);
 }
 
 .tabs {
@@ -396,7 +396,7 @@
   display: flex;
   gap: 4px;
   padding: 8px 10px 0;
-  border-bottom: 1px solid #e9ecee;
+  border-bottom: 1px solid var(--cv-border-light);
 }
 
 .tab {
@@ -409,7 +409,7 @@
   padding: 9px 10px 11px;
   border: 0;
   background: none;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -429,7 +429,7 @@
 }
 
 .tabActive {
-  color: #103a40;
+  color: var(--cv-primary-text-deep);
 }
 
 .tabActive::after {
@@ -442,7 +442,7 @@
   padding: 0 5px;
   border-radius: 999px;
   background: #e0a526;
-  color: #1a2227;
+  color: var(--cv-text);
   font-size: 11px;
   font-weight: 700;
   display: inline-flex;
@@ -473,8 +473,8 @@
   gap: 8px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: #edf5f6;
-  color: #103a40;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text-deep);
   font-size: 13.5px;
   line-height: 1.5;
 }
@@ -487,7 +487,7 @@
 .help {
   margin: 0;
   font-size: 13.5px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 /* ---------- around the call ---------- */
@@ -498,7 +498,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px 16px;
-  background: #f5f7f8;
+  background: var(--cv-page);
 }
 
 .stateCard {
@@ -510,8 +510,8 @@
   gap: 8px;
   padding: 28px 24px;
   text-align: center;
-  background: #fff;
-  border: 1px solid #e3e7ea;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border-3);
   border-radius: 16px;
   box-shadow: 0 10px 30px rgba(16, 58, 64, 0.06);
 }
@@ -524,13 +524,13 @@
   margin: 0 0 6px;
   font-size: 15px;
   line-height: 1.55;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .spinner {
   width: 28px;
   height: 28px;
-  border: 3px solid #d5e9eb;
+  border: 3px solid var(--cv-primary-border);
   border-top-color: #23717a;
   border-radius: 50%;
   animation: spin 1s linear infinite;
@@ -589,7 +589,7 @@
   .callSide {
     height: 520px;
     border-left: 0;
-    border-top: 1px solid #e3e7ea;
+    border-top: 1px solid var(--cv-border-3);
   }
 }
 

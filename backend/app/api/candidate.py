@@ -7,9 +7,10 @@ session. They see the job, the time, the interviewer's name, the call and
 the chat with the interviewer; never scores, rankings, transcripts, the CV
 panel, the assistant or reports (N9).
 
-Identity check (F7): before the interview the candidate can give a face
-reference with consent (three pictures; only an encrypted embedding is
-kept) or decline; they can withdraw later. They never see the result.
+Identity check (F7, §4B-15): after the code, the candidate checks in with
+three camera pictures that are compared with the photo they sent with their
+application (when it is usable), or declines; they can withdraw later. They
+never see the result.
 
 Waiting room: the candidate's page sends a heartbeat while they wait; they
 get a call ticket only after the interviewer let them in (checked here, not
@@ -36,7 +37,7 @@ from app.db.models.interview import (
     SessionStatus,
     Speaker,
 )
-from app.identity import references
+from app.identity import checkin, references
 from app.interviews import chat, room
 
 logger = logging.getLogger(__name__)
@@ -64,10 +65,10 @@ class LobbyOut(BaseModel):
 
 
 class IdentityOut(BaseModel):
-    """The candidate's identity-check choice (never the result, N9)."""
+    """The candidate's check-in (never the result, N9)."""
 
-    available: bool  # the identity check is set up
-    consent: IdentityConsent | None  # None: not asked yet
+    available: bool  # a check-in is possible: set up, application photo usable
+    consent: IdentityConsent | None  # None: not yet; given: checked in
     retention_days: int
 
 
@@ -139,18 +140,22 @@ def join_room(
 
 
 @router.post("/identity", response_model=MyInterviewOut)
-def give_face_reference(
+def check_in(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[CurrentUser, Depends(require_candidate)],
     pictures: Annotated[list[UploadFile], File()],
 ) -> MyInterviewOut:
-    """Consent given: store the face reference from three camera pictures."""
+    """Consent given: compare three camera pictures with the application
+    photo. 422 with what to change when the pictures are unusable; the
+    result itself is only for the interviewer."""
     session = _open(db, user.id)
     if not references.is_set_up():
         raise HTTPException(status.HTTP_409_CONFLICT, IDENTITY_OFF)
     try:
-        references.enrol(db, session, [p.file.read() for p in pictures])
-    except references.EnrolError as exc:
+        checkin.check_in(
+            db, session, [p.file.read(checkin.MAX_PICTURE_BYTES + 1) for p in pictures]
+        )
+    except checkin.CheckInError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
     return _out(db, session)
 
@@ -160,10 +165,11 @@ def decline_identity_check(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[CurrentUser, Depends(require_candidate)],
 ) -> MyInterviewOut:
-    """No identity check: declined, or consent withdrawn (the reference is
-    deleted at once). The interview goes ahead as normal."""
+    """No face check: declined, or consent withdrawn (the result and the
+    processed application photo are deleted at once). The interview goes
+    ahead as normal."""
     session = _open(db, user.id)
-    references.decline(db, session)
+    checkin.decline(db, session)
     return _out(db, session)
 
 
@@ -224,7 +230,8 @@ def _out(db: Session, session: InterviewSession) -> MyInterviewOut:
             interviewer_present=lobby["interviewer_present"], admitted=lobby["admitted"]
         ),
         identity=IdentityOut(
-            available=references.is_set_up(),
+            available=checkin.can_check_in(db, session)
+            or session.identity_consent is not None,
             consent=session.identity_consent,
             retention_days=get_settings().face_retention_days,
         ),

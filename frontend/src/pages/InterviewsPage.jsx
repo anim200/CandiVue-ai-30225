@@ -48,6 +48,21 @@ const INVITATION = {
   failed: { tone: 'danger', icon: IconMailX, text: 'Invitation failed' },
 };
 
+// The application photo for the identity check (F7, §4B-15), shown under
+// upcoming interviews so a missing or unusable photo is known in advance.
+const PHOTO = {
+  ready: ['ok', 'Application photo ready'],
+  pending: ['plain', 'Application photo not processed yet'],
+  missing: ['plain', 'No application photo'],
+  no_consent: ['plain', 'No consent to use the photo'],
+  no_face: ['warn', 'Application photo: no face found'],
+  several_faces: ['warn', 'Application photo: more than one person'],
+  too_small: ['warn', 'Application photo: face too small'],
+  unreadable: ['warn', 'Application photo: file unreadable'],
+  too_large: ['warn', 'Application photo: file too large'],
+  download_failed: ['warn', 'Application photo: download failed'],
+};
+
 // A status badge from one of the tables above.
 function Badge({ of, value }) {
   const { tone, icon: Icon, text } = of[value];
@@ -155,7 +170,14 @@ export default function InterviewsPage() {
         </div>
         {interviews.map((interview) => (
           <div key={interview.id} className={classes.row}>
-            <div className={classes.name}>{interview.candidate_name}</div>
+            <div className={classes.name}>
+              {interview.candidate_name}
+              {when === 'upcoming' && PHOTO[interview.photo] && (
+                <div className={`${classes.photo} ${classes[`photo_${PHOTO[interview.photo][0]}`]}`}>
+                  {PHOTO[interview.photo][1]}
+                </div>
+              )}
+            </div>
             <Link to={`/jobs/${interview.job_id}`} className={`${classes.job} ${classes.medium}`}>
               {interview.job_title}
             </Link>
