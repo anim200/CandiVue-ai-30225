@@ -60,10 +60,10 @@ const ACCEPT = {
 
 // File-type tile colours (design).
 const TYPE_COLORS = {
-  pdf: ['#FBE9E7', '#932E24'],
-  docx: ['#E7EEF9', '#234E8B'],
-  md: ['#EEF1F3', '#3E484F'],
-  txt: ['#EEF1F3', '#3E484F'],
+  pdf: ['var(--cv-danger-tint)', 'var(--cv-danger-text-strong)'],
+  docx: ['var(--cv-info-tint)', 'var(--cv-info-text-strong)'],
+  md: ['var(--cv-muted)', 'var(--cv-text-body)'],
+  txt: ['var(--cv-muted)', 'var(--cv-text-body)'],
 };
 
 // "3.2 MB" / "84 KB" from a number of bytes.
@@ -235,7 +235,7 @@ function RetrievalTest({ collection }) {
       {error && <ErrorBanner title="The search didn’t work.">{error}</ErrorBanner>}
       {hits?.length === 0 && (
         <div className={classes.noHits}>
-          <IconSearchOff size={18} color="#66717A" />
+          <IconSearchOff size={18} color="var(--cv-text-dimmed)" />
           No passages matched closely enough. The assistant would answer without a reference for
           this question. Try different words, or upload a document that covers it.
         </div>
@@ -402,7 +402,7 @@ export default function KnowledgeBasePage() {
       </div>
 
       <div className={classes.warning}>
-        <IconShieldLock size={18} color="#C08A1E" style={{ flex: 'none', marginTop: 1 }} />
+        <IconShieldLock size={18} color="var(--cv-warning-text-mid)" style={{ flex: 'none', marginTop: 1 }} />
         <span>
           <b>Don’t upload CVs, interview notes or any personal data here.</b> CVs arrive through each
           job’s application form.
@@ -430,7 +430,7 @@ export default function KnowledgeBasePage() {
             </Dropzone.Accept>
             <Dropzone.Reject>
               <div className={classes.dragging}>
-                <IconFileX size={30} color="#B03A2E" />
+                <IconFileX size={30} color="var(--cv-danger-text)" />
                 <div className={classes.draggingText}>Only PDF, DOCX, TXT or Markdown, up to {MAX_MB} MB</div>
               </div>
             </Dropzone.Reject>

@@ -28,10 +28,10 @@ import classes from './Report.module.css';
 import { componentRows, coverageLine, POSITIONS } from './reportFormat';
 
 const SECTIONS = [
-  { key: 'strengths', title: 'Strengths', icon: IconThumbUp, color: '#2D7A4E' },
-  { key: 'weaknesses', title: 'Weaknesses', icon: IconThumbDown, color: '#B03A2E' },
-  { key: 'gaps', title: 'Evidence gaps', icon: IconHelpCircle, color: '#C08A1E' },
-  { key: 'verify', title: 'Areas to verify', icon: IconListCheck, color: '#2B5FA8' },
+  { key: 'strengths', title: 'Strengths', icon: IconThumbUp, color: 'var(--cv-success-text)' },
+  { key: 'weaknesses', title: 'Weaknesses', icon: IconThumbDown, color: 'var(--cv-danger-text)' },
+  { key: 'gaps', title: 'Evidence gaps', icon: IconHelpCircle, color: 'var(--cv-warning-text-mid)' },
+  { key: 'verify', title: 'Areas to verify', icon: IconListCheck, color: 'var(--cv-info-text)' },
 ];
 const NEIGHBOURS = 1; // turns shown before and after a cited transcript line
 const SOURCE_KINDS = {
@@ -157,7 +157,7 @@ export function FollowUpCard({ claims, quality, sources, selected, onSelect, ana
     <section className={classes.findings}>
       <div className={classes.section}>
         <h2 className={classes.sectionTitle}>
-          <IconArrowsDiff size={18} color="#B03A2E" />
+          <IconArrowsDiff size={18} color="var(--cv-danger-text)" />
           CV claims to follow up
         </h2>
         {claims.length === 0 && <div className={classes.none}>None: the interview supported the CV claims checked.</div>}

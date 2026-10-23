@@ -6,8 +6,8 @@
   flex-direction: column;
   gap: 12px;
   padding: 18px 20px;
-  background: #fff;
-  border: 1px solid #dee3e6;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
   border-radius: 8px;
   container-type: inline-size;
   animation: fadeUp 0.3s ease-out;
@@ -31,14 +31,14 @@
 }
 
 .title svg {
-  color: #23717a;
+  color: var(--cv-primary-text);
 }
 
 .lead,
 .empty {
   margin: 4px 0 0;
   font-size: 14px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .table {
@@ -52,7 +52,7 @@
   gap: 0 12px;
   align-items: center;
   padding: 10px 0;
-  border-bottom: 1px solid #e9ecee;
+  border-bottom: 1px solid var(--cv-border-light);
   font-size: 15px;
   font-variant-numeric: tabular-nums;
 }
@@ -65,7 +65,7 @@
   padding-top: 4px;
   font-size: 13px;
   font-weight: 600;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .rank {
@@ -74,8 +74,8 @@
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: #edf5f6;
-  color: #1c5d65;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text-strong);
   font-weight: 700;
 }
 
@@ -95,19 +95,19 @@
 
 .name {
   font-weight: 600;
-  color: #1a2227;
+  color: var(--cv-text);
   text-decoration: none;
   overflow-wrap: anywhere;
 }
 
 .name:hover {
-  color: #23717a;
+  color: var(--cv-primary-text);
   text-decoration: underline;
 }
 
 .position {
   font-size: 13px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .badges {
@@ -118,11 +118,11 @@
 
 .overall {
   font-size: 17px;
-  color: #1c5d65;
+  color: var(--cv-primary-text-strong);
 }
 
 .none {
-  color: #8a959d;
+  color: var(--cv-text-faint-3);
 }
 
 .compareLabel {
@@ -136,25 +136,25 @@
 
 .sent {
   font-size: 13px;
-  color: #2d7a4e;
+  color: var(--cv-success-text);
   font-weight: 600;
 }
 
 .compare {
   padding-top: 4px;
-  border-top: 1px solid #e9ecee;
+  border-top: 1px solid var(--cv-border-light);
 }
 
 .waiting {
   padding-top: 10px;
-  border-top: 1px solid #e9ecee;
+  border-top: 1px solid var(--cv-border-light);
 }
 
 .subTitle {
   margin: 0 0 6px;
   font-size: 14px;
   font-weight: 600;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .waiting ul {
@@ -175,11 +175,11 @@
 
 .waiting li a {
   font-weight: 600;
-  color: #23717a;
+  color: var(--cv-primary-text);
 }
 
 .waiting li span {
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 /* Narrow card (tablet/phone): one block per candidate, labelled scores. */
@@ -230,7 +230,7 @@
 
   .row > [data-label]::before {
     content: attr(data-label) ' ';
-    color: #66717a;
+    color: var(--cv-text-dimmed);
     font-size: 13px;
   }
 }

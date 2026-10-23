@@ -43,7 +43,7 @@ function ScreeningBadge({ job }) {
   }
   if (job.screening_status === 'pending' || job.screening_status === 'running') {
     return (
-      <StatusBadge tone="info" icon={<Loader size={10} color="#234E8B" />}>
+      <StatusBadge tone="info" icon={<Loader size={10} color="var(--cv-info-text-strong)" />}>
         Screening…
       </StatusBadge>
     );

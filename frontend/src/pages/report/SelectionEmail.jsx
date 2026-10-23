@@ -146,7 +146,7 @@ export function SelectionEmailModal({ interviewId, candidateName, identityWarnin
             <Preview interviewId={interviewId} email={email} />
           )}
           {sendError && (
-            <Text mt="sm" fz={14} c="#B03A2E" role="alert">
+            <Text mt="sm" fz={14} c="var(--cv-danger-text)" role="alert">
               {sendError}
             </Text>
           )}

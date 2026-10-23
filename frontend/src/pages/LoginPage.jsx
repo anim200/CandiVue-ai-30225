@@ -24,6 +24,7 @@ import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react
 import { apiPost } from '../api/client';
 import { clearSession, loadSession, saveSession } from '../auth/session';
 import Logo from '../components/Logo';
+import ThemeToggle from '../components/ThemeToggle';
 import classes from './LoginPage.module.css';
 
 // Placeholder positioning from the design; to be replaced by the trainee's
@@ -179,6 +180,7 @@ export default function LoginPage() {
       <BrandPanel />
 
       <div className={classes.formSide}>
+        <ThemeToggle className={classes.themeToggle} />
         <form className={classes.form} onSubmit={handleSubmit} noValidate>
           {/* On wide screens the logo is in the brand panel. */}
           <Box hiddenFrom="md">
@@ -208,7 +210,7 @@ export default function LoginPage() {
             type="email"
             autoComplete="email"
             placeholder="name@example.com"
-            leftSection={<IconMail size={17} color="#8A949A" />}
+            leftSection={<IconMail size={17} color="var(--cv-text-faint)" />}
             value={email}
             onChange={(event) => setEmail(event.currentTarget.value)}
             error={emailError}
@@ -218,7 +220,7 @@ export default function LoginPage() {
             label="Password"
             autoComplete="current-password"
             placeholder="Your password"
-            leftSection={<IconLock size={17} color="#8A949A" />}
+            leftSection={<IconLock size={17} color="var(--cv-text-faint)" />}
             value={password}
             onChange={(event) => setPassword(event.currentTarget.value)}
             classNames={{ input: classes.input, label: classes.label }}

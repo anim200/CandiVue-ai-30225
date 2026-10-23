@@ -84,7 +84,7 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  color: #c9d0d4;
+  color: #c9d0d4 /* on the dark stage in both modes */;
 }
 
 .initials {
@@ -200,7 +200,7 @@
   gap: 14px;
   padding: 24px 26% 84px;
   text-align: center;
-  color: #d4dadd;
+  color: #d4dadd /* on the dark stage in both modes */;
   font-size: 15px;
   line-height: 1.55;
 }
@@ -236,7 +236,7 @@
   border: 0;
   border-radius: 999px;
   padding: 8px 16px;
-  background: #fff;
+  background: #ffffff /* a light pill over the video in both modes */;
   color: #1a2227;
   font-size: 14px;
   font-weight: 600;
@@ -391,7 +391,7 @@
   padding: 0 5px;
   border-radius: 999px;
   background: #e0a526;
-  color: #1a2227;
+  color: #1a2227 /* dark text on the amber dot in both modes */;
   font-size: 11px;
   font-weight: 700;
   display: inline-flex;
@@ -421,18 +421,18 @@
 }
 
 .ok {
-  background: #e7f3ec;
-  color: #245f3e;
+  background: var(--cv-success-tint);
+  color: var(--cv-success-text-strong);
 }
 
 .busy {
-  background: #fbf0d9;
-  color: #7a5000;
+  background: var(--cv-warning-tint);
+  color: var(--cv-warning-text);
 }
 
 .bad {
-  background: #fbe9e7;
-  color: #932e24;
+  background: var(--cv-danger-tint);
+  color: var(--cv-danger-text-strong);
 }
 
 /* Narrow stages: your own video sits above the control bar. */
@@ -534,13 +534,13 @@
   }
 
   .control {
-    border: 1px solid #dee3e6;
-    background: #fff;
-    color: #1a2227;
+    border: 1px solid var(--cv-border);
+    background: var(--cv-surface);
+    color: var(--cv-text);
   }
 
   .control:hover {
-    background: #f1f4f5;
+    background: var(--cv-hover);
   }
 
   .controlOff,

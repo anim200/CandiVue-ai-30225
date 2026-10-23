@@ -31,12 +31,12 @@ function jdAsText(jd, profile) {
 export function PostConfirmCard({ question, onDecide, busy }) {
   return (
     <div className={`${classes.postingCard} ${classes.postConfirm}`}>
-      <IconSpeakerphone size={20} color="#C08A1E" style={{ flex: 'none' }} />
+      <IconSpeakerphone size={20} color="var(--cv-warning-text-mid)" style={{ flex: 'none' }} />
       <div className={classes.postingBody}>
         <Text fz={15} fw={600}>
           Post this job to the job board?
         </Text>
-        <Text fz={15} c="#48535B" lh={1.5}>
+        <Text fz={15} c="var(--cv-text-secondary)" lh={1.5}>
           {question.has_form
             ? `I’ll publish job description version ${question.version} on the job board with your application form link.`
             : `Job description version ${question.version} is approved, but the application form link is missing. If you post now, I’ll ask for the link first.`}
@@ -67,12 +67,12 @@ export default function PostingCard({ result, approvedJd, profile, onPost, busy 
   if (result.status === 'posted') {
     return (
       <div className={classes.postingCard}>
-        <IconCircleCheck size={20} color="#2D7A4E" style={{ flex: 'none' }} />
+        <IconCircleCheck size={20} color="var(--cv-success-text)" style={{ flex: 'none' }} />
         <div className={classes.postingBody}>
           <Text fz={15} fw={600}>
             Posted to the job board
           </Text>
-          <Text fz={15} c="#48535B" lh={1.5}>
+          <Text fz={15} c="var(--cv-text-secondary)" lh={1.5}>
             Applicants send CVs through the application form linked in the post.
           </Text>
           <Group gap={12}>
@@ -93,12 +93,12 @@ export default function PostingCard({ result, approvedJd, profile, onPost, busy 
   if (result.status === 'needs_form') {
     return (
       <div className={classes.postingCard}>
-        <IconForms size={20} color="#C08A1E" style={{ flex: 'none' }} />
+        <IconForms size={20} color="var(--cv-warning-text-mid)" style={{ flex: 'none' }} />
         <div className={classes.postingBody}>
           <Text fz={15} fw={600}>
             Not posted yet: the application form link is missing
           </Text>
-          <Text fz={15} c="#48535B" lh={1.5}>
+          <Text fz={15} c="var(--cv-text-secondary)" lh={1.5}>
             Send the Google Form link in the chat, then post the job.
           </Text>
           {onPost && (
@@ -115,12 +115,12 @@ export default function PostingCard({ result, approvedJd, profile, onPost, busy 
 
   return (
     <div className={classes.postingCard}>
-      <IconAlertTriangle size={20} color="#B03A2E" style={{ flex: 'none' }} />
+      <IconAlertTriangle size={20} color="var(--cv-danger-text)" style={{ flex: 'none' }} />
       <div className={classes.postingBody}>
         <Text fz={15} fw={600}>
           The job board didn’t accept the post
         </Text>
-        <Text fz={15} c="#48535B" lh={1.5}>
+        <Text fz={15} c="var(--cv-text-secondary)" lh={1.5}>
           I tried 3 times. The approved job description is saved, so nothing is lost.
           {result.message ? ` (${result.message})` : ''}
         </Text>

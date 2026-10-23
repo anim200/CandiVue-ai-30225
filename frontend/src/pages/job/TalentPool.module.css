@@ -2,8 +2,8 @@
    list; the rows follow the card's own width (container query). */
 
 .card {
-  background: #fff;
-  border: 1px solid #dee3e6;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
   border-radius: 8px;
   overflow: hidden;
   container-type: inline-size;
@@ -12,14 +12,14 @@
 
 .top {
   padding: 14px 20px;
-  border-bottom: 1px solid #dee3e6;
+  border-bottom: 1px solid var(--cv-border);
   display: flex;
   align-items: flex-start;
   gap: 10px;
 }
 
 .icon {
-  color: #23717a;
+  color: var(--cv-primary-text);
   flex: none;
   margin-top: 2px;
 }
@@ -36,7 +36,7 @@
 
 .hint {
   font-size: 14px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   margin-top: 2px;
   line-height: 1.45;
 }
@@ -51,7 +51,7 @@
   gap: 8px;
   padding: 16px 20px;
   font-size: 15px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -59,8 +59,8 @@
   margin: 12px 20px 0;
   padding: 8px 12px;
   border-radius: 6px;
-  background: #fbe9e7;
-  color: #932e24;
+  background: var(--cv-danger-tint);
+  color: var(--cv-danger-text-strong);
   font-size: 14px;
 }
 
@@ -71,13 +71,13 @@
   align-items: center;
   min-height: 64px;
   padding: 0 20px;
-  border-bottom: 1px solid #e9ecee;
+  border-bottom: 1px solid var(--cv-border-light);
   font-size: 15px;
   animation: fadeUp 0.3s ease-out both;
 }
 
 .row:hover {
-  background: #fafbfb;
+  background: var(--cv-subtle);
 }
 
 /* Name and where they applied: opens the evidence drawer. */
@@ -95,7 +95,7 @@
 }
 
 .who:hover .name {
-  color: #1c5d65;
+  color: var(--cv-primary-text-strong);
   text-decoration: underline;
 }
 
@@ -108,7 +108,7 @@
 
 .applied {
   font-size: 14px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   overflow-wrap: anywhere;
 }
 
@@ -123,7 +123,7 @@
   flex: 1;
   max-width: 70px;
   height: 4px;
-  background: #e9ecee;
+  background: var(--cv-line);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -136,7 +136,7 @@
 
 .met {
   font-size: 14px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .action {
@@ -147,7 +147,7 @@
 .note {
   padding: 12px 20px;
   font-size: 14px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   line-height: 1.45;
 }
 

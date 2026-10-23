@@ -145,7 +145,7 @@ function AddCvDialog({ files, onClose, onAdd }) {
         </Text>
       }
     >
-      <Text fz={15} c="#48535B" lh={1.55}>
+      <Text fz={15} c="var(--cv-text-secondary)" lh={1.55}>
         Each file is checked and added to this job’s applicants.
       </Text>
       <Checkbox
@@ -616,7 +616,7 @@ export default function JobPage() {
               Open the job post <IconExternalLink size={13} />
             </Anchor>
           ) : (
-            <Text fz={15} c="#7A5000">
+            <Text fz={15} c="var(--cv-warning-text)">
               The job is not posted yet.{' '}
               <Anchor component={Link} to={`/assistant/${job.id}`} fz={15} fw={600}>
                 Post it from the chat
@@ -624,7 +624,7 @@ export default function JobPage() {
               so people can apply.
             </Text>
           )}
-          <Text fz={14} c="#66717A">
+          <Text fz={14} c="var(--cv-text-dimmed)">
             Received a CV another way? Use <b>Add CV</b> to add it by hand.
           </Text>
         </div>

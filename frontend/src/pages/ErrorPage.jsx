@@ -6,7 +6,7 @@ import { Button, Center, Stack, Text, Title } from '@mantine/core';
 // Friendly full-page message when a page crashes, with a reload button.
 export default function ErrorPage() {
   return (
-    <Center h="100vh" bg="#F5F7F8">
+    <Center h="100vh" bg="var(--cv-page)">
       <Stack align="center" gap="sm" maw={440} ta="center">
         <Title order={1} fz={27}>
           Something went wrong

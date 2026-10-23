@@ -4,7 +4,7 @@
    (user, 07-10-2026). */
 
 .navbar {
-  background: linear-gradient(180deg, #fbfcfc 0%, #f4f8f8 100%);
+  background: linear-gradient(180deg, var(--cv-subtle-3) 0%, var(--cv-subtle-6) 100%);
   padding: 12px 12px 16px;
   display: flex;
   flex-direction: column;
@@ -35,7 +35,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #8a959c;
+  color: var(--cv-text-faint);
 }
 
 .navLink {
@@ -45,7 +45,7 @@
   padding: 0 12px;
   font-size: 15px;
   font-weight: 500;
-  color: #1a2227;
+  color: var(--cv-text);
   transition:
     background-color 0.15s,
     color 0.15s;
@@ -66,13 +66,13 @@
 }
 
 .navLink:hover {
-  background-color: #ebf1f2;
+  background-color: var(--cv-hover-4);
 }
 
 .navLink[data-active],
 .navLink[data-active]:hover {
-  background-color: #e3f0f1;
-  color: #1c5d65;
+  background-color: var(--cv-primary-tint-2);
+  color: var(--cv-primary-text-strong);
   font-weight: 600;
 }
 
@@ -82,13 +82,13 @@
 
 .navIcon {
   margin-right: 12px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
   transition: color 0.15s;
 }
 
 .navLink:hover .navIcon,
 .navLink[data-active] .navIcon {
-  color: #1c5d65;
+  color: var(--cv-primary-text-strong);
 }
 
 /* Icon rail (live interview): icons centred, no titles or reminder card. */
@@ -111,8 +111,8 @@
   height: 21px;
   padding: 0 6px;
   border-radius: 999px;
-  background: #fbf0d9;
-  color: #7a5000;
+  background: var(--cv-warning-tint);
+  color: var(--cv-warning-text);
   font-size: 12px;
   font-weight: 700;
   display: inline-flex;
@@ -124,10 +124,10 @@
   display: flex;
   gap: 10px;
   padding: 12px;
-  border: 1px solid #d5e9eb;
+  border: 1px solid var(--cv-primary-border);
   border-radius: 8px;
-  background: #edf5f6;
-  color: #1c5d65;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text-strong);
   font-size: 13px;
   line-height: 1.45;
 }

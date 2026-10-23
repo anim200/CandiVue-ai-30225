@@ -123,7 +123,7 @@ export default function AppLayout() {
         )}
       </AppShell.Navbar>
 
-      <AppShell.Main bg="#F5F7F8">
+      <AppShell.Main bg="var(--cv-page)">
         <Box px={fullBleed ? 0 : { base: 16, sm: 32 }} py={fullBleed ? 0 : { base: 16, sm: 24 }}>
           <Outlet />
         </Box>

@@ -23,8 +23,8 @@
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #dee3e6;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
   border-radius: 8px;
   overflow: hidden;
   container-type: inline-size;
@@ -43,15 +43,15 @@
 .head {
   padding-top: 10px;
   padding-bottom: 10px;
-  border-bottom: 1px solid #dee3e6;
+  border-bottom: 1px solid var(--cv-border);
   font-size: 13px;
   font-weight: 600;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .row {
   min-height: 52px;
-  border-bottom: 1px solid #e9ecee;
+  border-bottom: 1px solid var(--cv-border-light);
   font-size: 15px;
   transition: background 0.15s;
 }
@@ -61,7 +61,7 @@
 }
 
 .row:hover {
-  background: #f1f4f5;
+  background: var(--cv-hover);
 }
 
 .name {
@@ -70,7 +70,7 @@
 }
 
 .job {
-  color: #23717a;
+  color: var(--cv-primary-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -81,12 +81,12 @@
   margin-top: 4px;
   font-size: 12px;
   line-height: 1.4;
-  color: #932e24;
+  color: var(--cv-danger-text-strong);
 }
 
 .when {
   font-variant-numeric: tabular-nums;
-  color: #48535b;
+  color: var(--cv-text-secondary);
   white-space: nowrap;
 }
 
@@ -147,13 +147,13 @@
 }
 
 .photo_ok {
-  color: #2d7a4e;
+  color: var(--cv-success-text);
 }
 
 .photo_warn {
-  color: #9a6400;
+  color: var(--cv-warning-text-3);
 }
 
 .photo_plain {
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }

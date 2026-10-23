@@ -21,14 +21,15 @@ import { useParams } from 'react-router';
 import { apiPost } from '../api/client';
 import { clearSession, loadSession, saveSession } from '../auth/session';
 import Logo from '../components/Logo';
+import ThemeToggle from '../components/ThemeToggle';
 import { HELP_EMAIL } from '../config';
 import classes from './CandidateJoinPage.module.css';
 import CandidateInterview from './interview/CandidateInterview';
 
 // Icon circle colours from the design frames.
-const RED = { bg: '#FBE9E7', color: '#B03A2E' };
-const GREEN = { bg: '#E7F3EC', color: '#2D7A4E' };
-const TEAL = { bg: '#EDF5F6', color: '#23717A' };
+const RED = { bg: 'var(--cv-danger-tint)', color: 'var(--cv-danger-text)' };
+const GREEN = { bg: 'var(--cv-success-tint)', color: 'var(--cv-success-text)' };
+const TEAL = { bg: 'var(--cv-primary-tint)', color: 'var(--cv-primary-text)' };
 
 // What to show for each result of the link check (wording from the design).
 function messageFor(result) {
@@ -60,7 +61,7 @@ function messageFor(result) {
 // White card used for every state of the link page.
 function StateCard({ children }) {
   return (
-    <Box bg="white" w="100%" maw={420} px={24} py={28} style={{ border: '1px solid #DEE3E6', borderRadius: 8 }}>
+    <Box bg="var(--cv-surface)" w="100%" maw={420} px={24} py={28} style={{ border: '1px solid var(--cv-border)', borderRadius: 8 }}>
       <Stack align="center" gap={10} ta="center">
         {children}
       </Stack>
@@ -117,7 +118,7 @@ function CodeStep({ linkToken, sent, onJoined, onResend }) {
       <Text fz={18} fw={600}>
         Check your email
       </Text>
-      <Text fz={15} lh={1.55} c="#48535B">
+      <Text fz={15} lh={1.55} c="var(--cv-text-secondary)">
         We sent a 6-digit code to <b>{sent.email_hint}</b>. Enter it to open your interview. This keeps your
         interview private, even if the link is forwarded.
       </Text>
@@ -135,14 +136,14 @@ function CodeStep({ linkToken, sent, onJoined, onResend }) {
         mt={6}
       />
       {error && (
-        <Text fz={14} c="#932E24" role="alert">
+        <Text fz={14} c="var(--cv-danger-text-strong)" role="alert">
           {error}
         </Text>
       )}
       <Button variant="subtle" size="sm" disabled={wait > 0 || busy} onClick={onResend}>
         {wait > 0 ? `Send a new code in ${wait} s` : 'Send a new code'}
       </Button>
-      <Text fz={13} c="#66717A">
+      <Text fz={13} c="var(--cv-text-dimmed)">
         The code works once, for 10 minutes. Not arrived? Check your spam folder.
       </Text>
     </StateCard>
@@ -192,7 +193,7 @@ export default function CandidateJoinPage() {
   const message = result.status === 'failed' ? messageFor(result) : null;
 
   return (
-    <Box mih="100vh" bg="#F5F7F8">
+    <Box mih="100vh" bg="var(--cv-page)">
       <header className={classes.header}>
         <Logo />
         <span className={classes.help}>
@@ -206,6 +207,7 @@ export default function CandidateJoinPage() {
               {HELP_EMAIL}
             </Anchor>
           </span>
+          <ThemeToggle />
         </span>
       </header>
 
@@ -231,7 +233,7 @@ export default function CandidateJoinPage() {
               <Text fz={18} fw={600}>
                 {message.title}
               </Text>
-              <Text fz={15} lh={1.55} c="#48535B">
+              <Text fz={15} lh={1.55} c="var(--cv-text-secondary)">
                 {message.text}
               </Text>
               {message.canRetry && (

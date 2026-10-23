@@ -33,7 +33,7 @@ export default function JobProgressBar({ job }) {
           {job.title}
         </div>
         <span className={classes.safeNote}>
-          <IconShieldCheck size={14} color="#23717A" />
+          <IconShieldCheck size={14} color="var(--cv-primary-text)" />
           Nothing is posted or sent until you confirm
         </span>
       </div>

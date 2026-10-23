@@ -24,7 +24,7 @@
 
 .intro {
   font-size: 15px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
   max-width: 640px;
   line-height: 1.55;
   margin-top: 6px;
@@ -35,7 +35,7 @@
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .dot {
@@ -55,10 +55,10 @@
   align-items: flex-start;
   padding: 10px 14px;
   border-radius: 8px;
-  background: #fbf0d9;
+  background: var(--cv-warning-tint);
   font-size: 15px;
   line-height: 1.5;
-  color: #5a3d00;
+  color: var(--cv-warning-text-deep);
 }
 
 .warning b {
@@ -82,8 +82,8 @@
 /* ---- Collections ---- */
 
 .collections {
-  background: #fff;
-  border: 1px solid #dee3e6;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
   border-radius: 8px;
   padding: 8px;
   display: flex;
@@ -94,7 +94,7 @@
 .collectionsTitle {
   font-size: 13px;
   font-weight: 600;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   padding: 6px 8px;
 }
 
@@ -110,27 +110,27 @@
   background: none;
   text-align: left;
   font-family: inherit;
-  color: #1a2227;
+  color: var(--cv-text);
   width: 100%;
 }
 
 .collection:hover {
-  background: #f1f4f5;
+  background: var(--cv-hover);
 }
 
 .collectionActive,
 .collectionActive:hover {
-  background: #edf5f6;
+  background: var(--cv-primary-tint);
 }
 
 .collectionIcon {
   flex: none;
   margin-top: 1px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .collectionActive .collectionIcon {
-  color: #23717a;
+  color: var(--cv-primary-text);
 }
 
 .collectionText {
@@ -151,27 +151,27 @@
 
 .collectionActive .collectionName {
   font-weight: 600;
-  color: #1c5d65;
+  color: var(--cv-primary-text-strong);
 }
 
 .count {
   font-size: 13px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
 
 .use {
   font-size: 13px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   line-height: 1.4;
 }
 
 /* ---- Drop zone ---- */
 
 .dropzone {
-  border: 2px dashed #c9d0d4;
-  background: #fafbfb;
+  border: 2px dashed var(--cv-border-strong);
+  background: var(--cv-subtle);
   border-radius: 10px;
   padding: 26px 20px;
   transition:
@@ -180,18 +180,18 @@
 }
 
 .dropzone:hover {
-  background: #edf5f6;
+  background: var(--cv-primary-tint);
   border-color: #4fa2ab;
 }
 
 .dropzone[data-accept] {
   border-color: #23717a;
-  background: #edf5f6;
+  background: var(--cv-primary-tint);
 }
 
 .dropzone[data-reject] {
   border-color: #b03a2e;
-  background: #fbe9e7;
+  background: var(--cv-danger-tint);
 }
 
 .dropInner {
@@ -205,9 +205,9 @@
   width: 52px;
   height: 52px;
   border-radius: 12px;
-  background: #fff;
-  border: 1px solid #d5e9eb;
-  color: #23717a;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-primary-border);
+  color: var(--cv-primary-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -229,7 +229,7 @@
 }
 
 .choose {
-  color: #1c5d65;
+  color: var(--cv-primary-text-strong);
   text-decoration: underline;
   cursor: pointer;
   border: 0;
@@ -240,12 +240,12 @@
 
 .dropMeta {
   font-size: 14px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
 }
 
 .dropMeta b {
   font-weight: 600;
-  color: #1a2227;
+  color: var(--cv-text);
 }
 
 .target {
@@ -258,7 +258,7 @@
 
 .targetLabel {
   font-size: 13px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 /* Files being dragged over the zone (frame 2a). */
@@ -272,21 +272,21 @@
 }
 
 .draggingIcon {
-  color: #23717a;
+  color: var(--cv-primary-text);
   animation: bob 1.2s ease-in-out infinite;
 }
 
 .draggingText {
   font-size: 17px;
   font-weight: 600;
-  color: #103a40;
+  color: var(--cv-primary-text-deep);
 }
 
 /* ---- Documents table ---- */
 
 .card {
-  background: #fff;
-  border: 1px solid #dee3e6;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
   border-radius: 8px;
   overflow: hidden;
   container-type: inline-size; /* the table below follows the card's width */
@@ -294,7 +294,7 @@
 
 .tableTop {
   padding: 12px 18px;
-  border-bottom: 1px solid #dee3e6;
+  border-bottom: 1px solid var(--cv-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -307,7 +307,7 @@
 
 .tableCount {
   font-size: 14px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .head,
@@ -322,14 +322,14 @@
 .head {
   padding-top: 9px;
   padding-bottom: 9px;
-  border-bottom: 1px solid #dee3e6;
+  border-bottom: 1px solid var(--cv-border);
   font-size: 13px;
   font-weight: 600;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .docItem {
-  border-bottom: 1px solid #e9ecee;
+  border-bottom: 1px solid var(--cv-border-light);
   animation: fadeUp 0.3s ease-out;
 }
 
@@ -375,11 +375,11 @@
 
 .small {
   font-size: 13px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
 }
 
 .collectionCell {
-  color: #48535b;
+  color: var(--cv-text-secondary);
   font-size: 14px;
 }
 
@@ -392,7 +392,7 @@
 .badgeSpinner {
   width: 9px;
   height: 9px;
-  border: 1.5px solid #a9c0e4;
+  border: 1.5px solid var(--cv-info-border);
   border-top-color: #234e8b;
   border-radius: 50%;
   display: inline-block;
@@ -404,7 +404,7 @@
   height: 4px;
   width: 120px;
   max-width: 100%;
-  background: #e9ecee;
+  background: var(--cv-line);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -433,7 +433,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #48535b;
+  color: var(--cv-text-secondary);
   cursor: pointer;
   border: 0;
   background: none;
@@ -441,16 +441,16 @@
 }
 
 .iconButton:hover {
-  background: #fbe9e7;
-  color: #932e24;
+  background: var(--cv-danger-tint);
+  color: var(--cv-danger-text-strong);
 }
 
 .message {
   margin: 0 18px 12px 58px;
   padding: 9px 12px;
   border-radius: 6px;
-  background: #fbe9e7;
-  color: #5a2620;
+  background: var(--cv-danger-tint);
+  color: var(--cv-danger-text-deep);
   font-size: 14px;
   line-height: 1.5;
   display: flex;
@@ -480,8 +480,8 @@
 /* ---- Search test ---- */
 
 .search {
-  background: #fff;
-  border: 1px solid #dee3e6;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
   border-radius: 8px;
   padding: 16px 18px;
   display: flex;
@@ -496,7 +496,7 @@
 
 .searching {
   font-size: 14px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -505,7 +505,7 @@
 .spinner {
   width: 12px;
   height: 12px;
-  border: 2px solid #d5e9eb;
+  border: 2px solid var(--cv-primary-border);
   border-top-color: #23717a;
   border-radius: 50%;
   display: inline-block;
@@ -513,7 +513,7 @@
 }
 
 .hit {
-  border: 1px solid #e9ecee;
+  border: 1px solid var(--cv-border-light);
   border-radius: 6px;
   padding: 10px 12px;
   display: flex;
@@ -531,7 +531,7 @@
 
 .hitSource {
   font: 500 13px var(--mantine-font-family-monospace);
-  color: #1c5d65;
+  color: var(--cv-primary-text-strong);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -539,7 +539,7 @@
 
 .match {
   font-size: 13px;
-  color: #66717a;
+  color: var(--cv-text-dimmed);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -549,7 +549,7 @@
 .matchTrack {
   width: 60px;
   height: 4px;
-  background: #e9ecee;
+  background: var(--cv-line);
   border-radius: 2px;
 }
 
@@ -567,7 +567,7 @@
 
 .noHits {
   font-size: 15px;
-  color: #48535b;
+  color: var(--cv-text-secondary);
   line-height: 1.5;
   display: flex;
   gap: 10px;
@@ -585,7 +585,7 @@
 }
 
 .skeleton div {
-  background: #edf0f2;
+  background: var(--cv-muted);
   border-radius: 4px;
   height: 14px;
 }

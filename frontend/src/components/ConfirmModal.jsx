@@ -41,7 +41,7 @@ export default function ConfirmModal({
         </Text>
       }
     >
-      <Text fz={15} c="#48535B" lh={1.55}>
+      <Text fz={15} c="var(--cv-text-secondary)" lh={1.55}>
         {children}
       </Text>
       <Group justify="flex-end" gap={8} mt="lg">
