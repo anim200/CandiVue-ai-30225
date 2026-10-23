@@ -199,6 +199,7 @@ width.
 | `LLM_TIMEOUT_SECONDS` | `60` | Longest wait for one answer. |
 | `LLM_MAX_RETRIES` | `2` | Extra tries after a failure, with a growing pause. |
 | `LLM_TEMPERATURE` | `0` | Randomness of answers. `0` keeps candidate scores repeatable. |
+| `SCREENING_AI_MODEL` / `SCREENING_MODEL` | `gemini-3.5-flash-lite` / `qwen3:4b-instruct` | The two AI checks in CV screening: Gemini first (with `LLM_API_KEY`), the local Ollama model when there is no key, the quota is used up or Gemini fails. Empty `SCREENING_AI_MODEL` = local model only. |
 | `EMBEDDING_PROVIDER` / `EMBEDDING_MODEL` | `ollama` / `qwen3-embedding:0.6b` | Model that turns knowledge-base text into embeddings for search. Runs locally in Docker (no key). `google_genai` / `gemini-embedding-001` uses Gemini with the LLM key instead. |
 | `MAX_UPLOAD_MB` | `20` | Largest knowledge-base document accepted. |
 
@@ -218,7 +219,12 @@ width.
     CV summary**: job titles with dates, years, skills, degree level,
     certificates and how each requirement was met in screening. No name,
     email, phone number, address or links (they are removed first).
-  - CV screening: nothing (it runs locally, see "CV screening").
+  - CV screening: only for a CV the rules cannot settle (no job dates,
+    or a mandatory requirement not found before excluding): the CV text
+    (first 6,000 characters) with **email addresses, phone numbers,
+    links and the candidate's name removed**, the job's requirement
+    names, and today's date. Nothing when there is no key or
+    `SCREENING_AI_MODEL` is empty (the local model answers).
   - Interview analysis (F5, F8-F10): the job title and requirements, the
     interview transcript with **names, email addresses, phone numbers and
     links removed**, the knowledge-base passages found for each answer
@@ -942,11 +948,29 @@ CVs in one batch, one parallel branch per CV (at most 4 at a time: the
 local models answer one request at a time, and more branches used up the
 database connections; see docs/VERIFICATION.md), in the background with
 progress ("12 of 20 CVs"). It is checkpointed, so after a restart it
-continues where it stopped (N26). **No Gemini is used**: everything runs
-locally, so there is no quota and CV text stays on this machine. Mostly
-rules and local embeddings; a small **local model** (Ollama,
-`SCREENING_MODEL`, default `qwen3:4b-instruct`, about 2.5 GB) is asked only
-in the two cases the rules cannot settle (see below).
+continues where it stopped (N26). Mostly rules and local embeddings; an
+**AI model** is asked only in the two cases the rules cannot settle (see
+below), at most one request per question, and its answers are saved, so a
+repeat run asks nothing. Which model (`app/screening/ai_checks.py`):
+
+- **Gemini first** (`SCREENING_AI_MODEL`, default `gemini-3.5-flash-lite`,
+  the cheapest), with the CV's contact details and name removed;
+- the **local model** (Ollama, `SCREENING_MODEL`, default
+  `qwen3:4b-instruct`, about 2.5 GB, no quota) when there is no API key,
+  `SCREENING_AI_MODEL` is empty, Gemini's daily quota is known to be used
+  up, or Gemini still fails after its retries (then Gemini is skipped for
+  10 minutes, so the other CVs do not wait for it);
+- if **both** fail, the run stops with a clear message: nobody is excluded
+  on the rules alone. An answer in the wrong format is ignored (not asked
+  again).
+
+Screening requests count in the usage meter under the chat. The panel
+says which model gave each answer. Gemini 3.5 models ignore the
+temperature setting, so a first answer can differ slightly between fresh
+screenings; saved answers keep every repeat run the same (F2). Live check
+(23-10-2026, synthetic CV): Gemini read "seven years" and found Docker in
+a Compose line, invented nothing for Kafka; with Gemini unavailable the
+local model gave the same answers (about 100 s, mostly loading it).
 
 ```
 load_cv_batch → Send (one branch per CV):
@@ -970,8 +994,8 @@ load_cv_batch → Send (one branch per CV):
   "2017 through 2018", "March 2019 until today" and "since 2014".
   "Master" counts as a degree only as "Master of / Master's in" (not
   "Scrum Master").
-- **Years without dates (local model):** when the rules find no job dates,
-  the local model reads the years the CV shows ("7 years of experience",
+- **Years without dates (AI check):** when the rules find no job dates,
+  the AI model reads the years the CV shows ("7 years of experience",
   "over five years"). It must quote the CV lines it used; a rule checks the
   quotes are really in the CV and the number comes from them. If nothing is
   found, the years are **unknown**: the candidate is **not excluded** for
@@ -986,11 +1010,11 @@ load_cv_batch → Send (one branch per CV):
   counts; "no manual steps using Docker" still counts. A version number
   does not hide a name ("PHP8" counts for PHP). Every result keeps the CV
   line as evidence.
-- **Second look before excluding (local model):** when a mandatory
+- **Second look before excluding (AI check):** when a mandatory
   requirement is still not found (and the years are not too few anyway),
-  the local model reads the CV once more. It counts only with a quoted line
-  that is really in the CV and does not deny the skill; the panel then says
-  the local model found it. This protects against excluding a good
+  the AI model reads the CV once more (all such requirements of a CV in one
+  request). It counts only with a quoted line that is really in the CV and
+  does not deny the skill; the panel then says which model found it. This protects against excluding a good
   candidate because the rules missed a wording.
 - **Hard-requirement gate:** a candidate is **excluded** (not ranked, with
   the reason) when a mandatory requirement is not met, is only "partly met
@@ -1036,8 +1060,8 @@ correctly. A fresh run and a repeat run give the same ranking.
   saved; check them, since a missing name can make a skill look unmet.
 - Similarity thresholds were calibrated on synthetic CVs; unusual CV
   layouts can lose lines. Scanned CVs are marked so they can be checked.
-- The local model is small: its answers are only used with a quote that
-  is checked against the CV, but it can still miss a wording (then the
+- The AI checks (Gemini or the small local model) are only used with a
+  quote that is checked against the CV, but they can still miss a wording (then the
   result is the same as the rules alone). Years it computes from unusual
   dates are checked for plausibility, not exactly.
 - English CVs only (OCR and rules are set up for English).
