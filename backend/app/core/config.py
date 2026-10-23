@@ -34,9 +34,12 @@ class Settings(BaseSettings):
     embedding_model: str = "qwen3-embedding:0.6b"
     ollama_base_url: str = "http://ollama:11434"  # the ollama service in Compose
 
-    # Local model for CV screening (app/screening/local_model.py): reads the
-    # years when a CV has no readable job dates, and checks a missing
-    # mandatory requirement once more before a candidate is excluded.
+    # AI checks in CV screening (app/screening/ai_checks.py): read the years
+    # when a CV has no readable job dates, and check a missing mandatory
+    # requirement once more before a candidate is excluded. Gemini first
+    # (SCREENING_AI_MODEL, with the LLM key; empty = never), else the local
+    # model (SCREENING_MODEL, Ollama).
+    screening_ai_model: str = "gemini-3.5-flash-lite"
     screening_model: str = "qwen3:4b-instruct"
     screening_model_timeout_seconds: float = Field(default=300, gt=0)
 

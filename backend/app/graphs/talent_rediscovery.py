@@ -5,10 +5,12 @@ screened against the job with LangGraph 2's own per-CV subgraph.
           → collect_results → save_matches → END
 
 - Runs after the job's screening finishes, and again on "Check again".
-- No new AI and nothing leaves the machine: the same local parsing,
-  matching, gate and scores as screening (parsed CVs and their embeddings
-  are reused). Only applications that pass the job's mandatory
-  requirements and reach SHOW_FROM are saved as matches.
+- The same parsing, matching, gate and scores as screening (parsed CVs
+  and their embeddings are reused). Like screening, a must-have of this
+  job the rules miss gets the AI second look (Gemini first, the local
+  model as fallback; app/screening/ai_checks.py). Only applications that
+  pass the job's mandatory requirements and reach SHOW_FROM are saved as
+  matches.
 - Matches are stored apart from screening runs, so they never mix into the
   job's own ranking. Checkpointed like every run (N26).
 """

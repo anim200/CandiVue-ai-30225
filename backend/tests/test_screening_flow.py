@@ -20,8 +20,8 @@ from app.db.models import Candidate, Job, ScreeningRun
 from app.graphs import cv_screening
 from app.graphs.checkpointer import open_checkpointer
 from app.main import app
-from app.screening import local_model, matching
-from app.screening.local_model import RequirementAnswer, RequirementAnswers, YearsAnswer
+from app.screening import ai_checks, matching
+from app.screening.ai_checks import RequirementAnswer, RequirementAnswers, YearsAnswer
 
 pytestmark = pytest.mark.usefixtures("database_available")
 
@@ -105,7 +105,7 @@ def model_says_no(monkeypatch):
             return YearsAnswer(years=None, evidence=[])
         return RequirementAnswers(answers=[])
 
-    monkeypatch.setattr(local_model, "_ask", answer)
+    monkeypatch.setattr(ai_checks, "_ask", lambda p, s: (answer(p, s), "test-model"))
 
 
 @pytest.fixture
@@ -270,7 +270,7 @@ def test_no_dates_and_a_second_look_before_excluding(intake_dir, monkeypatch):
             answers=[RequirementAnswer(number=1, has_it=True, quote=quote)]
         )
 
-    monkeypatch.setattr(local_model, "_ask", answer)
+    monkeypatch.setattr(ai_checks, "_ask", lambda p, s: (answer(p, s), "test-model"))
     run_now(monkeypatch)
     job = make_job(
         [
@@ -298,9 +298,8 @@ def test_no_dates_and_a_second_look_before_excluding(intake_dir, monkeypatch):
     docker = next(
         m for m in ranked["Cam Tainer"]["matches"] if m["requirement"] == "Docker"
     )
-    assert (
-        docker["decided_by"] == "local_model" and docker["evidence"] == CONTAINERS_LINE
-    )
+    assert docker["decided_by"] == "ai_model" and docker["model"] == "test-model"
+    assert docker["evidence"] == CONTAINERS_LINE
     assert [r["name"] for r in result["excluded"]] == [
         "Lee Plain"
     ]  # invented line ignored

@@ -20,6 +20,7 @@ from app.assistant import drafting, posting
 from app.assistant.interview_tools import INTERVIEW_TOOLS
 from app.assistant.posting import clean_form_url
 from app.assistant.schemas import JobProfile
+from app.assistant.scope import decline_off_topic
 from app.core import clock
 from app.db.database import SessionLocal
 from app.db.models import Job, JobDescription
@@ -226,6 +227,7 @@ TOOLS = [
     set_application_deadline,
     request_job_posting,
     *INTERVIEW_TOOLS,  # shortlist and invitations (after screening)
+    decline_off_topic,  # the scope guardrail (scope.py)
 ]
 
 

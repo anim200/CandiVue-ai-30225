@@ -6,8 +6,8 @@ tests check the rules themselves.
 
 from datetime import date
 
-from app.screening import local_model, matching, scoring
-from app.screening.local_model import RequirementAnswer, RequirementAnswers, YearsAnswer
+from app.screening import ai_checks, matching, scoring
+from app.screening.ai_checks import RequirementAnswer, RequirementAnswers, YearsAnswer
 from app.screening.parsing import (
     find_jobs,
     find_name,
@@ -269,33 +269,33 @@ Senior PHP Developer, Company X
 
 
 def fake_model(monkeypatch, answer):
-    """The local model gives `answer` to any question."""
-    monkeypatch.setattr(local_model, "_ask", lambda prompt, schema: answer)
+    """The AI model ("test-model") gives `answer` to any question."""
+    monkeypatch.setattr(
+        ai_checks, "_ask", lambda prompt, schema: (answer, "test-model")
+    )
 
 
-def test_years_from_the_local_model_must_come_from_the_cv(monkeypatch):
+def test_years_from_the_ai_model_must_come_from_the_cv(monkeypatch):
     quote = "PHP developer with 7 years of experience."
     fake_model(monkeypatch, YearsAnswer(years=7, evidence=[quote]))
-    assert local_model.read_years(STATED_CV, TODAY) == (7.0, [quote])
+    assert ai_checks.read_years(STATED_CV, TODAY) == (7.0, [quote], "test-model")
 
     fake_model(monkeypatch, YearsAnswer(years=9, evidence=["9 years of PHP"]))
-    assert local_model.read_years(STATED_CV, TODAY) is None  # quote not in the CV
+    assert ai_checks.read_years(STATED_CV, TODAY) is None  # quote not in the CV
 
     fake_model(monkeypatch, YearsAnswer(years=9, evidence=[quote]))
-    assert local_model.read_years(STATED_CV, TODAY) is None  # 9 is not in the quote
+    assert ai_checks.read_years(STATED_CV, TODAY) is None  # 9 is not in the quote
 
     fake_model(monkeypatch, YearsAnswer(years=None, evidence=[]))
-    assert local_model.read_years(STATED_CV, TODAY) is None
+    assert ai_checks.read_years(STATED_CV, TODAY) is None
 
 
 def test_years_must_fit_the_quoted_lines():
-    assert local_model.years_supported(
+    assert ai_checks.years_supported(
         5, ["Company X (3 years)", "Company Y (2 years)"], TODAY
     )
-    assert local_model.years_supported(6.5, ["PHP Developer, 2020/01 onwards"], TODAY)
-    assert not local_model.years_supported(
-        12, ["PHP Developer, 2020/01 onwards"], TODAY
-    )
+    assert ai_checks.years_supported(6.5, ["PHP Developer, 2020/01 onwards"], TODAY)
+    assert not ai_checks.years_supported(12, ["PHP Developer, 2020/01 onwards"], TODAY)
 
 
 def test_a_second_look_needs_a_real_line_that_claims_it(monkeypatch):
@@ -315,12 +315,11 @@ def test_a_second_look_needs_a_real_line_that_claims_it(monkeypatch):
         monkeypatch,
         answer("Runs every service in containers built from Compose files."),
     )
-    assert local_model.confirm_requirements(cv, [docker])["Docker"].startswith(
-        "Runs every"
-    )
+    found, model = ai_checks.confirm_requirements(cv, [docker])
+    assert found["Docker"].startswith("Runs every") and model == "test-model"
 
     fake_model(monkeypatch, answer("Uses Docker every day."))  # not in the CV
-    assert local_model.confirm_requirements(cv, [docker]) == {"Docker": None}
+    assert ai_checks.confirm_requirements(cv, [docker])[0] == {"Docker": None}
 
     fake_model(monkeypatch, answer("Interested in learning Docker."))  # only a wish
-    assert local_model.confirm_requirements(cv, [docker]) == {"Docker": None}
+    assert ai_checks.confirm_requirements(cv, [docker])[0] == {"Docker": None}

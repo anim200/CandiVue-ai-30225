@@ -27,7 +27,9 @@ import { Link, useParams, useSearchParams } from 'react-router';
 import { apiGet, apiPost } from '../../api/client';
 import ConfirmModal from '../../components/ConfirmModal';
 import { EmptyState, ErrorBanner, Skeleton } from '../../components/Feedback';
+import PageHero from '../../components/PageHero';
 import { notifyError } from '../../components/notify';
+import AiSignalStatus from '../../components/AiSignalStatus';
 import StatusBadge from '../../components/StatusBadge';
 import { whenText } from '../../utils/dates';
 import { usePolling } from '../../utils/usePolling';
@@ -57,13 +59,18 @@ function spanText(interview) {
 function AnalysisProgress({ run }) {
   const share = run.total ? Math.round((100 * run.processed) / run.total) : 0;
   return (
-    <section className={classes.card} role="status">
+    <section className={classes.card}>
       <div className={classes.cardHead}>
         <h2 className={classes.cardTitle}>Analysing questions and answers</h2>
-        <span className={classes.mono}>
-          {run.total ? `${run.processed} of ${run.total} Q&A units` : 'Finding the questions…'}
-        </span>
       </div>
+      <AiSignalStatus
+        status={
+          run.total
+            ? `Checking answer ${Math.min(run.processed + 1, run.total)} of ${run.total}…`
+            : 'Finding the questions…'
+        }
+        startedAt={run.started_at}
+      />
       <div className={classes.track}>
         <div className={classes.stripes} style={{ width: `${Math.max(share, 4)}%` }} />
       </div>
@@ -246,38 +253,40 @@ export default function InterviewAnalysisPage() {
 
   return (
     <div className={classes.page}>
-      <div className={classes.header}>
-        <div className={classes.breadcrumb}>
-          <Link to="/interviews">Interviews</Link>
-          <IconChevronRight size={14} />
-          <span>{interview.candidate_name}</span>
-        </div>
-        <div className={classes.titleRow}>
-          <div className={classes.titleBlock}>
-            <h1 className={classes.title}>{interview.candidate_name} · Interview analysis</h1>
-            <div className={classes.meta}>
-              <Anchor component={Link} to={`/jobs/${interview.job_id}`} c="inherit">
-                {interview.job_title}
-              </Anchor>
-              <span className={classes.sep}>·</span>
-              <span>{spanText(interview)}</span>
-              {badge && (
-                <StatusBadge tone={badge.tone} icon={<badge.icon size={13} />}>
-                  {badge.text}
-                </StatusBadge>
-              )}
-            </div>
+      <PageHero art="qa">
+        <div className={classes.header}>
+          <div className={classes.breadcrumb}>
+            <Link to="/interviews">Interviews</Link>
+            <IconChevronRight size={14} />
+            <span>{interview.candidate_name}</span>
           </div>
-          <Button
-            component={Link}
-            to={`/interviews/${interviewId}/report`}
-            leftSection={<IconFileText size={16} />}
-            disabled={!report}
-          >
-            Open assessment report
-          </Button>
+          <div className={classes.titleRow}>
+            <div className={classes.titleBlock}>
+              <h1 className={classes.title}>{interview.candidate_name} · Interview analysis</h1>
+              <div className={classes.meta}>
+                <Anchor component={Link} to={`/jobs/${interview.job_id}`} c="inherit">
+                  {interview.job_title}
+                </Anchor>
+                <span className={classes.sep}>·</span>
+                <span>{spanText(interview)}</span>
+                {badge && (
+                  <StatusBadge tone={badge.tone} icon={<badge.icon size={13} />}>
+                    {badge.text}
+                  </StatusBadge>
+                )}
+              </div>
+            </div>
+            <Button
+              component={Link}
+              to={`/interviews/${interviewId}/report`}
+              leftSection={<IconFileText size={16} />}
+              disabled={!report}
+            >
+              Open assessment report
+            </Button>
+          </div>
         </div>
-      </div>
+      </PageHero>
 
       <Tabs value={tab} onChange={(value) => setSearch({ tab: value })} keepMounted={false}>
         <Tabs.List className={classes.tabs}>

@@ -30,6 +30,7 @@ import { Link, useNavigate } from 'react-router';
 import { apiGet, apiPost } from '../api/client';
 import ConfirmModal from '../components/ConfirmModal';
 import { EmptyState, ErrorBanner, Skeleton } from '../components/Feedback';
+import PageHero from '../components/PageHero';
 import { notifyDone, notifyError } from '../components/notify';
 import StatusBadge from '../components/StatusBadge';
 import { whenText } from '../utils/dates';
@@ -262,17 +263,19 @@ export default function InterviewsPage() {
 
   return (
     <div className={classes.page}>
-      <div className={classes.top}>
-        <h1 className={classes.title}>Interviews</h1>
-        <SegmentedControl
-          value={when}
-          onChange={setWhen}
-          data={[
-            { value: 'upcoming', label: 'Upcoming' },
-            { value: 'past', label: 'Past' },
-          ]}
-        />
-      </div>
+      <PageHero art="interview" beside={170}>
+        <div className={classes.top}>
+          <h1 className={classes.title}>Interviews</h1>
+          <SegmentedControl
+            value={when}
+            onChange={setWhen}
+            data={[
+              { value: 'upcoming', label: 'Upcoming' },
+              { value: 'past', label: 'Past' },
+            ]}
+          />
+        </div>
+      </PageHero>
       {body}
       <ConfirmModal
         opened={Boolean(cancelling)}

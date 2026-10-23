@@ -13,13 +13,14 @@ import {
   IconCheck,
   IconChevronRight,
   IconClock,
-  IconSparkles,
 } from '@tabler/icons-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { apiGet, apiPost } from '../api/client';
+import AssistantMark from '../components/AssistantMark';
 import { EmptyState, ErrorBanner, Skeleton } from '../components/Feedback';
+import PageHero from '../components/PageHero';
 import { notifyError } from '../components/notify';
 import StatusBadge from '../components/StatusBadge';
 import classes from './JobsPage.module.css';
@@ -80,7 +81,7 @@ export function CreateJobButton() {
   }
 
   return (
-    <Button leftSection={<IconSparkles size={16} />} loading={creating} onClick={createJob}>
+    <Button leftSection={<AssistantMark size={18} />} loading={creating} onClick={createJob}>
       Create job with Hiring Assistant
     </Button>
   );
@@ -166,10 +167,12 @@ export default function JobsPage() {
 
   return (
     <div className={classes.page}>
-      <div className={classes.top}>
-        <h1 className={classes.title}>Jobs</h1>
-        {jobs?.length > 0 && <CreateJobButton />}
-      </div>
+      <PageHero art="network" beside={290}>
+        <div className={classes.top}>
+          <h1 className={classes.title}>Jobs</h1>
+          {jobs?.length > 0 && <CreateJobButton />}
+        </div>
+      </PageHero>
       {body}
     </div>
   );

@@ -31,6 +31,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { apiDelete, apiGet, apiGetFile, apiPost, apiPut, apiUpload } from '../../api/client';
 import ConfirmModal, { POP_TRANSITION } from '../../components/ConfirmModal';
 import { ErrorBanner, Skeleton } from '../../components/Feedback';
+import PageHero from '../../components/PageHero';
 import { notifyDone, notifyWarning } from '../../components/notify';
 import StatusBadge from '../../components/StatusBadge';
 import { STAGES } from '../assistant/labels';
@@ -474,93 +475,95 @@ export default function JobPage() {
 
   return (
     <div className={classes.page}>
-      <header className={classes.header}>
-        <nav className={classes.breadcrumb} aria-label="Breadcrumb">
-          <Link to="/jobs">Jobs</Link>
-          <IconChevronRight size={14} />
-          <span>{job.title}</span>
-        </nav>
-        <div className={classes.titleRow}>
-          <div className={classes.titleBlock}>
-            <h1 className={classes.title}>{job.title}</h1>
-            <div className={classes.meta}>
-              <span>{cvCount(job.cvs_received)}</span>
-              {screening?.run?.finished_at && (
-                <>
-                  <span className={classes.dot}>·</span>
-                  <span>Last screened {dateTime(screening.run.finished_at)}</span>
-                </>
-              )}
-              {job.applications_close_at && (
-                <>
-                  <span className={classes.dot}>·</span>
-                  <span>
-                    {closed ? 'Applications closed' : 'Applications close'} {dateTime(job.applications_close_at)}
-                  </span>
-                </>
-              )}
-              {stage && (
-                <>
-                  <span className={classes.dot}>·</span>
-                  <StatusBadge tone={stage.attention ? 'warning' : 'neutral'}>{stage.text}</StatusBadge>
-                </>
-              )}
+      <PageHero art="network">
+        <header className={classes.header}>
+          <nav className={classes.breadcrumb} aria-label="Breadcrumb">
+            <Link to="/jobs">Jobs</Link>
+            <IconChevronRight size={14} />
+            <span>{job.title}</span>
+          </nav>
+          <div className={classes.titleRow}>
+            <div className={classes.titleBlock}>
+              <h1 className={classes.title}>{job.title}</h1>
+              <div className={classes.meta}>
+                <span>{cvCount(job.cvs_received)}</span>
+                {screening?.run?.finished_at && (
+                  <>
+                    <span className={classes.dot}>·</span>
+                    <span>Last screened {dateTime(screening.run.finished_at)}</span>
+                  </>
+                )}
+                {job.applications_close_at && (
+                  <>
+                    <span className={classes.dot}>·</span>
+                    <span>
+                      {closed ? 'Applications closed' : 'Applications close'} {dateTime(job.applications_close_at)}
+                    </span>
+                  </>
+                )}
+                {stage && (
+                  <>
+                    <span className={classes.dot}>·</span>
+                    <StatusBadge tone={stage.attention ? 'warning' : 'neutral'}>{stage.text}</StatusBadge>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-          <Group gap={8} className={classes.headerActions}>
-            {applicants.length > 0 && (
-              <Button
-                onClick={startScreening}
-                loading={starting}
-                disabled={!job.profile || running}
-                leftSection={running ? <Loader size={14} color="white" /> : <IconPlayerPlay size={16} />}
-                className={running ? classes.screeningButton : undefined}
-              >
-                {running ? 'Screening…' : 'Screen CVs'}
+            <Group gap={8} className={classes.headerActions}>
+              {applicants.length > 0 && (
+                <Button
+                  onClick={startScreening}
+                  loading={starting}
+                  disabled={!job.profile || running}
+                  leftSection={running ? <Loader size={14} color="white" /> : <IconPlayerPlay size={16} />}
+                  className={running ? classes.screeningButton : undefined}
+                >
+                  {running ? 'Screening…' : 'Screen CVs'}
+                </Button>
+              )}
+              <AddCvButton onFiles={(files) => files?.length && setPendingFiles(files)} busy={uploading} disabled={closed} />
+              {uploadProgress && <span className={classes.progress}>Adding {uploadProgress}…</span>}
+              {job.job_board_post_url && (
+                <Button
+                  component="a"
+                  href={job.job_board_post_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="default"
+                  leftSection={<IconExternalLink size={16} />}
+                >
+                  View job post
+                </Button>
+              )}
+              <Button component={Link} to={`/assistant/${job.id}`} variant="default" leftSection={<IconMessageCircle size={16} />}>
+                Open chat
               </Button>
-            )}
-            <AddCvButton onFiles={(files) => files?.length && setPendingFiles(files)} busy={uploading} disabled={closed} />
-            {uploadProgress && <span className={classes.progress}>Adding {uploadProgress}…</span>}
-            {job.job_board_post_url && (
               <Button
-                component="a"
-                href={job.job_board_post_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                variant="default"
-                leftSection={<IconExternalLink size={16} />}
+                variant="subtle"
+                color="#B03A2E"
+                leftSection={<IconTrash size={16} />}
+                onClick={() => setDeleting(true)}
+                disabled={running}
+                title={running ? 'Wait until the screening finishes' : undefined}
               >
-                View job post
+                Delete job
               </Button>
-            )}
-            <Button component={Link} to={`/assistant/${job.id}`} variant="default" leftSection={<IconMessageCircle size={16} />}>
-              Open chat
-            </Button>
-            <Button
-              variant="subtle"
-              color="#B03A2E"
-              leftSection={<IconTrash size={16} />}
-              onClick={() => setDeleting(true)}
-              disabled={running}
-              title={running ? 'Wait until the screening finishes' : undefined}
-            >
-              Delete job
-            </Button>
-          </Group>
-        </div>
-        {/* Says why "Screen CVs" is disabled (a tooltip never shows on a disabled button). */}
-        {applicants.length > 0 && !job.profile && (
-          <div className={classes.hint}>
-            Save the job profile in the chat before screening: the CVs are checked against it.
+            </Group>
           </div>
-        )}
-        {closed && (
-          <div className={classes.hint}>
-            Applications are closed, so no more CVs are added. Change the closing date in the chat to
-            reopen them.
-          </div>
-        )}
-      </header>
+          {/* Says why "Screen CVs" is disabled (a tooltip never shows on a disabled button). */}
+          {applicants.length > 0 && !job.profile && (
+            <div className={classes.hint}>
+              Save the job profile in the chat before screening: the CVs are checked against it.
+            </div>
+          )}
+          {closed && (
+            <div className={classes.hint}>
+              Applications are closed, so no more CVs are added. Change the closing date in the chat to
+              reopen them.
+            </div>
+          )}
+        </header>
+      </PageHero>
 
       {actionError && <ErrorBanner title="That didn’t work.">{actionError}</ErrorBanner>}
       {uploadResults && <UploadResults results={uploadResults} onClose={() => setUploadResults(null)} />}

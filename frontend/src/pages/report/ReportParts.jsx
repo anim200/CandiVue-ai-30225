@@ -118,8 +118,7 @@ export function InterviewRadar({ candidates, height = 260 }) {
 }
 
 // CV screening and the interview score with its six dimensions, 0-100,
-// with coverage (a dimension without evidence shows a dash), and the
-// dimensions as a radar.
+// with coverage (a dimension without evidence shows a dash).
 export function ComponentScoresCard({ components, analysisLink }) {
   const rows = componentRows(components);
   return (
@@ -138,7 +137,6 @@ export function ComponentScoresCard({ components, analysisLink }) {
         </div>
       ))}
       {rows.length === 0 && <div className={classes.note}>No scores: the CV was not screened and no answer was scored.</div>}
-      <InterviewRadar candidates={[{ name: 'Interview score', content: { components } }]} />
       <div className={classes.coverage}>
         {coverageLine(components.coverage)} · <Link to={analysisLink}>Q&amp;A analysis</Link>
       </div>

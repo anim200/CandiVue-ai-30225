@@ -26,6 +26,7 @@ import { Link, useNavigate } from 'react-router';
 import { apiGet } from '../../api/client';
 import { loadSession } from '../../auth/session';
 import { EmptyState, ErrorBanner, Skeleton } from '../../components/Feedback';
+import PageHero from '../../components/PageHero';
 import StatusBadge from '../../components/StatusBadge';
 import { CreateJobButton } from '../JobsPage';
 import classes from './Home.module.css';
@@ -175,16 +176,18 @@ export default function HomePage() {
 
   return (
     <div className={classes.page}>
-      <div className={classes.top}>
-        <div>
-          <h1 className={classes.title}>
-            {greeting(new Date().getHours())}
-            {name && `, ${name}`}
-          </h1>
-          <p className={classes.date}>{today}</p>
+      <PageHero art="rings" beside={290}>
+        <div className={classes.top}>
+          <div>
+            <h1 className={classes.title}>
+              {greeting(new Date().getHours())}
+              {name && `, ${name}`}
+            </h1>
+            <p className={classes.date}>{today}</p>
+          </div>
+          <CreateJobButton />
         </div>
-        <CreateJobButton />
-      </div>
+      </PageHero>
 
       {failed && !data && (
         <ErrorBanner title="We couldn’t load your overview." onRetry={load}>

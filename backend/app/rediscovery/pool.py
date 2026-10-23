@@ -12,7 +12,7 @@ Who is in the pool for a job (pool_ids), all must hold:
 A person who applied to several jobs is checked once, with their latest
 application.
 
-Matching uses the existing screening (no new AI); a match is only a
+Matching uses the existing screening (the same rules and AI checks); a match is only a
 suggestion: the interviewer decides whether to add the application to the
 job (add_to_job), and the normal steps follow (screen, shortlist, invite).
 """

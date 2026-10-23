@@ -25,7 +25,9 @@ import { Link, useNavigate, useParams } from 'react-router';
 
 import { apiGet, apiPost } from '../../api/client';
 import { EmptyState, ErrorBanner, Skeleton } from '../../components/Feedback';
+import PageHero from '../../components/PageHero';
 import { notifyDone, notifyError } from '../../components/notify';
+import AiSignalStatus from '../../components/AiSignalStatus';
 import StatusBadge from '../../components/StatusBadge';
 import { whenText } from '../../utils/dates';
 import { usePolling } from '../../utils/usePolling';
@@ -50,8 +52,14 @@ function interviewText(interview) {
 // While the report is prepared (design 2c): the three steps.
 function Generating({ page }) {
   return (
-    <section className={classes.card} role="status">
+    <section className={classes.card}>
       <div className={classes.label}>Preparing the report</div>
+      <AiSignalStatus
+        status={
+          generatingStep(page) === 1 ? 'Analysing the questions and answers…' : 'Writing the final assessment…'
+        }
+        startedAt={page.analysis?.started_at}
+      />
       <Stepper active={generatingStep(page)} size="sm" allowNextStepsSelect={false}>
         <Stepper.Step label="Interview ended" />
         <Stepper.Step label="Q&A analysis" loading={generatingStep(page) === 1} />
@@ -304,49 +312,51 @@ export default function AssessmentReportPage() {
 
   return (
     <div className={classes.page}>
-      <div className={classes.header}>
-        <div className={classes.breadcrumb}>
-          <Link to={`/reports?job=${interview.job_id}`}>Reports</Link>
-          <IconChevronRight size={14} />
-          <span>{interview.candidate_name}</span>
-        </div>
-        <div className={classes.titleRow}>
-          <div className={classes.titleBlock}>
-            <h1 className={classes.title}>{interview.candidate_name}</h1>
-            <div className={classes.meta}>
-              <Anchor component={Link} to={`/jobs/${interview.job_id}`} c="inherit">
-                {interview.job_title}
-              </Anchor>
-              <span className={classes.sep}>·</span>
-              <span>{interviewText(interview)}</span>
-              {review && content && <StatusBadge tone={review.tone}>{review.label}</StatusBadge>}
+      <PageHero art="chart">
+        <div className={classes.header}>
+          <div className={classes.breadcrumb}>
+            <Link to={`/reports?job=${interview.job_id}`}>Reports</Link>
+            <IconChevronRight size={14} />
+            <span>{interview.candidate_name}</span>
+          </div>
+          <div className={classes.titleRow}>
+            <div className={classes.titleBlock}>
+              <h1 className={classes.title}>{interview.candidate_name}</h1>
+              <div className={classes.meta}>
+                <Anchor component={Link} to={`/jobs/${interview.job_id}`} c="inherit">
+                  {interview.job_title}
+                </Anchor>
+                <span className={classes.sep}>·</span>
+                <span>{interviewText(interview)}</span>
+                {review && content && <StatusBadge tone={review.tone}>{review.label}</StatusBadge>}
+              </div>
+            </div>
+            <div className={classes.actions}>
+              <Button variant="light" component={Link} to={`${base}/analysis`} leftSection={<IconMessage2Search size={16} />}>
+                Interview analysis
+              </Button>
+              <Menu position="bottom-end">
+                <Menu.Target>
+                  <Button variant="default" rightSection={<IconChevronDown size={15} />} disabled={!content}>
+                    Export / print
+                  </Button>
+                </Menu.Target>
+                <Menu.Dropdown>
+                  <Menu.Item leftSection={<IconPrinter size={16} />} onClick={() => exportAs('print')}>
+                    Print or save as PDF
+                  </Menu.Item>
+                  <Menu.Item leftSection={<IconDownload size={16} />} onClick={() => exportAs('html')}>
+                    Download HTML
+                  </Menu.Item>
+                  {state !== 'approved' && (
+                    <Menu.Label>Drafts are marked “Not yet approved” on every page.</Menu.Label>
+                  )}
+                </Menu.Dropdown>
+              </Menu>
             </div>
           </div>
-          <div className={classes.actions}>
-            <Button variant="light" component={Link} to={`${base}/analysis`} leftSection={<IconMessage2Search size={16} />}>
-              Interview analysis
-            </Button>
-            <Menu position="bottom-end">
-              <Menu.Target>
-                <Button variant="default" rightSection={<IconChevronDown size={15} />} disabled={!content}>
-                  Export / print
-                </Button>
-              </Menu.Target>
-              <Menu.Dropdown>
-                <Menu.Item leftSection={<IconPrinter size={16} />} onClick={() => exportAs('print')}>
-                  Print or save as PDF
-                </Menu.Item>
-                <Menu.Item leftSection={<IconDownload size={16} />} onClick={() => exportAs('html')}>
-                  Download HTML
-                </Menu.Item>
-                {state !== 'approved' && (
-                  <Menu.Label>Drafts are marked “Not yet approved” on every page.</Menu.Label>
-                )}
-              </Menu.Dropdown>
-            </Menu>
-          </div>
         </div>
-      </div>
+      </PageHero>
 
       <Tabs value={tab} onChange={setTab}>
         <Tabs.List>

@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3A9E98"/>
+      <stop offset="1" stop-color="#1D5C5A"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#fff" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="tileClip"><rect width="40" height="40" rx="10"/></clipPath>
+    <style>
+      /* Final state lives in the base styles; animations only play from it,
+         so with reduced motion the static logo shows. */
+      .tile   { transform-origin: 20px 20px; animation: tileIn .6s cubic-bezier(.2,.8,.2,1) backwards; }
+      .shine  { transform: translateX(-40px) skewX(-20deg); animation: shimmer 8s 1.6s ease-in-out infinite; }
+      .ring   { animation: draw .7s .25s ease-in-out backwards; }
+
+      .n1, .n2, .n3 { animation: pop .35s cubic-bezier(.3,1.6,.5,1) backwards; }
+      .n1 { transform-origin: 14.5px 15px; animation-delay: .6s; }
+      .n2 { transform-origin: 26px 14.5px; animation-delay: .72s; }
+      .n3 { transform-origin: 15px 25.5px; animation-delay: .84s; }
+
+      .l1, .l2, .l3 { animation: draw .35s ease-out backwards; }
+      .l1 { animation-delay: .9s; }
+      .l2 { animation-delay: 1s; }
+      .l3 { animation-delay: 1.1s; }
+
+      .coreIn { transform-origin: 21.5px 21.5px; animation: pop .45s 1.3s cubic-bezier(.3,1.6,.5,1) backwards; }
+      .core   { transform-origin: 21.5px 21.5px; animation: glow 8s 2s ease-in-out infinite; }
+      .ping1  { opacity: 0; transform-origin: 21.5px 21.5px; animation: ping 1s 1.4s ease-out; }
+      .ping2  { opacity: 0; transform-origin: 21.5px 21.5px; animation: pingLoop 8s 2s ease-out infinite; }
+
+      .s1, .s2, .s3 { opacity: 0; animation-duration: 8s; animation-delay: 2s;
+                      animation-iteration-count: infinite; animation-timing-function: ease-in; }
+      .s1 { animation-name: sig1; }
+      .s2 { animation-name: sig2; }
+      .s3 { animation-name: sig3; }
+
+      .orbitIn { animation: fadeIn .6s 1.5s backwards; }
+      .orbit   { transform-origin: 20px 20px; animation: orbit 10s 1.5s linear infinite; }
+
+      @keyframes tileIn  { 0% { transform: scale(.5) rotate(-12deg); opacity: 0 }
+                           60% { transform: scale(1.08) rotate(2deg); opacity: 1 }
+                           100% { transform: none; opacity: 1 } }
+      @keyframes draw    { from { stroke-dasharray: 100; stroke-dashoffset: 100 }
+                           to { stroke-dasharray: 100; stroke-dashoffset: 0 } }
+      @keyframes pop     { 0% { transform: scale(0) } 100% { transform: scale(1) } }
+      @keyframes fadeIn  { from { opacity: 0 } to { opacity: 1 } }
+      @keyframes orbit   { to { transform: rotate(360deg) } }
+      @keyframes ping    { 0% { transform: scale(1); opacity: .9 } 100% { transform: scale(3); opacity: 0 } }
+
+      /* Loop: each candidate sends a signal to the centre, the match lights up and pings */
+      @keyframes sig1 { 0% { transform: translate(0, 0); opacity: 0 } 2% { opacity: 1 }
+                        9% { transform: translate(7px, 6.5px); opacity: 1 }
+                        10%, 100% { transform: translate(7px, 6.5px); opacity: 0 } }
+      @keyframes sig2 { 0%, 3% { transform: translate(0, 0); opacity: 0 } 5% { opacity: 1 }
+                        12% { transform: translate(-4.5px, 7px); opacity: 1 }
+                        13%, 100% { transform: translate(-4.5px, 7px); opacity: 0 } }
+      @keyframes sig3 { 0%, 6% { transform: translate(0, 0); opacity: 0 } 8% { opacity: 1 }
+                        15% { transform: translate(6.5px, -4px); opacity: 1 }
+                        16%, 100% { transform: translate(6.5px, -4px); opacity: 0 } }
+      @keyframes glow { 0%, 15% { transform: scale(1) } 19% { transform: scale(1.3) } 24%, 100% { transform: scale(1) } }
+      @keyframes pingLoop { 0%, 16% { transform: scale(1); opacity: 0 }
+                            17% { transform: scale(1); opacity: .8 }
+                            34%, 100% { transform: scale(3); opacity: 0 } }
+      @keyframes shimmer { 0% { transform: translateX(-40px) skewX(-20deg) }
+                           25%, 100% { transform: translateX(60px) skewX(-20deg) } }
+
+      @media (prefers-reduced-motion: reduce) {
+        * { animation: none !important; }
+        .orbitIn { display: none; }
+      }
+    </style>
+  </defs>
+
+  <g class="tile">
+    <rect width="40" height="40" rx="10" fill="url(#g)"/>
+    <g clip-path="url(#tileClip)">
+      <rect class="shine" x="0" y="-10" width="16" height="60" fill="url(#shine)"/>
+    </g>
+
+    <circle class="ring" pathLength="100" cx="20" cy="20" r="11.5" fill="none" stroke="#fff" stroke-width="2.6"/>
+
+    <g stroke="#fff" stroke-width="1.4" stroke-opacity="0.75" stroke-linecap="round">
+      <line class="l1" pathLength="100" x1="14.5" y1="15" x2="21.5" y2="21.5"/>
+      <line class="l2" pathLength="100" x1="26" y1="14.5" x2="21.5" y2="21.5"/>
+      <line class="l3" pathLength="100" x1="15" y1="25.5" x2="21.5" y2="21.5"/>
+    </g>
+
+    <g class="s1"><circle cx="14.5" cy="15" r="2.6" fill="#BFF3EA" fill-opacity=".45"/><circle cx="14.5" cy="15" r="1.3" fill="#fff"/></g>
+    <g class="s2"><circle cx="26" cy="14.5" r="2.6" fill="#BFF3EA" fill-opacity=".45"/><circle cx="26" cy="14.5" r="1.3" fill="#fff"/></g>
+    <g class="s3"><circle cx="15" cy="25.5" r="2.6" fill="#BFF3EA" fill-opacity=".45"/><circle cx="15" cy="25.5" r="1.3" fill="#fff"/></g>
+
+    <g fill="#fff">
+      <circle class="n1" cx="14.5" cy="15" r="1.8"/>
+      <circle class="n2" cx="26" cy="14.5" r="1.8"/>
+      <circle class="n3" cx="15" cy="25.5" r="1.8"/>
+    </g>
+
+    <circle class="ping1" cx="21.5" cy="21.5" r="3.6" fill="none" stroke="#BFF3EA" stroke-width="1.2"/>
+    <circle class="ping2" cx="21.5" cy="21.5" r="3.6" fill="none" stroke="#BFF3EA" stroke-width="1"/>
+
+    <g class="coreIn">
+      <circle class="core" cx="21.5" cy="21.5" r="3.6" fill="#BFF3EA" stroke="#fff" stroke-width="1.4"/>
+    </g>
+
+    <g class="orbitIn">
+      <g class="orbit">
+        <circle cx="20" cy="8.5" r="1.7" fill="#BFF3EA" stroke="#1D5C5A" stroke-width="0.7"/>
+      </g>
+    </g>
+  </g>
+</svg>

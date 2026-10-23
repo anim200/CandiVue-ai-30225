@@ -35,9 +35,11 @@ def check_gate(
     years: float | None,
     min_years: int | None,
     years_source: str = "dates",
+    years_model: str | None = None,
 ) -> list[str]:
     """Reasons the candidate fails the hard requirements (empty = passes).
-    `years` is None when the CV's years could not be read."""
+    `years` is None when the CV's years could not be read; years_model: the
+    AI model that read them (years_source "model")."""
     reasons = []
     for match in matches:
         if not fails_mandatory(match):
@@ -53,7 +55,7 @@ def check_gate(
             )
     if too_few_years(years, min_years):
         how = (
-            " (read by the local model; no job dates found)"
+            f" (read by the AI model {years_model or 'local'}; no job dates found)"
             if years_source == "model"
             else ""
         )
@@ -103,9 +105,11 @@ def score_experience(
     jobs: list[dict],
     years_source: str = "dates",
     evidence: list[str] | None = None,
+    years_model: str | None = None,
 ) -> tuple[int, str]:
     """Years of experience against the minimum. years_source: "dates" (job
-    dates), "model" (read from the CV by the local model) or "unknown"."""
+    dates), "model" (read from the CV by the AI model years_model) or
+    "unknown"."""
     needed = f"; the job needs {min_years}+" if min_years else ""
     if years is None:
         return 0, (
@@ -117,7 +121,8 @@ def score_experience(
     if years_source == "model":
         quote = f": “{evidence[0]}”" if evidence else ""
         return score, (
-            f"About {years:g} years, read from the CV by the local model{quote} "
+            f"About {years:g} years, read from the CV by the AI model "
+            f"{years_model or 'local'}{quote} "
             f"(no job dates found){needed}."
         )
     roles = len(jobs)

@@ -4,10 +4,11 @@
 // percentages that must add up to 100 (the backend checks it too).
 
 import { Button, Group, NumberInput } from '@mantine/core';
-import { IconAdjustments, IconSparkles } from '@tabler/icons-react';
+import { IconAdjustments } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 
 import { apiDelete, apiPut } from '../../api/client';
+import AssistantMark from '../../components/AssistantMark';
 import { notifyDone } from '../../components/notify';
 import classes from './JobPage.module.css';
 
@@ -79,7 +80,7 @@ export default function WeightsCard({ job, onSaved, disabled }) {
         <div>
           <div className={classes.cardTitle}>Scoring weights</div>
           <div className={classes.cardHint}>
-            {job.weights.source === 'ai' && <IconSparkles size={13} className={classes.sparkle} />}
+            {job.weights.source === 'ai' && <AssistantMark size={15} className={classes.sparkle} />}
             {sourceText(job.weights)}
           </div>
         </div>

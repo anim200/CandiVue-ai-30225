@@ -38,6 +38,8 @@ services:
       LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0}
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-ollama}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-qwen3-embedding:0.6b}
+      # Empty SCREENING_AI_MODEL (set, but blank) = local model only.
+      SCREENING_AI_MODEL: ${SCREENING_AI_MODEL-gemini-3.5-flash-lite}
       SCREENING_MODEL: ${SCREENING_MODEL:-qwen3:4b-instruct}
       OLLAMA_BASE_URL: http://ollama:11434
       JOBBOARD_MCP_URL: http://jobboard-mcp:8001/mcp

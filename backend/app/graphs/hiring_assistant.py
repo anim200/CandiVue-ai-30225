@@ -33,6 +33,13 @@ shortlist and invite candidates.
 - After posting, skipping or confirming invitations the turn ends without
   another AI request: the chat card already shows the result (fewer
   requests on the free tier, README "AI usage").
+- Scope guardrail (app/assistant/scope.py): when a message is purely
+  off-topic (the LLM only calls decline_off_topic, with no job request in
+  it), the off_topic node gives a fixed "please ask about this job" reply
+  and ends the turn; no extra AI request. A mixed message goes through the
+  tools as usual, so its job part is handled.
+
+    assistant --(only decline_off_topic)--> off_topic --> END
 """
 
 import logging
@@ -47,7 +54,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 
 from app.ai.llm import invoke_llm
-from app.assistant import posting
+from app.assistant import posting, scope
 from app.assistant.prompts import ASSISTANT_PROMPT, ROOM_PROMPT
 from app.assistant.room_tools import ROOM_TOOLS, question_bank_size
 from app.assistant.schemas import JobDescriptionContent
@@ -64,7 +71,8 @@ logger = logging.getLogger(__name__)
 THREAD_KIND = "assistant-job"
 ROOM_THREAD_KIND = "assistant-interview"
 MAX_STEPS = 30  # safety limit for one chat turn (stops endless tool loops)
-ROOM_TOOLSET = [*ROOM_TOOLS, rag_search]  # what the LLM may call in the room
+# What the LLM may call in the room.
+ROOM_TOOLSET = [*ROOM_TOOLS, rag_search, scope.decline_off_topic]
 # Every tool the graph can run (each once, by name).
 ALL_TOOLS = list({t.name: t for t in [*TOOLS, *ROOM_TOOLSET]}.values())
 
@@ -163,9 +171,18 @@ def assistant(state: AssistantState) -> dict:
 
 
 def after_assistant(state: AssistantState) -> str:
-    """Go to the tools if the LLM asked for one; otherwise the turn ends."""
+    """Go to the tools if the LLM asked for one; an off-topic request goes
+    to off_topic; otherwise the turn ends."""
     last = state["messages"][-1]
+    if scope.only_declines(last):
+        return "off_topic"
     return "tools" if isinstance(last, AIMessage) and last.tool_calls else END
+
+
+def off_topic(state: AssistantState) -> dict:
+    """Answer an off-topic request with the fixed reply (scope.py)."""
+    room = bool(state.get("session_id"))
+    return {"messages": scope.decline(state["messages"][-1], room)}
 
 
 def after_tools(state: AssistantState) -> str:
@@ -392,10 +409,14 @@ def build_hiring_assistant(checkpointer):
     graph.add_node("confirm_posting", confirm_posting)
     graph.add_node("post_to_job_board", post_to_job_board)
     graph.add_node("confirm_invitations", confirm_invitations)
+    graph.add_node("off_topic", off_topic)
 
     graph.add_edge(START, "load_context")
     graph.add_edge("load_context", "assistant")
-    graph.add_conditional_edges("assistant", after_assistant, ["tools", END])
+    graph.add_conditional_edges(
+        "assistant", after_assistant, ["tools", "off_topic", END]
+    )
+    graph.add_edge("off_topic", END)
     graph.add_conditional_edges(
         "tools",
         after_tools,

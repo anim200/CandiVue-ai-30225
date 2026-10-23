@@ -2,13 +2,12 @@
 // states in section 2). Candidates never sign in here: they use the private
 // link in their invitation email.
 // Left out on purpose (decided for #646482): "Forgot password?" and
-// "Keep me signed in". The light/dark switch comes with dark mode later.
+// "Keep me signed in".
 
 import { Anchor, Box, Button, PasswordInput, TextInput } from '@mantine/core';
 import { useDocumentTitle } from '@mantine/hooks';
 import {
   IconAlertCircle,
-  IconCheck,
   IconCircleCheck,
   IconCloudOff,
   IconInfoCircle,
@@ -25,6 +24,7 @@ import { apiPost } from '../api/client';
 import { clearSession, loadSession, saveSession } from '../auth/session';
 import Logo from '../components/Logo';
 import ThemeToggle from '../components/ThemeToggle';
+import LoginCards from './LoginCards';
 import classes from './LoginPage.module.css';
 
 // Placeholder positioning from the design; to be replaced by the trainee's
@@ -73,35 +73,11 @@ function BrandPanel() {
       <div className={classes.glow} />
 
       <div className={classes.logoRow}>
-        <Logo size="lg" onDark glance />
+        <Logo size="lg" onDark animated />
       </div>
 
       {/* Synthetic examples of the evidence CandiVue links to. */}
-      <div className={classes.chips} aria-hidden="true">
-        <div className={classes.chip}>
-          <span className={classes.timestamp}>02:47</span>
-          “added pagination and an index…”
-        </div>
-        <div className={classes.chip} style={{ marginRight: 46, animationDuration: '8s', animationDelay: '1.2s' }}>
-          <span className={classes.met}>
-            <IconCheck size={12} />
-            Met
-          </span>
-          Python web framework
-        </div>
-        <div
-          className={classes.chip}
-          style={{ marginRight: 12, gap: 12, animationDuration: '7.5s', animationDelay: '2.4s' }}
-        >
-          <span className={classes.score}>82</span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span className={classes.scoreLabel}>Candidate C · screening</span>
-            <div className={classes.scoreTrack}>
-              <div className={classes.scoreBar} />
-            </div>
-          </div>
-        </div>
-      </div>
+      <LoginCards />
 
       <div className={classes.story}>
         <h1 className={classes.headline}>{HEADLINE}</h1>
@@ -184,7 +160,7 @@ export default function LoginPage() {
         <form className={classes.form} onSubmit={handleSubmit} noValidate>
           {/* On wide screens the logo is in the brand panel. */}
           <Box hiddenFrom="md">
-            <Logo />
+            <Logo animated />
           </Box>
 
           <div>

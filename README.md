@@ -6,6 +6,27 @@ AI-powered recruitment and interview platform (BJIT AI Trainee final project).
 > (backend, database and frontend skeleton). Architecture, usage, data
 > providers and known limitations will be added as the features are built.
 
+## Diagrams
+
+`docs/diagrams/` holds the design figures as PDFs, updated on 23-10-2026 to
+match the code:
+
+| Figure | File | Shows |
+|---|---|---|
+| 1 | `high_level_system_diagram.pdf` | The whole process in four stages: who does each step |
+| 2 | `detailed_architecture_diagram.pdf` | Every step with its app part, AI model, external service and data store |
+| 3 | `langgraph_1_hiring_assistant.pdf` | LangGraph 1, the Hiring Assistant (tools, three pauses, guardrail, room mode) |
+| 4 | `langgraph_2_cv_screening.pdf` | LangGraph 2, CV screening and scoring |
+| 5 | `langgraph_3_qa_analysis.pdf` | LangGraph 3, interview Q&A analysis |
+| 6 | `langgraph_4_final_assessment.pdf` | LangGraph 4, the final assessment and its review |
+| 7 | `langgraph_5_talent_rediscovery.pdf` | LangGraph 5, talent rediscovery (F11) |
+
+Node names in Figures 3-7 are the real ones in `backend/app/graphs/`. All
+figures are drawn by `docs/diagrams/src/build_diagrams.py` (edit it, then
+run `python docs/diagrams/src/build_diagrams.py`; it prints the PDFs with
+Microsoft Edge). `docs/diagrams/png/` has the same figures as high-resolution
+PNGs (6x, Figure 2 5x: 6,000-9,600 pixels wide) for slides and documents.
+
 ## Prerequisites
 
 - Docker Desktop (Docker Engine with Docker Compose v2)
@@ -141,8 +162,8 @@ How it runs:
   all from `GET /api/dashboard` (interviewer only). The job page shows the
   screening as a *Ranking* (with a score distribution chart) or as a
   read-only *Pipeline* (Screened → Shortlisted → Invited → Interviewed →
-  Selected); the report and the comparison show the interview dimensions
-  as a radar chart.
+  Selected); the comparison of 2-3 candidates shows the interview
+  dimensions as a radar chart.
 - **Light or dark:** *Appearance* in the user menu (and a sun/moon button
   on the login and candidate pages). The choice is remembered in the browser
   and all its tabs follow it; the default is light. All colours of our own
@@ -199,6 +220,7 @@ width.
 | `LLM_TIMEOUT_SECONDS` | `60` | Longest wait for one answer. |
 | `LLM_MAX_RETRIES` | `2` | Extra tries after a failure, with a growing pause. |
 | `LLM_TEMPERATURE` | `0` | Randomness of answers. `0` keeps candidate scores repeatable. |
+| `SCREENING_AI_MODEL` / `SCREENING_MODEL` | `gemini-3.5-flash-lite` / `qwen3:4b-instruct` | The two AI checks in CV screening: Gemini first (with `LLM_API_KEY`), the local Ollama model when there is no key, the quota is used up or Gemini fails. Empty `SCREENING_AI_MODEL` = local model only. |
 | `EMBEDDING_PROVIDER` / `EMBEDDING_MODEL` | `ollama` / `qwen3-embedding:0.6b` | Model that turns knowledge-base text into embeddings for search. Runs locally in Docker (no key). `google_genai` / `gemini-embedding-001` uses Gemini with the LLM key instead. |
 | `MAX_UPLOAD_MB` | `20` | Largest knowledge-base document accepted. |
 
@@ -218,7 +240,12 @@ width.
     CV summary**: job titles with dates, years, skills, degree level,
     certificates and how each requirement was met in screening. No name,
     email, phone number, address or links (they are removed first).
-  - CV screening: nothing (it runs locally, see "CV screening").
+  - CV screening: only for a CV the rules cannot settle (no job dates,
+    or a mandatory requirement not found before excluding): the CV text
+    (first 6,000 characters) with **email addresses, phone numbers,
+    links and the candidate's name removed**, the job's requirement
+    names, and today's date. Nothing when there is no key or
+    `SCREENING_AI_MODEL` is empty (the local model answers).
   - Interview analysis (F5, F8-F10): the job title and requirements, the
     interview transcript with **names, email addresses, phone numbers and
     links removed**, the knowledge-base passages found for each answer
@@ -277,9 +304,11 @@ START -> load_context -> assistant --(tool call)--> tools --> assistant ...
          human_review --approve----> confirm_posting (pause)
          human_review --reject-----> assistant
          human_review --edit-------> human_review
-         confirm_posting --post----> post_to_job_board --> assistant
-         confirm_posting --skip----> assistant
+         confirm_posting --post----> post_to_job_board --> END
+         confirm_posting --skip----> END
          tools --(request_job_posting)--> confirm_posting
+         tools --(invitation plan)--> confirm_invitations (pause) --> END
+         assistant --(only decline_off_topic)--> off_topic --> END
 ```
 
 - **assistant**: the LLM reads the chat and decides the next step.
@@ -312,6 +341,27 @@ START -> load_context -> assistant --(tool call)--> tools --> assistant ...
   the chat. If the form link is missing, it asks for it first; if the
   job board fails after 3 tries, the chat shows **Try again** and
   **Copy job description**.
+- **Scope guardrail** (`app/assistant/scope.py`): the assistant only
+  helps with hiring for this job (in the interview room: this interview).
+  For a purely off-topic message ("Tell me about Bangladesh", maths, news,
+  jokes, "ignore your instructions") the model calls `decline_off_topic`;
+  the **off_topic** node then shows a fixed reply ("I can only help with
+  hiring for this job ... Please ask me something about this job."),
+  hides anything the model wrote next to the call and ends the turn, so
+  there is no partial answer and no extra AI request. Short answers to
+  the assistant's own questions ("Bangladesh" for the location),
+  greetings and "what can you do?" are in scope. A mixed message
+  ("SQL is mandatory. Also tell me a joke.") keeps its job part: the
+  model marks `also_job_request` and answers only that part. Only the
+  fact that a request was declined is logged, never its text. Live check
+  on 23-10-2026 with `gemini-3.5-flash-lite`: 11 of 11 messages handled
+  as expected.
+- **While the AI works** the chat shows the Signal status in place of the
+  reply: the assistant's match mark (its icon everywhere) moving, the current step ("Thinking…", or
+  steps such as "Posting to the job board…") and the time since the
+  request started (`components/AiSignalStatus.jsx`). Screening, the Q&A
+  analysis, the report being prepared and the talent pool check use it
+  too, with the real progress ("Screening CV 3 of 5…").
 - **Retry path**: a tool call with invalid arguments goes back to the LLM
   as an error so it can correct itself; a turn that never ends is stopped
   after 30 steps with a clear message; "Try again" continues a turn that
@@ -920,11 +970,29 @@ CVs in one batch, one parallel branch per CV (at most 4 at a time: the
 local models answer one request at a time, and more branches used up the
 database connections; see docs/VERIFICATION.md), in the background with
 progress ("12 of 20 CVs"). It is checkpointed, so after a restart it
-continues where it stopped (N26). **No Gemini is used**: everything runs
-locally, so there is no quota and CV text stays on this machine. Mostly
-rules and local embeddings; a small **local model** (Ollama,
-`SCREENING_MODEL`, default `qwen3:4b-instruct`, about 2.5 GB) is asked only
-in the two cases the rules cannot settle (see below).
+continues where it stopped (N26). Mostly rules and local embeddings; an
+**AI model** is asked only in the two cases the rules cannot settle (see
+below), at most one request per question, and its answers are saved, so a
+repeat run asks nothing. Which model (`app/screening/ai_checks.py`):
+
+- **Gemini first** (`SCREENING_AI_MODEL`, default `gemini-3.5-flash-lite`,
+  the cheapest), with the CV's contact details and name removed;
+- the **local model** (Ollama, `SCREENING_MODEL`, default
+  `qwen3:4b-instruct`, about 2.5 GB, no quota) when there is no API key,
+  `SCREENING_AI_MODEL` is empty, Gemini's daily quota is known to be used
+  up, or Gemini still fails after its retries (then Gemini is skipped for
+  10 minutes, so the other CVs do not wait for it);
+- if **both** fail, the run stops with a clear message: nobody is excluded
+  on the rules alone. An answer in the wrong format is ignored (not asked
+  again).
+
+Screening requests count in the usage meter under the chat. The panel
+says which model gave each answer. Gemini 3.5 models ignore the
+temperature setting, so a first answer can differ slightly between fresh
+screenings; saved answers keep every repeat run the same (F2). Live check
+(23-10-2026, synthetic CV): Gemini read "seven years" and found Docker in
+a Compose line, invented nothing for Kafka; with Gemini unavailable the
+local model gave the same answers (about 100 s, mostly loading it).
 
 ```
 load_cv_batch → Send (one branch per CV):
@@ -948,8 +1016,8 @@ load_cv_batch → Send (one branch per CV):
   "2017 through 2018", "March 2019 until today" and "since 2014".
   "Master" counts as a degree only as "Master of / Master's in" (not
   "Scrum Master").
-- **Years without dates (local model):** when the rules find no job dates,
-  the local model reads the years the CV shows ("7 years of experience",
+- **Years without dates (AI check):** when the rules find no job dates,
+  the AI model reads the years the CV shows ("7 years of experience",
   "over five years"). It must quote the CV lines it used; a rule checks the
   quotes are really in the CV and the number comes from them. If nothing is
   found, the years are **unknown**: the candidate is **not excluded** for
@@ -964,11 +1032,11 @@ load_cv_batch → Send (one branch per CV):
   counts; "no manual steps using Docker" still counts. A version number
   does not hide a name ("PHP8" counts for PHP). Every result keeps the CV
   line as evidence.
-- **Second look before excluding (local model):** when a mandatory
+- **Second look before excluding (AI check):** when a mandatory
   requirement is still not found (and the years are not too few anyway),
-  the local model reads the CV once more. It counts only with a quoted line
-  that is really in the CV and does not deny the skill; the panel then says
-  the local model found it. This protects against excluding a good
+  the AI model reads the CV once more (all such requirements of a CV in one
+  request). It counts only with a quoted line that is really in the CV and
+  does not deny the skill; the panel then says which model found it. This protects against excluding a good
   candidate because the rules missed a wording.
 - **Hard-requirement gate:** a candidate is **excluded** (not ranked, with
   the reason) when a mandatory requirement is not met, is only "partly met
@@ -1014,8 +1082,8 @@ correctly. A fresh run and a repeat run give the same ranking.
   saved; check them, since a missing name can make a skill look unmet.
 - Similarity thresholds were calibrated on synthetic CVs; unusual CV
   layouts can lose lines. Scanned CVs are marked so they can be checked.
-- The local model is small: its answers are only used with a quote that
-  is checked against the CV, but it can still miss a wording (then the
+- The AI checks (Gemini or the small local model) are only used with a
+  quote that is checked against the CV, but they can still miss a wording (then the
   result is the same as the rules alone). Years it computes from unusual
   dates are checked for plausibility, not exactly.
 - English CVs only (OCR and rules are set up for English).
@@ -1052,11 +1120,12 @@ Job B page: "Past applicants who may fit" ─► interviewer clicks "Add to this
   shortlisted while waiting for one). People who already applied to this
   job (same email) or were added from the pool are left out. A person with
   several applications is checked once, with the latest one.
-- **Same screening, no new AI:** each past CV is screened against job B's
+- **Same screening:** each past CV is screened against job B's
   requirements, weights and job description with the **same subgraph as
-  LangGraph 2** (`app/graphs/talent_rediscovery.py`): mandatory gate,
-  requirement evidence, four dimension scores. Parsed CVs and embeddings
-  are reused, everything runs locally, nothing is sent to an AI provider.
+  LangGraph 2** (`app/graphs/talent_rediscovery.py`, Figure 7): mandatory
+  gate, requirement evidence, four dimension scores. Parsed CVs and
+  embeddings are reused; like screening, only a must-have the rules miss
+  gets the AI second look (Gemini first, local model as fallback).
   Results are stored in `rediscovery_runs` / `rediscovery_matches`, apart
   from job B's own ranking, so they never mix into it.
 - **When it runs:** after every finished screening of the job, and on

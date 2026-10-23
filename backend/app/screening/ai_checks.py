@@ -1,7 +1,20 @@
-"""The local AI model for the two cases the rules cannot settle (F1).
+"""The AI checks for the two cases the rules cannot settle (F1).
 
-It runs in Ollama in Docker (SCREENING_MODEL, default qwen3:4b-instruct):
-CV text stays on this machine and there is no quota.
+Which model answers (_ask):
+- Gemini first (SCREENING_AI_MODEL, default gemini-3.5-flash-lite, the
+  cheapest), when an API key is set;
+- the local model (Ollama in Docker, SCREENING_MODEL, default
+  qwen3:4b-instruct) when there is no key, SCREENING_AI_MODEL is empty,
+  Gemini's daily quota is known to be used up, or Gemini fails after its
+  retries (outage, timeout, wrong key). After such a failure Gemini is
+  skipped for CLOUD_PAUSE_SECONDS, so the other CVs do not wait for it.
+- If both fail, AIServiceError stops the run with a clear message: nobody
+  is excluded on the rules alone.
+Cost: only CVs the rules cannot settle are asked, one request per
+question, all requirements of a CV in one request; the answers are saved
+with the parsed CV, so a repeat run asks nothing.
+Privacy (N18): the CV is sent without email addresses, phone numbers,
+links or the candidate's name (private_text).
 
 1. read_years: a CV whose job dates the rules could not read. The model
    reads how many years of work experience the CV shows ("7 years of
@@ -17,7 +30,10 @@ Guard rails, so the model cannot invent anything:
   sum of stated durations, or no more than the years since the earliest
   year quoted);
 - a quote that denies the skill or only wishes for it does not count;
-- temperature 0 and a fixed seed: the same CV gets the same answer (F2).
+- repeatable (F2): every answer is saved with the parsed CV and reused
+  in later runs, whichever model gave it. (The local model also runs with
+  temperature 0 and a fixed seed; Gemini 3.5 ignores the temperature, so
+  only the saved answer makes it repeatable.)
 Anything that fails a check is ignored (unknown years / requirement stays
 not met), so the result is never worse than the rules alone.
 """
@@ -25,14 +41,19 @@ not met), so the result is never worse than the rules alone.
 import logging
 import re
 import threading
+import time
 from datetime import date
 from functools import lru_cache
 
 import ollama
+from langchain_core.messages import HumanMessage
 from pydantic import BaseModel, Field, ValidationError
 
+from app.ai import usage
 from app.ai.errors import AIServiceError
+from app.ai.llm import invoke_llm
 from app.core.config import get_settings
+from app.interviews.cv_view import clean_text
 from app.screening.matching import negated
 
 logger = logging.getLogger(__name__)
@@ -40,6 +61,8 @@ logger = logging.getLogger(__name__)
 MAX_CV_CHARS = 6000  # enough for a normal CV, keeps each call a few seconds
 MIN_QUOTE_CHARS = 4
 SEED = 7
+CLOUD_PAUSE_SECONDS = 600  # after Gemini failed, use the local model this long
+_cloud_paused_until = 0.0  # time.monotonic() value
 # Ollama on a CPU answers one request at a time. Asking one at a time here
 # (several CVs are screened in parallel) keeps the timeout for the answer
 # itself instead of the wait in Ollama's queue (measured in the 45-minute
@@ -114,48 +137,58 @@ CV:
 >>>"""
 
 
-def read_years(cv_text: str, today: date) -> tuple[float, list[str]] | None:
-    """(years, evidence lines) of work experience, or None when the model
-    finds none or its answer does not pass the checks."""
-    prompt = YEARS_PROMPT.format(today=today.isoformat(), cv=cv_text[:MAX_CV_CHARS])
-    answer = _ask(prompt, YearsAnswer)
+def read_years(
+    cv_text: str, today: date, names: list[str] = ()
+) -> tuple[float, list[str], str] | None:
+    """(years, evidence lines, model that answered), or None when the model
+    finds none or its answer does not pass the checks. names: the
+    candidate's name words, removed before sending."""
+    text = private_text(cv_text, names)
+    prompt = YEARS_PROMPT.format(today=today.isoformat(), cv=text)
+    answer, model = _ask(prompt, YearsAnswer)
     if answer is None or answer.years is None or not 0 < answer.years <= 60:
         return None
     quotes = [q.strip() for q in answer.evidence if len(q.strip()) >= MIN_QUOTE_CHARS]
-    if not quotes or not all(in_cv(q, cv_text) for q in quotes):
-        logger.info("Local model: years answer rejected (quote not in the CV)")
+    if not quotes or not all(in_cv(q, text) for q in quotes):
+        logger.info("AI check: years answer rejected (quote not in the CV)")
         return None
     if not years_supported(answer.years, quotes, today):
-        logger.info("Local model: years answer rejected (number not in the quotes)")
+        logger.info("AI check: years answer rejected (number not in the quotes)")
         return None
-    return round(answer.years, 1), quotes
+    return round(answer.years, 1), quotes, model
 
 
 def confirm_requirements(
-    cv_text: str, requirements: list[dict]
-) -> dict[str, str | None]:
-    """For each requirement: the CV line that shows it, or None. One call for
-    all of them."""
+    cv_text: str, requirements: list[dict], names: list[str] = ()
+) -> tuple[dict[str, str | None], str]:
+    """For each requirement: the CV line that shows it, or None; and the
+    model that answered. One request for all of them."""
     lines = []
     for number, requirement in enumerate(requirements, start=1):
         line = f"{number}. {requirement['text']}"
         if requirement.get("also_counts"):
             line += f" (also counts: {', '.join(requirement['also_counts'])})"
         lines.append(line)
-    prompt = REQUIREMENTS_PROMPT.format(
-        requirements="\n".join(lines), cv=cv_text[:MAX_CV_CHARS]
-    )
-    answer = _ask(prompt, RequirementAnswers)
+    text = private_text(cv_text, names)
+    prompt = REQUIREMENTS_PROMPT.format(requirements="\n".join(lines), cv=text)
+    answer, model = _ask(prompt, RequirementAnswers)
     given = {a.number: a for a in answer.answers} if answer else {}
     found = {}
     for number, requirement in enumerate(requirements, start=1):
         reply = given.get(number)
         found[requirement["text"]] = (
             reply.quote.strip()
-            if reply and _quote_shows(reply, requirement, cv_text)
+            if reply and _quote_shows(reply, requirement, text)
             else None
         )
-    return found
+    return found, model
+
+
+def private_text(cv_text: str, names: list[str]) -> str:
+    """The CV text for the model: at most MAX_CV_CHARS, line by line, without
+    email addresses, phone numbers, links or the candidate's name."""
+    lines = (clean_text(line, names) for line in cv_text[:MAX_CV_CHARS].splitlines())
+    return "\n".join(line for line in lines if line)
 
 
 def in_cv(quote: str, cv_text: str) -> bool:
@@ -188,7 +221,40 @@ def _quote_shows(reply: RequirementAnswer, requirement: dict, cv_text: str) -> b
     return not any(negated(quote, name) for name in names)
 
 
-def _ask(prompt: str, schema: type[BaseModel]) -> BaseModel | None:
+def _ask(prompt: str, schema: type[BaseModel]) -> tuple[BaseModel | None, str]:
+    """Ask Gemini, else the local model (see the top of this file). Returns
+    (answer or None when it does not fit the schema, model name)."""
+    global _cloud_paused_until
+    settings = get_settings()
+    cloud = settings.screening_ai_model
+    if (
+        cloud
+        and settings.llm_api_key
+        and time.monotonic() >= _cloud_paused_until
+        and not usage.is_blocked(cloud)
+    ):
+        try:
+            return _ask_cloud(prompt, schema, cloud), cloud
+        except AIServiceError:
+            _cloud_paused_until = time.monotonic() + CLOUD_PAUSE_SECONDS
+            logger.warning("AI check: %s unavailable, using the local model", cloud)
+    return _ask_local(prompt, schema), settings.screening_model
+
+
+def _ask_cloud(prompt: str, schema: type[BaseModel], name: str) -> BaseModel | None:
+    """Ask the cloud model (with its retries, counted in the usage meter).
+    An answer that does not fit the schema is None, not retried (cost)."""
+    result = invoke_llm(
+        [HumanMessage(prompt)],
+        prepare=lambda model: model.with_structured_output(schema, include_raw=True),
+        model=name,
+    )
+    if result.get("parsed") is None:
+        logger.warning("AI check: %s gave an answer in the wrong format", name)
+    return result.get("parsed")
+
+
+def _ask_local(prompt: str, schema: type[BaseModel]) -> BaseModel | None:
     """Ask the local model for JSON that fits the schema. An answer that does
     not fit is None; a model that cannot be reached is an AIServiceError."""
     settings = get_settings()
@@ -204,7 +270,8 @@ def _ask(prompt: str, schema: type[BaseModel]) -> BaseModel | None:
         # Only the error type: the message could contain CV text.
         logger.warning("Local screening model failed: %s", type(exc).__name__)
         raise AIServiceError(
-            "The local screening model is unavailable. Please try again later."
+            "The AI for CV screening is unavailable (Gemini and the local "
+            "model). Please try again later."
         ) from exc
     try:
         return schema.model_validate_json(response.message.content)

@@ -52,22 +52,27 @@ def get_chat_model(name: str) -> BaseChatModel:
     )
 
 
-def invoke_llm(messages, prepare: Callable[[BaseChatModel], Runnable] | None = None):
+def invoke_llm(
+    messages,
+    prepare: Callable[[BaseChatModel], Runnable] | None = None,
+    model: str | None = None,
+):
     """Send messages to the chosen model and return its answer.
 
     `prepare` is optional: it adapts the model first, e.g. binds the Hiring
-    Assistant's tools or asks for structured output.
+    Assistant's tools or asks for structured output. `model` is optional: a
+    fixed model instead of the interviewer's choice (CV screening).
     A daily limit ("quota used up") is not retried: it would only fail again.
     Raises AIServiceError if every attempt fails.
     """
-    name = current_model()
+    name = model or current_model()
     attempts = get_settings().llm_max_retries + 1
     for attempt in range(1, attempts + 1):
         record_request(name)
         pause = min(2 ** (attempt - 1), 10)
         try:
-            model = get_chat_model(name)
-            return (prepare(model) if prepare else model).invoke(messages)
+            chat_model = get_chat_model(name)
+            return (prepare(chat_model) if prepare else chat_model).invoke(messages)
         except ModelRateLimitError as exc:
             wait = record_rate_limit(name, exc)
             if wait > SHORT_WAIT_SECONDS or attempt == attempts:
