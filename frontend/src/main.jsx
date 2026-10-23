@@ -9,6 +9,7 @@ import '@fontsource/ibm-plex-mono/400.css';
 import '@fontsource/ibm-plex-mono/500.css';
 import '@fontsource/ibm-plex-mono/600.css';
 import '@mantine/core/styles.css';
+import '@mantine/charts/styles.css';
 import '@mantine/dropzone/styles.css';
 import '@mantine/notifications/styles.css';
 import './styles/tokens.css';

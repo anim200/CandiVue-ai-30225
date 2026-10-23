@@ -63,7 +63,7 @@ function ScreeningBadge({ job }) {
 }
 
 // Button that creates an empty job and opens its Hiring Assistant chat.
-function CreateJobButton() {
+export function CreateJobButton() {
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
 

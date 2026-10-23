@@ -134,7 +134,7 @@ export default function LoginPage() {
   const [error, setError] = useState(null); // { text, serviceDown }
   const [errorKey, setErrorKey] = useState(0); // restarts the shake on each new error
   const [stage, setStage] = useState('idle'); // idle | signingIn | signedIn
-  const goTo = location.state?.from ?? '/jobs';
+  const goTo = location.state?.from ?? '/';
   useDocumentTitle('Sign in · CandiVue AI');
 
   // After "Signed in" has been visible for a moment, open the app.

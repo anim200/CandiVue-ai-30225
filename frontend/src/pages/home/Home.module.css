@@ -1,0 +1,314 @@
+/* Home (dashboard). Same card look as the other pages; colours are the
+   tokens from styles/tokens.css, so light and dark both work. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: fadeUp 0.3s ease-out;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.date {
+  margin: 4px 0 0;
+  font-size: 15px;
+  color: var(--cv-text-dimmed);
+}
+
+/* The six number cards: 6 / 3 / 2 per row. */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 1200px) {
+  .stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
+  border-radius: 10px;
+  color: inherit;
+  text-decoration: none;
+  transition:
+    border-color 0.15s,
+    transform 0.15s,
+    box-shadow 0.15s;
+  animation: fadeUp 0.35s ease-out both;
+}
+
+.stat:nth-child(2) {
+  animation-delay: 0.04s;
+}
+
+.stat:nth-child(3) {
+  animation-delay: 0.08s;
+}
+
+.stat:nth-child(4) {
+  animation-delay: 0.12s;
+}
+
+.stat:nth-child(5) {
+  animation-delay: 0.16s;
+}
+
+.stat:nth-child(6) {
+  animation-delay: 0.2s;
+}
+
+.stat:hover {
+  border-color: var(--cv-primary-border-strong);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(16, 22, 25, 0.08);
+}
+
+.statIcon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text);
+}
+
+/* A number that needs attention (e.g. reports to review) in amber. */
+.statAlert .statIcon {
+  background: var(--cv-warning-tint);
+  color: var(--cv-warning-text);
+}
+
+.statValue {
+  margin-top: 6px;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--cv-text);
+}
+
+.statLabel {
+  font-size: 13.5px;
+  color: var(--cv-text-dimmed);
+}
+
+/* "Needs you" beside the next interviews and the chart. */
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card {
+  padding: 16px 18px;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
+  border-radius: 10px;
+}
+
+.cardTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.count {
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--cv-warning-tint);
+  color: var(--cv-warning-text);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.more {
+  margin-left: auto;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--cv-primary-text);
+}
+
+.steps,
+.upcoming {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--cv-border-light);
+}
+
+.step:last-child,
+.upcoming li:last-child {
+  border-bottom: 0;
+}
+
+.stepIcon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text);
+}
+
+.step_live .stepIcon {
+  background: var(--cv-danger-tint);
+  color: var(--cv-danger-text);
+  animation: pulse 1.8s ease-out infinite;
+}
+
+.step_review .stepIcon {
+  background: var(--cv-warning-tint);
+  color: var(--cv-warning-text);
+}
+
+.step_screen .stepIcon {
+  background: var(--cv-info-tint);
+  color: var(--cv-info-text-strong);
+}
+
+.stepText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14.5px;
+  overflow-wrap: anywhere;
+}
+
+.stepText b {
+  font-weight: 600;
+  color: var(--cv-text);
+}
+
+.stepText span {
+  font-size: 13px;
+  color: var(--cv-text-dimmed);
+}
+
+.upcoming li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--cv-border-light);
+}
+
+.who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 14.5px;
+}
+
+.who b {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.who span {
+  font-size: 13px;
+  color: var(--cv-text-dimmed);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.when {
+  flex: none;
+  font-size: 13.5px;
+  color: var(--cv-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.none {
+  margin: 0;
+  font-size: 14px;
+  color: var(--cv-text-dimmed);
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(176, 58, 46, 0.35);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(176, 58, 46, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(176, 58, 46, 0);
+  }
+}

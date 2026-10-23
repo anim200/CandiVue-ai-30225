@@ -100,7 +100,7 @@ export default function AppLayout() {
                           </span>
                         )
                       }
-                      active={pathname.startsWith(path)}
+                      active={path === '/' ? pathname === '/' : pathname.startsWith(path)}
                       classNames={{ root: classes.navLink, section: classes.navIcon }}
                       onClick={closeMenu} // on phones, close the menu after choosing
                     />
