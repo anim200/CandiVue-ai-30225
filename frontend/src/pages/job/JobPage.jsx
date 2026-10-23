@@ -1,10 +1,11 @@
 // One job's page (design: CV Screening Results.dc.html). Header with
 // "Screen CVs", the scoring weights, the screening run (progress, ranking,
-// excluded and unreadable CVs, candidate drawer) and the applicants: the
-// CVs the CV Collector took from the job's Google Form, plus any added by
-// hand ("Add CV"). Interviewers only (route guard + backend).
+// excluded and unreadable CVs, candidate drawer), past applicants who may
+// fit (talent pool, F11) and the applicants: the CVs the CV Collector took
+// from the job's Google Form, plus any added by hand ("Add CV").
+// Interviewers only (route guard + backend).
 
-import { Anchor, Button, Collapse, FileButton, Group, Loader, Text } from '@mantine/core';
+import { Anchor, Button, Checkbox, Collapse, FileButton, Group, Loader, Modal, Text } from '@mantine/core';
 import { useDocumentTitle } from '@mantine/hooks';
 import {
   IconAlertTriangle,
@@ -19,19 +20,22 @@ import {
   IconRefresh,
   IconTrash,
   IconUpload,
+  IconUserPlus,
+  IconUsersGroup,
   IconX,
 } from '@tabler/icons-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 
-import { apiDelete, apiGet, apiGetFile, apiPost, apiUpload } from '../../api/client';
-import ConfirmModal from '../../components/ConfirmModal';
+import { apiDelete, apiGet, apiGetFile, apiPost, apiPut, apiUpload } from '../../api/client';
+import ConfirmModal, { POP_TRANSITION } from '../../components/ConfirmModal';
 import { ErrorBanner, Skeleton } from '../../components/Feedback';
 import { notifyDone } from '../../components/notify';
 import StatusBadge from '../../components/StatusBadge';
 import { STAGES } from '../assistant/labels';
 import classes from './JobPage.module.css';
 import ScreeningResults, { ScreeningProgress } from './ScreeningResults';
+import TalentPool from './TalentPool';
 import WeightsCard from './WeightsCard';
 
 const POLL_MS = 2000; // progress refresh while screening runs
@@ -94,6 +98,46 @@ function AddCvButton({ onFiles, busy, disabled, variant = 'default' }) {
   );
 }
 
+// After choosing files: did these applicants agree to the talent pool
+// (F11)? The Google Form asks applicants; for a CV received another way
+// the interviewer says so. Unticked by default: no consent, no matching.
+function AddCvDialog({ files, onClose, onAdd }) {
+  const [inPool, setInPool] = useState(false);
+  const what = files.length === 1 ? '1 CV' : `${files.length} CVs`;
+  return (
+    <Modal
+      opened
+      onClose={onClose}
+      size={460}
+      radius="md"
+      centered
+      transitionProps={POP_TRANSITION}
+      title={
+        <Text fz={18} fw={600}>
+          Add {what}
+        </Text>
+      }
+    >
+      <Text fz={15} c="#48535B" lh={1.55}>
+        Each file is checked and added to this job’s applicants.
+      </Text>
+      <Checkbox
+        mt="md"
+        checked={inPool}
+        onChange={(event) => setInPool(event.currentTarget.checked)}
+        label="They agreed to be considered for other vacancies (talent pool)"
+        description="Tick only if every applicant said yes. You can remove anyone from the talent pool later."
+      />
+      <Group justify="flex-end" gap={8} mt="lg">
+        <Button variant="default" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={() => onAdd(files, inPool)}>Add {what}</Button>
+      </Group>
+    </Modal>
+  );
+}
+
 // What happened to each file of the last "Add CV": added, or why not.
 function UploadResults({ results, onClose }) {
   const added = results.filter((r) => r.added).length;
@@ -120,8 +164,9 @@ function UploadResults({ results, onClose }) {
   );
 }
 
-// One applicant row: who, when, which file, status and actions.
-function ApplicantRow({ applicant, onView, onRemove, viewing }) {
+// One applicant row: who, when, which file, status and actions (view the
+// CV, talent pool in or out, remove).
+function ApplicantRow({ applicant, onView, onTalentPool, onRemove, viewing }) {
   const received = applicant.status !== 'rejected';
   return (
     <div className={classes.item}>
@@ -130,6 +175,12 @@ function ApplicantRow({ applicant, onView, onRemove, viewing }) {
           <span className={classes.name}>{applicant.full_name || 'Name not given'}</span>
           <span className={classes.email}>
             {applicant.source === 'upload' && <span className={classes.source}>Added by hand</span>}
+            {applicant.source === 'rediscovered' && (
+              <span className={classes.source} title={`Applied for ${applicant.rediscovered_from ?? 'another job'}`}>
+                From talent pool
+              </span>
+            )}
+            {applicant.open_to_other_roles && <span className={classes.poolChip}>Talent pool</span>}
             {applicant.email || (applicant.source === 'upload' ? '' : '—')}
           </span>
         </div>
@@ -161,6 +212,22 @@ function ApplicantRow({ applicant, onView, onRemove, viewing }) {
               View CV
             </Button>
           )}
+          {received && (
+            <button
+              type="button"
+              className={`${classes.poolButton} ${applicant.open_to_other_roles ? classes.poolOn : ''}`}
+              title={
+                applicant.open_to_other_roles
+                  ? 'In the talent pool. Click to remove (e.g. they asked to be left out).'
+                  : 'Add to the talent pool (only if they agreed to other vacancies).'
+              }
+              aria-pressed={applicant.open_to_other_roles}
+              aria-label={`Talent pool: ${applicant.full_name || 'applicant'}`}
+              onClick={() => onTalentPool(applicant, !applicant.open_to_other_roles)}
+            >
+              {applicant.open_to_other_roles ? <IconUsersGroup size={16} /> : <IconUserPlus size={16} />}
+            </button>
+          )}
           <button
             type="button"
             className={classes.iconButton}
@@ -187,6 +254,7 @@ export default function JobPage() {
   const [removing, setRemoving] = useState(null); // applicant to confirm
   const [removeBusy, setRemoveBusy] = useState(false);
   const [actionError, setActionError] = useState(null);
+  const [pendingFiles, setPendingFiles] = useState(null); // chosen, not sent yet
   const [uploading, setUploading] = useState(false);
   const [uploadResults, setUploadResults] = useState(null); // last "Add CV" outcome
   const [uploadProgress, setUploadProgress] = useState(null); // "3 of 19"
@@ -256,12 +324,13 @@ export default function JobPage() {
   // "View CV" from the screening drawer (same as in the applicants list).
   const viewResultCv = (result) => view({ id: result.candidate_id, cv_filename: result.cv_filename });
 
-  // Show an applicant's CV.
-  async function view(applicant) {
+  // Show an applicant's CV (of this job, or of the job a talent-pool
+  // suggestion applied for).
+  async function view(applicant, fromJob = jobId) {
     setViewingId(applicant.id);
     setActionError(null);
     try {
-      await openCv(jobId, applicant);
+      await openCv(fromJob, applicant);
     } catch (error) {
       setActionError(error.message);
     } finally {
@@ -271,9 +340,9 @@ export default function JobPage() {
 
   // Send the chosen files one at a time (small requests, progress shown);
   // each file is added or refused on its own, and one failure never stops
-  // the rest.
-  async function addCvs(files) {
-    if (!files?.length) return;
+  // the rest. inPool: the applicants agreed to the talent pool.
+  async function addCvs(files, inPool) {
+    setPendingFiles(null);
     setUploading(true);
     setActionError(null);
     setUploadResults(null);
@@ -282,6 +351,7 @@ export default function JobPage() {
       setUploadProgress(`${index + 1} of ${files.length}`);
       const form = new FormData();
       form.append('files', file);
+      form.append('open_to_other_roles', String(inPool));
       try {
         results.push(...(await apiUpload(`/jobs/${jobId}/cvs`, form)));
       } catch (error) {
@@ -292,6 +362,19 @@ export default function JobPage() {
     setUploadProgress(null);
     setUploading(false);
     await load();
+  }
+
+  // Put an applicant in the talent pool or take them out (their choice).
+  async function setTalentPool(applicant, inPool) {
+    setActionError(null);
+    const who = applicant.full_name || 'The applicant';
+    try {
+      await apiPut(`/jobs/${jobId}/cvs/${applicant.id}/talent-pool`, { open_to_other_roles: inPool });
+      notifyDone(inPool ? `${who} is in the talent pool` : `${who} left the talent pool`);
+      await load();
+    } catch (error) {
+      setActionError(error.message);
+    }
   }
 
   // Remove the confirmed applicant and their CV file.
@@ -388,7 +471,7 @@ export default function JobPage() {
                 {running ? 'Screening…' : 'Screen CVs'}
               </Button>
             )}
-            <AddCvButton onFiles={addCvs} busy={uploading} disabled={closed} />
+            <AddCvButton onFiles={(files) => files?.length && setPendingFiles(files)} busy={uploading} disabled={closed} />
             {uploadProgress && <span className={classes.progress}>Adding {uploadProgress}…</span>}
             {job.job_board_post_url && (
               <Button
@@ -447,6 +530,16 @@ export default function JobPage() {
       )}
       {screening?.run?.status === 'completed' && (
         <ScreeningResults data={screening} onViewCv={viewResultCv} viewingId={viewingId} />
+      )}
+      {/* A finished screening starts a new talent-pool check: the new key reloads the card. */}
+      {job.profile && (
+        <TalentPool
+          key={screening?.run?.finished_at ?? 'never'}
+          job={job}
+          onAdded={load}
+          onViewCv={(fromJob, file) => view(file, fromJob)}
+          viewingId={viewingId}
+        />
       )}
 
       {applicants.length === 0 ? (
@@ -522,12 +615,15 @@ export default function JobPage() {
                 applicant={applicant}
                 viewing={viewingId === applicant.id}
                 onView={view}
+                onTalentPool={setTalentPool}
                 onRemove={setRemoving}
               />
             ))}
           </Collapse>
         </section>
       )}
+
+      {pendingFiles && <AddCvDialog files={pendingFiles} onClose={() => setPendingFiles(null)} onAdd={addCvs} />}
 
       <ConfirmModal
         opened={Boolean(removing)}

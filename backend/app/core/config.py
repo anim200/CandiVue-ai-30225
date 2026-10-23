@@ -75,6 +75,9 @@ class Settings(BaseSettings):
     cv_collect_interval_seconds: int = Field(default=300, ge=30)
     cv_intake_dir: str = "/data/cv_intake"  # Docker named volume, never in git
     max_cv_mb: int = Field(default=10, gt=0)
+    # Talent rediscovery (F11): applications older than this are not
+    # matched to other vacancies (data minimisation, N16).
+    rediscovery_max_age_days: int = Field(default=365, gt=0)
     # The form question "Position applied for", e.g. "entry.123456789": the job
     # post pre-fills it with "JOB-12 · title" so each CV finds its job.
     google_form_position_field: str | None = None

@@ -15,6 +15,7 @@ from fastapi import (
     APIRouter,
     Depends,
     File,
+    Form,
     HTTPException,
     Response,
     UploadFile,
@@ -100,8 +101,12 @@ class CvOut(BaseModel):
     cv_filename: str
     status: CandidateStatus
     problem: str | None  # why it was rejected or could not be read
-    source: str  # "form" (Google Form, via the collector) or "upload" (by hand)
+    # "form" (Google Form, via the collector), "upload" (by hand) or
+    # "rediscovered" (added from another job's talent pool, F11).
+    source: str
     received_at: datetime
+    open_to_other_roles: bool  # in the talent pool (the applicant agreed)
+    rediscovered_from: str | None  # the job they first applied for
 
 
 class UploadResult(BaseModel):
@@ -227,20 +232,35 @@ def list_cvs(job_id: int, db: Annotated[Session, Depends(get_db)]) -> list[CvOut
         select(Candidate)
         .where(Candidate.job_id == job_id)
         .order_by(Candidate.created_at.desc())
+    ).all()
+    origins = dict(
+        db.execute(
+            select(Candidate.id, Job.title)
+            .join(Job, Job.id == Candidate.job_id)
+            .where(Candidate.id.in_([c.rediscovered_from_id for c in candidates]))
+        ).all()
     )
-    return [
-        CvOut(
-            id=c.id,
-            full_name=c.full_name,
-            email=c.email,
-            cv_filename=c.cv_filename,
-            status=c.status,
-            problem=c.parse_error,
-            source="form" if c.drive_file_id else "upload",
-            received_at=c.created_at,
-        )
-        for c in candidates
-    ]
+    return [cv_out(c, origins.get(c.rediscovered_from_id)) for c in candidates]
+
+
+def cv_out(candidate: Candidate, origin_job: str | None = None) -> CvOut:
+    """One applicant as the job page shows it."""
+    if candidate.rediscovered_from_id:
+        source = "rediscovered"
+    else:
+        source = "form" if candidate.drive_file_id else "upload"
+    return CvOut(
+        id=candidate.id,
+        full_name=candidate.full_name,
+        email=candidate.email,
+        cv_filename=candidate.cv_filename,
+        status=candidate.status,
+        problem=candidate.parse_error,
+        source=source,
+        received_at=candidate.created_at,
+        open_to_other_roles=candidate.open_to_other_roles,
+        rediscovered_from=origin_job,
+    )
 
 
 MAX_FILES_PER_UPLOAD = 30
@@ -261,10 +281,13 @@ def upload_cvs(
     job_id: int,
     db: Annotated[Session, Depends(get_db)],
     files: Annotated[list[UploadFile], File()],
+    open_to_other_roles: Annotated[bool, Form()] = False,
 ) -> list[UploadResult]:
     """Add CVs by hand (fallback when the Google Form route is not available).
     Same checks as the collector, and none after the closing date; each file
-    gets its own result, and one refused file does not stop the others."""
+    gets its own result, and one refused file does not stop the others.
+    open_to_other_roles: the interviewer confirms these applicants agreed to
+    be considered for other vacancies (talent pool, F11; off by default)."""
     job = db.get(Job, job_id)
     if job is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, NOT_FOUND)
@@ -289,7 +312,10 @@ def upload_cvs(
             )
             continue
         candidate = Candidate(
-            job_id=job_id, full_name=name_from_filename(filename), cv_filename=filename
+            job_id=job_id,
+            full_name=name_from_filename(filename),
+            cv_filename=filename,
+            open_to_other_roles=open_to_other_roles,
         )
         db.add(candidate)
         db.flush()  # the candidate's id names the file

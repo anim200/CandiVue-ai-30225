@@ -658,7 +658,8 @@ Google Form ─► Drive (CV file) + response Sheet (name, email, job, CV link)
   already filled in, e.g. `JOB-12 · Python Developer`
   (`GOOGLE_FORM_POSITION_FIELD`). Answers without a job reference, without
   consent or without a CV are skipped; a CV already collected is never
-  downloaded again.
+  downloaded again. The optional talent-pool question is recorded too
+  (see "Innovation Feature (F11)").
 - **Checks (N8):** PDF or Word (DOCX) only, decided by the file's content,
   and at most `MAX_CV_MB` (checked before downloading). A rejected file is
   not saved; the reason is recorded. One bad answer never stops the others.
@@ -678,10 +679,10 @@ Google Form ─► Drive (CV file) + response Sheet (name, email, job, CV link)
   is guessed from the file name until screening reads the CV).
   API: `POST /api/jobs/{id}/cvs` (multipart `files`, at most 30 per request).
   nginx accepts requests up to 25 MB (`client_max_body_size`).
-- **Synthetic test CVs:** `test-data/synthetic-cvs/` holds 20 made-up CVs for
+- **Synthetic test CVs:** `test-data/synthetic-cvs/` holds 29 made-up CVs for
   the "PHP Laravel Developer" test job (strong, partial, excluded and edge
-  cases: scanned, DOCX, two-column, missing sections) and an answer key in
-  `EXPECTED.md`. Re-create them with `python test-data/synthetic-cvs/make_cvs.py`.
+  cases: scanned, DOCX, two-column, missing sections; CV 29 for the
+  talent-pool demo) and an answer key in `EXPECTED.md`. Re-create them with `python test-data/synthetic-cvs/make_cvs.py`.
 - Without the settings below, the collector waits and logs "not set up yet".
 
 **One-time setup** (same Google Cloud project as the job board):
@@ -815,6 +816,70 @@ correctly. A fresh run and a repeat run give the same ranking.
 - English CVs only (OCR and rules are set up for English).
 - Scores support the interviewer's decision; nothing is rejected or hired
   automatically.
+
+## Innovation Feature (F11): Talent rediscovery
+
+Good applicants who were not chosen for one job are usually never looked
+at again, even when a later job fits them better. CandiVue keeps a
+**talent pool** of applicants who agreed to be considered for other
+vacancies, and suggests them when another job is screened.
+
+```
+Google Form: "Consider me for other vacancies" (optional, unticked)
+   └► candidates.open_to_other_roles
+"Screen CVs" on job B finishes ─► talent rediscovery run for job B
+   load_pool ─ Send: screen_cv (LangGraph 2's own per-CV subgraph) per past application
+            ─► collect_results ─► save_matches (passed the gate and overall ≥ 50)
+Job B page: "Past applicants who may fit" ─► interviewer clicks "Add to this job"
+   └► a copy of the application in job B (CV file, parsed CV, passages)
+      ─► screen again, shortlist, invite as usual
+```
+
+- **Consent first:** only applicants who ticked the optional form question
+  are in the pool (`open_to_other_roles`, default false). For CVs added by
+  hand, the **Add CV** dialog asks whether the applicants agreed (unticked
+  by default). The applicant row shows a **Talent pool** chip and a button
+  to put someone in or take them out (e.g. when they ask to be left out).
+- **Who is in the pool for a job** (`app/rediscovery/pool.py`):
+  applications to *other* jobs whose CV was read, from the last
+  `REDISCOVERY_MAX_AGE_DAYS` days (default 365, data minimisation), and not
+  in the middle of their own process (no scheduled or live interview, not
+  shortlisted while waiting for one). People who already applied to this
+  job (same email) or were added from the pool are left out. A person with
+  several applications is checked once, with the latest one.
+- **Same screening, no new AI:** each past CV is screened against job B's
+  requirements, weights and job description with the **same subgraph as
+  LangGraph 2** (`app/graphs/talent_rediscovery.py`): mandatory gate,
+  requirement evidence, four dimension scores. Parsed CVs and embeddings
+  are reused, everything runs locally, nothing is sent to an AI provider.
+  Results are stored in `rediscovery_runs` / `rediscovery_matches`, apart
+  from job B's own ranking, so they never mix into it.
+- **When it runs:** after every finished screening of the job, and on
+  **Check again** (e.g. more people agreed since). Checkpointed and
+  resumed after a restart like the other runs.
+- **On screen** (job page, under the ranking): name, the job they applied
+  for, when, how they did there ("Ranked 3 of 12", "Interviewed",
+  "Not ranked: …"), the overall score for this job and the requirements
+  met; clicking a name opens the same drawer as the ranking (score
+  breakdown, requirement evidence, View CV). **Add to this job** copies the
+  application (the original stays in its job) and marks it
+  "From talent pool". A suggestion is never added automatically.
+- **Hidden again** when it no longer qualifies (left the pool, now in an
+  interview, already applied); added ones stay, marked "Added".
+- **API (interviewers only):** `GET /api/jobs/{id}/rediscovery`,
+  `POST /api/jobs/{id}/rediscovery` (check again; 409 while one runs),
+  `POST /api/jobs/{id}/rediscovery/{candidate}/add`,
+  `PUT /api/jobs/{id}/cvs/{candidate}/talent-pool`. Candidates get 403.
+- **Google Form:** add an optional checkbox question whose title contains
+  "talent pool", e.g. "Talent pool: other vacancies (optional)" with the
+  option "Yes, consider me for other vacancies". Forms without it still
+  work (nobody joins the pool).
+
+**Demo:** synthetic CV 29 (`29-imran-crossway.pdf`, Python and PHP)
+applies for the PHP Laravel job with the talent-pool box ticked. Create a
+"Python Backend Developer" job in the chat (mandatory Python, Docker),
+then on its page click **Check again**: Imran is suggested with his
+evidence; **Add to this job**, then **Screen CVs**.
 
 ## Knowledge base (RAG)
 

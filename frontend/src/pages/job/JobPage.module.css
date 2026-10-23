@@ -365,7 +365,7 @@
 .head,
 .row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 130px minmax(0, 220px) 130px 150px;
+  grid-template-columns: minmax(0, 1fr) 130px minmax(0, 220px) 130px 186px;
   gap: 0 14px;
   align-items: center;
   padding: 0 20px;
@@ -461,6 +461,27 @@
   color: #932e24;
 }
 
+/* Talent pool in or out (F11): teal while in. */
+.poolButton {
+  composes: iconButton;
+}
+
+.poolButton:hover {
+  background: #edf5f6;
+  color: #1c5d65;
+}
+
+.poolOn {
+  color: #23717a;
+}
+
+/* "Talent pool" next to the email while the applicant is in it. */
+.poolChip {
+  composes: source;
+  background: #e7f3ec;
+  color: #245f3e;
+}
+
 .problem {
   margin: -6px 20px 12px;
   padding: 6px 10px;
@@ -474,7 +495,7 @@
 @container (max-width: 760px) {
   .head,
   .row {
-    grid-template-columns: minmax(0, 1fr) 120px 130px 140px;
+    grid-template-columns: minmax(0, 1fr) 120px 130px 176px;
   }
 
   .fileColumn {

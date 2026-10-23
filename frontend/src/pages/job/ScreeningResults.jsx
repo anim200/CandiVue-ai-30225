@@ -127,8 +127,10 @@ function RequirementRow({ match }) {
   );
 }
 
-// The side panel for one candidate (design CandidateDrawer).
-function CandidateDrawer({ result, rankedCount, onClose, onViewCv, viewing }) {
+// The side panel for one candidate (design CandidateDrawer). heading: the
+// line above the name ("Rank 2 of 9" unless given, e.g. for a talent-pool
+// suggestion).
+export function CandidateDrawer({ result, rankedCount, onClose, onViewCv, viewing, heading }) {
   const met = result?.matches.filter((m) => m.status === 'met').length ?? 0;
   return (
     <Drawer
@@ -146,7 +148,7 @@ function CandidateDrawer({ result, rankedCount, onClose, onViewCv, viewing }) {
           <div className={classes.drawerHead}>
             <div className={classes.drawerTitle}>
               <div className={classes.drawerRank}>
-                {result.outcome === 'ranked' ? `Rank ${result.rank} of ${rankedCount}` : 'Excluded'}
+                {heading ?? (result.outcome === 'ranked' ? `Rank ${result.rank} of ${rankedCount}` : 'Excluded')}
               </div>
               {result.scanned && (
                 <div className={classes.scannedLine}>

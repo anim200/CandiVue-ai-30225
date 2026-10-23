@@ -11,6 +11,7 @@ from app.db.models.interview import (
 from app.db.models.job import Job, JobDescription
 from app.db.models.knowledge import KnowledgeChunk, KnowledgeDocument
 from app.db.models.llm_model import LlmModel
+from app.db.models.rediscovery import RediscoveryMatch, RediscoveryRun
 from app.db.models.screening import CandidateScore, CvPassage, ScreeningRun
 from app.db.models.user import User
 
@@ -27,6 +28,8 @@ __all__ = [
     "KnowledgeDocument",
     "LlmModel",
     "QAAnalysis",
+    "RediscoveryMatch",
+    "RediscoveryRun",
     "ScreeningRun",
     "TranscriptTurn",
     "User",

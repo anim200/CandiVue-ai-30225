@@ -50,3 +50,14 @@ class Candidate(TimestampMixin, Base):
     # Set when the interviewer shortlists the candidate in the Hiring
     # Assistant; only shortlisted candidates can be invited to an interview.
     shortlisted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Talent pool (F11): the applicant agreed (form question, or the
+    # interviewer when adding the CV by hand) that this application may be
+    # matched against other open vacancies. Never matched without it.
+    open_to_other_roles: Mapped[bool] = mapped_column(
+        default=False, server_default="false"
+    )
+    # Set when this application was added from another job's talent pool
+    # (the original application stays as it was).
+    rediscovered_from_id: Mapped[int | None] = mapped_column(
+        ForeignKey("candidates.id", ondelete="SET NULL")
+    )

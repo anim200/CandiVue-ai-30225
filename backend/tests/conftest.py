@@ -25,6 +25,7 @@ from app.graphs.checkpointer import open_checkpointer
 from app.integrations.calendar import CalendarError
 from app.interviews import calendar_sync
 from app.main import app
+from app.rediscovery import pool
 
 
 @pytest.fixture(autouse=True)
@@ -38,8 +39,9 @@ def no_real_usage_counting(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def background_runs(monkeypatch):
-    """Ending an interview starts its Q&A analysis (and later its report) in
-    a background thread. Tests record the starts instead; the ones that need
+    """Ending an interview starts its Q&A analysis (and later its report),
+    and a finished screening starts the job's talent-pool check, each in a
+    background thread. Tests record the starts instead; the ones that need
     a run call its work function themselves."""
     started = []
 
@@ -49,6 +51,7 @@ def background_runs(monkeypatch):
 
     monkeypatch.setattr(qa_analysis, "start_run", record)
     monkeypatch.setattr(final_assessment, "start_run", record)
+    monkeypatch.setattr(pool, "start_run", record)
     return started
 
 

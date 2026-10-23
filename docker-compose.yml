@@ -57,6 +57,7 @@ services:
       DEMO_INTERVIEWER_PASSWORD: ${DEMO_INTERVIEWER_PASSWORD:-}
       GOOGLE_FORM_POSITION_FIELD: ${GOOGLE_FORM_POSITION_FIELD:-}
       MAX_CV_MB: ${MAX_CV_MB:-10}
+      REDISCOVERY_MAX_AGE_DAYS: ${REDISCOVERY_MAX_AGE_DAYS:-365}
     volumes:
       - cv_intake:/data/cv_intake  # CVs for screening (later steps)
     ports:

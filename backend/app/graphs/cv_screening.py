@@ -21,6 +21,8 @@ by the "Screen CVs" button (not by the chatbot), so scores stay repeatable.
 - State is checkpointed in PostgreSQL: after a restart the run continues
   where it stopped (N26). Parsed CVs and their embeddings are stored, so a
   later run reuses them.
+- When a run finishes, the job's talent pool is checked with this same
+  per-CV subgraph (F11, app/graphs/talent_rediscovery.py).
 """
 
 import json
@@ -46,11 +48,13 @@ from app.db.models import (
     CvPassage,
     Job,
     JobDescription,
+    RediscoveryRun,
     ScreeningRun,
 )
 from app.db.models.candidate import CandidateStatus
 from app.db.models.job import JobDescriptionStatus
 from app.graphs.checkpointer import open_checkpointer
+from app.rediscovery.pool import start_rediscovery
 from app.runs.runner import graph_config, register_run_kind
 from app.screening import local_model, scoring
 from app.screening.matching import (
@@ -98,9 +102,12 @@ class ScreeningState(TypedDict, total=False):
 
 
 class CvState(TypedDict, total=False):
-    """One CV's branch (screen_cv subgraph)."""
+    """One CV's branch (screen_cv subgraph). progress: which run counts the
+    finished CVs ("screening", or "rediscovery" when talent rediscovery
+    reuses this subgraph)."""
 
     run_id: int
+    progress: str
     candidate_id: int
     context: dict
     text: str
@@ -130,15 +137,6 @@ def load_cv_batch(state: ScreeningState) -> dict:
     with SessionLocal() as db:
         run = db.get(ScreeningRun, state["run_id"])
         job = db.get(Job, run.job_id)
-        jd = db.scalar(
-            select(JobDescription)
-            .where(
-                JobDescription.job_id == job.id,
-                JobDescription.status == JobDescriptionStatus.APPROVED,
-            )
-            .order_by(JobDescription.version.desc())
-            .limit(1)
-        )
         candidate_ids = list(
             db.scalars(
                 select(Candidate.id)
@@ -151,19 +149,34 @@ def load_cv_batch(state: ScreeningState) -> dict:
         )
         run.total, run.processed = len(candidate_ids), 0
         db.commit()
-        profile = job.profile or {}
-        jd_text = jd_plain_text(jd.content) if jd else ""
+        context = job_context(db, job, run_weights(state["run_id"]))
+    return {"job_id": job.id, "context": context, "candidate_ids": candidate_ids}
+
+
+def job_context(db, job: Job, weights: dict) -> dict:
+    """What every CV of a batch is screened against: the requirements,
+    minimum years, weights, JD key terms and vectors (made once per batch,
+    not once per CV). Also used by talent rediscovery (F11)."""
+    jd = db.scalar(
+        select(JobDescription)
+        .where(
+            JobDescription.job_id == job.id,
+            JobDescription.status == JobDescriptionStatus.APPROVED,
+        )
+        .order_by(JobDescription.version.desc())
+        .limit(1)
+    )
+    profile = job.profile or {}
+    jd_text = jd_plain_text(jd.content) if jd else ""
     requirements = profile.get("requirements", [])
-    context = {
+    return {
         "requirements": requirements,
         "min_years": profile.get("min_years_experience"),
-        "weights": run_weights(state["run_id"]),
+        "weights": weights,
         "key_terms": key_terms(jd_text, requirements),
-        # Made once for the whole batch, not once per CV.
         "requirement_vectors": requirement_vectors(requirements),
         "jd_vector": embed_query(jd_text[:MAX_CV_CHARS_FOR_ATS]) if jd_text else None,
     }
-    return {"job_id": job.id, "context": context, "candidate_ids": candidate_ids}
 
 
 def send_cvs(state: ScreeningState) -> list[Send]:
@@ -440,7 +453,7 @@ def combine_scores(state: CvState) -> dict:
     """Weights × dimensions → overall 0-100, and this CV's result."""
     weights = state["context"]["weights"]
     overall = scoring.combine(state["scores"], weights)
-    _count_progress(state["run_id"])
+    _count_progress(state)
     return {
         "results": [
             {
@@ -460,7 +473,7 @@ def combine_scores(state: CvState) -> dict:
 
 def record_exclusion(state: CvState) -> dict:
     """Failed a mandatory requirement: excluded, with the reasons (F1)."""
-    _count_progress(state["run_id"])
+    _count_progress(state)
     return {
         "results": [
             {
@@ -481,7 +494,7 @@ def log_and_skip(state: CvState) -> dict:
         candidate.parse_error = state["error"]
         db.commit()
     logger.warning("CV skipped in screening: candidate %d", state["candidate_id"])
-    _count_progress(state["run_id"])
+    _count_progress(state)
     return {
         "results": [
             {
@@ -610,13 +623,15 @@ def _passages(candidate_id: int) -> list[tuple[str, str, list[float]]]:
         return [(p.section, p.text, list(p.embedding)) for p in rows]
 
 
-def _count_progress(run_id: int) -> None:
-    """One more CV done ("12 of 20" on screen, N25)."""
+def _count_progress(state: CvState) -> None:
+    """One more CV done ("12 of 20" on screen, N25), in the run this branch
+    belongs to (a screening run, or a talent rediscovery run)."""
+    run = RediscoveryRun if state.get("progress") == "rediscovery" else ScreeningRun
     with SessionLocal() as db:
         db.execute(
-            update(ScreeningRun)
-            .where(ScreeningRun.id == run_id)
-            .values(processed=ScreeningRun.processed + 1)
+            update(run)
+            .where(run.id == state["run_id"])
+            .values(processed=run.processed + 1)
         )
         db.commit()
 
@@ -703,6 +718,9 @@ def run_screening(run_id: int) -> None:
         graph = build_cv_screening(checkpointer)
         started = graph.get_state(config).next
         graph.invoke(None if started else {"run_id": run_id, "results": []}, config)
+    # The job's talent pool is checked next (F11), against the same job.
+    with SessionLocal() as db:
+        start_rediscovery(db, db.get(ScreeningRun, run_id).job_id)
 
 
 register_run_kind(RUN_KIND, ScreeningRun, run_screening)
