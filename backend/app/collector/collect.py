@@ -71,13 +71,22 @@ def job_reference(job_id: int, title: str) -> str:
 
 def find_columns(header: list[str]) -> dict[str, int]:
     """Find which column holds each question; raise if a required one is
-    missing (an optional one is just left out)."""
+    missing (an optional one is just left out). The specific optional
+    questions are matched first, so "Photo consent" can never be taken for
+    the privacy consent, whatever the order of the questions."""
     lowered = [cell.strip().lower() for cell in header]
     columns = {}
-    for key, words in (COLUMNS | OPTIONAL_COLUMNS).items():
+    for key, words in (OPTIONAL_COLUMNS | COLUMNS).items():
         for word in words:
-            index = next((i for i, cell in enumerate(lowered) if word in cell), None)
-            if index is not None and index not in columns.values():
+            index = next(
+                (
+                    i
+                    for i, cell in enumerate(lowered)
+                    if word in cell and i not in columns.values()  # not taken yet
+                ),
+                None,
+            )
+            if index is not None:
                 columns[key] = index
                 break
         else:

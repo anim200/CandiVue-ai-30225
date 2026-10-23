@@ -512,3 +512,23 @@ def test_without_the_key_no_photo_is_processed(invited, monkeypatch):
     google = FakeGoogle([], {"photo-000001": ("me.jpg", b"\xff\xd8\xff photo")})
 
     assert process_photos(google).ready == 0 and google.downloads == []
+
+
+def test_photo_questions_may_come_before_the_privacy_consent():
+    header = [
+        "Timestamp",
+        "Full name",
+        "Email address",
+        "Position applied for",
+        "Upload your CV (PDF or Word)",
+        "Photo of your face",
+        "Photo consent",
+        "Privacy consent",
+        "Talent pool: other vacancies (optional)",
+    ]
+
+    columns = find_columns(header)
+
+    assert columns["consent"] == 7  # the privacy consent, not the photo one
+    assert (columns["photo"], columns["photo_consent"]) == (5, 6)
+    assert columns["cv"] == 4 and columns["talent_pool"] == 8
