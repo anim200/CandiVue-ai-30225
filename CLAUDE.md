@@ -5,7 +5,8 @@
 - Repository: candivue-ai-30225 (BJIT GitHub).
 - Source of truth for requirements: docs/requirement.md (including project decisions in §4B).
 - Progress and next steps: docs/PROJECT_STATUS.md.
-- Designs: docs/diagrams/ (Fig 1 high-level, Fig 2 detailed architecture, Fig 3–6 LangGraphs).
+- Designs: docs/diagrams/ (Fig 1 high-level, Fig 2 detailed architecture, Fig 3–7 LangGraphs 1–5);
+  source: docs/diagrams/src/build_diagrams.py.
 
 ## Mandatory stack
 - Python, FastAPI + Pydantic (OpenAPI docs), LangGraph, Docker Compose, PostgreSQL, vector store.

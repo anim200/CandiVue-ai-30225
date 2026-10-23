@@ -6,6 +6,27 @@ AI-powered recruitment and interview platform (BJIT AI Trainee final project).
 > (backend, database and frontend skeleton). Architecture, usage, data
 > providers and known limitations will be added as the features are built.
 
+## Diagrams
+
+`docs/diagrams/` holds the design figures as PDFs, updated on 23-10-2026 to
+match the code:
+
+| Figure | File | Shows |
+|---|---|---|
+| 1 | `high_level_system_diagram.pdf` | The whole process in four stages: who does each step |
+| 2 | `detailed_architecture_diagram.pdf` | Every step with its app part, AI model, external service and data store |
+| 3 | `langgraph_1_hiring_assistant.pdf` | LangGraph 1, the Hiring Assistant (tools, three pauses, guardrail, room mode) |
+| 4 | `langgraph_2_cv_screening.pdf` | LangGraph 2, CV screening and scoring |
+| 5 | `langgraph_3_qa_analysis.pdf` | LangGraph 3, interview Q&A analysis |
+| 6 | `langgraph_4_final_assessment.pdf` | LangGraph 4, the final assessment and its review |
+| 7 | `langgraph_5_talent_rediscovery.pdf` | LangGraph 5, talent rediscovery (F11) |
+
+Node names in Figures 3-7 are the real ones in `backend/app/graphs/`. All
+figures are drawn by `docs/diagrams/src/build_diagrams.py` (edit it, then
+run `python docs/diagrams/src/build_diagrams.py`; it prints the PDFs with
+Microsoft Edge). `docs/diagrams/png/` has the same figures as high-resolution
+PNGs (6x, Figure 2 5x: 6,000-9,600 pixels wide) for slides and documents.
+
 ## Prerequisites
 
 - Docker Desktop (Docker Engine with Docker Compose v2)
@@ -283,9 +304,10 @@ START -> load_context -> assistant --(tool call)--> tools --> assistant ...
          human_review --approve----> confirm_posting (pause)
          human_review --reject-----> assistant
          human_review --edit-------> human_review
-         confirm_posting --post----> post_to_job_board --> assistant
-         confirm_posting --skip----> assistant
+         confirm_posting --post----> post_to_job_board --> END
+         confirm_posting --skip----> END
          tools --(request_job_posting)--> confirm_posting
+         tools --(invitation plan)--> confirm_invitations (pause) --> END
          assistant --(only decline_off_topic)--> off_topic --> END
 ```
 
@@ -1098,11 +1120,12 @@ Job B page: "Past applicants who may fit" ─► interviewer clicks "Add to this
   shortlisted while waiting for one). People who already applied to this
   job (same email) or were added from the pool are left out. A person with
   several applications is checked once, with the latest one.
-- **Same screening, no new AI:** each past CV is screened against job B's
+- **Same screening:** each past CV is screened against job B's
   requirements, weights and job description with the **same subgraph as
-  LangGraph 2** (`app/graphs/talent_rediscovery.py`): mandatory gate,
-  requirement evidence, four dimension scores. Parsed CVs and embeddings
-  are reused, everything runs locally, nothing is sent to an AI provider.
+  LangGraph 2** (`app/graphs/talent_rediscovery.py`, Figure 7): mandatory
+  gate, requirement evidence, four dimension scores. Parsed CVs and
+  embeddings are reused; like screening, only a must-have the rules miss
+  gets the AI second look (Gemini first, local model as fallback).
   Results are stored in `rediscovery_runs` / `rediscovery_matches`, apart
   from job B's own ranking, so they never mix into it.
 - **When it runs:** after every finished screening of the job, and on
