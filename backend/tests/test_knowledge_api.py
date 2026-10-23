@@ -195,7 +195,8 @@ def test_failed_indexing_shows_a_plain_message_and_can_be_retried(
     listed = client.get("/api/knowledge/documents", headers=headers).json()
     document = next(d for d in listed if d["id"] == document_id)
     assert document["status"] == "failed"
-    assert document["error"] == runner.AI_FAILURE_MESSAGE  # plain message, no details
+    # Plain message, no details of the provider's error.
+    assert document["error"] == "The AI service is unavailable. Please try again later."
 
     monkeypatch.setattr(embeddings, "get_embedding_model", lambda: WordEmbeddings())
     retried = client.post(

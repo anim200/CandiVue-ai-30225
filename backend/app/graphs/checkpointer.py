@@ -36,3 +36,10 @@ def open_checkpointer() -> Generator[PostgresSaver]:
         # manages these tables itself, so they are not in our Alembic models.
         checkpointer.setup()
         yield checkpointer
+
+
+def forget_thread(config: dict) -> None:
+    """Delete the saved graph state of a run that is being replaced (e.g.
+    "Analyse again"), so old checkpoints do not pile up."""
+    with open_checkpointer() as checkpointer:
+        checkpointer.delete_thread(config["configurable"]["thread_id"])

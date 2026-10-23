@@ -3,7 +3,8 @@
 // interviewer confirms them (the invitation email is sent then). The email
 // is the only way the candidate gets their link, and "Join now" (the video
 // call) only opens once it was sent. "Send invitation" emails it (again,
-// with a new link); "Cancel" stops the interview and its link.
+// with a new link); "Cancel" stops the interview and its link. An ended
+// interview opens its Q&A analysis and its assessment report.
 // Interviewers only.
 
 import { ActionIcon, Button, Group, SegmentedControl, Tooltip } from '@mantine/core';
@@ -13,8 +14,10 @@ import {
   IconCalendarEvent,
   IconCheck,
   IconClock,
+  IconFileText,
   IconMailCheck,
   IconMailX,
+  IconMessage2Search,
   IconPlayerPlay,
   IconPlayerRecord,
   IconSend,
@@ -205,6 +208,27 @@ export default function InterviewsPage() {
                       <IconX size={17} />
                     </ActionIcon>
                   </Tooltip>
+                </>
+              )}
+              {interview.status === 'ended' && (
+                <>
+                  <Button
+                    size="xs"
+                    variant="light"
+                    component={Link}
+                    to={`/interviews/${interview.id}/analysis`}
+                    leftSection={<IconMessage2Search size={14} />}
+                  >
+                    Analysis
+                  </Button>
+                  <Button
+                    size="xs"
+                    component={Link}
+                    to={`/interviews/${interview.id}/report`}
+                    leftSection={<IconFileText size={14} />}
+                  >
+                    Report
+                  </Button>
                 </>
               )}
             </Group>

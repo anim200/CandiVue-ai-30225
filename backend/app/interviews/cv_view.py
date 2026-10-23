@@ -82,22 +82,22 @@ def ai_summary(db: Session, session: InterviewSession) -> str | None:
     parsed = candidate.parsed_cv
     if not parsed:
         return None
-    names = [part for part in (candidate.full_name or "").split() if len(part) > 1]
+    names = name_parts(candidate.full_name)
     lines = [f"Job: {job.title}"]
     if parsed.get("years_source") not in (None, "unknown"):
         lines.append(f"Years of experience: about {parsed['years_experience']:g}")
     if parsed.get("degree"):
         lines.append(f"Highest degree: {parsed['degree']}")
     jobs = [
-        f"- {_clean(j.get('title') or 'Untitled role', names)} ({j.get('start')} to {j.get('end')})"
+        f"- {clean_text(j.get('title') or 'Untitled role', names)} ({j.get('start')} to {j.get('end')})"
         for j in parsed.get("jobs", [])[:MAX_JOBS]
     ]
     if jobs:
         lines += ["Roles:", *jobs]
     skills = parsed.get("sections", {}).get("skills")
     if skills:
-        lines.append(f"Skills: {_clean(skills[:MAX_SKILLS_CHARS], names)}")
-    certificates = [_clean(c, names) for c in parsed.get("certifications", [])]
+        lines.append(f"Skills: {clean_text(skills[:MAX_SKILLS_CHARS], names)}")
+    certificates = [clean_text(c, names) for c in parsed.get("certifications", [])]
     if certificates:
         lines.append("Certificates: " + "; ".join(certificates))
     result = screening_result(db, job, candidate.id)
@@ -106,7 +106,7 @@ def ai_summary(db: Session, session: InterviewSession) -> str | None:
         for match in result["matches"]:
             evidence = match.get("evidence")
             shown = (
-                f': "{_clean(evidence[:MAX_EVIDENCE_CHARS], names)}"'
+                f': "{clean_text(evidence[:MAX_EVIDENCE_CHARS], names)}"'
                 if evidence
                 else ""
             )
@@ -117,7 +117,15 @@ def ai_summary(db: Session, session: InterviewSession) -> str | None:
     return "\n".join(lines)
 
 
-def _clean(text: str, names: list[str]) -> str:
+def name_parts(*full_names: str | None) -> list[str]:
+    """The words of people's names, to remove them from texts for the LLM
+    (single letters are left alone: they also occur in normal text)."""
+    return [
+        part for name in full_names for part in (name or "").split() if len(part) > 1
+    ]
+
+
+def clean_text(text: str, names: list[str]) -> str:
     """Remove contact details, links and the candidate's name from a text."""
     text = LINK.sub("[link]", EMAIL.sub("[email]", text))
     # A phone number has 9+ digits; "2014 - 2018" (8 digits) is a date range.

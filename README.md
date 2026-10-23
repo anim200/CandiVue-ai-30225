@@ -75,7 +75,11 @@ the background, so the API answers at once and the screen stays responsive.
 
 - Each run has a status: `pending` → `running` → `completed`, `failed`, or
   `waiting_for_review` (paused until the interviewer reviews the result).
-- Screening runs also show progress, e.g. 12 of 20 CVs.
+- Screening runs and interview analyses show progress, e.g. 12 of 20 CVs,
+  4 of 7 Q&A units.
+- An AI failure shows its own plain message, e.g. which model reached its
+  daily limit and what to do; "Try again" continues from the last finished
+  step (finished CVs or Q&A units are not sent to the AI again).
 - A failed run stores a short, plain-language message (no technical details).
 - If the backend stops in the middle of a run, the run starts again
   automatically on the next start and continues from its last saved step.
@@ -199,8 +203,13 @@ width.
     certificates and how each requirement was met in screening. No name,
     email, phone number, address or links (they are removed first).
   - CV screening: nothing (it runs locally, see "CV screening").
-  - Later steps: interview transcripts and the instructions (prompts)
-    needed to assess candidates.
+  - Interview analysis (F5): the job title and requirements, the interview
+    transcript with **names, email addresses, phone numbers and links
+    removed**, and the knowledge-base passages found for each answer
+    (Reference library, Company policies).
+  - Assessment report (F6): the same transcript lines, the reduced CV facts
+    (as above), the CV screening scores and reasons, the Q&A evaluations,
+    and the interviewer's comment when they request changes.
 
 Other external services (N18):
 
@@ -481,6 +490,71 @@ Setup: create an API key at deepgram.com and put it in `.env` as
 `DEEPGRAM_API_KEY`; `docker compose up -d`. Only the `transcriber`
 container receives it. It shares LiveKit's network (`network_mode`), because
 LiveKit tells participants to send media to 127.0.0.1.
+
+## Interview analysis and assessment report (LangGraphs 3 and 4)
+
+When the interviewer ends an interview, two fixed workflows run in the
+background, one after the other; the report is usually ready to review
+within a minute. Nothing is shown to the candidate (N9: interviewer-only
+routes, candidates get 403).
+
+**Q&A analysis (F5, LangGraph 3, `backend/app/graphs/qa_analysis.py`).**
+
+- Waits a few seconds for the transcriber's last words, then the LLM splits
+  the transcript into question–answer units. Multi-part questions become
+  `Q6a` / `Q6b`, follow-ups are linked to the question they follow. The LLM
+  only points at numbered transcript lines; the code checks every number
+  (it must exist and come from the right person).
+- Greetings, small talk and unanswered questions are kept but not scored.
+  Each job- or company-related answer is scored 0-100 on relevance,
+  accuracy, completeness and articulation, with a reason per dimension and
+  the transcript lines it rests on.
+- **Accuracy is checked against documents (RAG):** job answers against the
+  knowledge base's *Reference library*, company answers against *Company
+  policies* (user decision 17-10-2026; see `docs/requirement.md` §4B-5).
+  Passages scoring below 0.5 are ignored (measured: on-topic 0.6-0.7,
+  off-topic under 0.25). Without a matching passage the answer is marked
+  "not checked against a reference document".
+- Requirement coverage (which units explored each job requirement) and the
+  requirements never explored are computed in code.
+- Units are evaluated four at a time, which stays under Gemini's
+  per-minute limit. One analysis costs one request plus one per scored unit.
+
+**Assessment report (F6, LangGraph 4, `backend/app/graphs/final_assessment.py`).**
+
+- Component scores are computed in code: the CV screening score and its
+  four dimensions (F2), the interview's four dimensions averaged over the
+  scored units (F5), and the requirement coverage. The overall position is
+  the average of the CV and interview scores on a 4-step scale (Not yet
+  suitable < 50 ≤ Partial fit < 65 ≤ Good fit < 80 ≤ Strong fit). Without
+  scored answers the headline says it rests on the CV alone. It is a
+  summary for a person, never a decision.
+- Four LLM requests run in parallel: strengths, weaknesses, evidence gaps
+  and areas to verify. Every conclusion must cite evidence ids: CV items
+  (`CV3`), transcript lines (`T12`) or a requirement's coverage record
+  (`R2`, for what was never discussed). Ids are checked; a conclusion
+  without valid evidence is sent back for repair (at most twice) and then
+  shown as unsupported.
+- **Review (HITL):** the report waits for the interviewer. *Approve* makes
+  it final; *Request changes* with a comment writes the next version with
+  that comment, says what changed, and waits again.
+- **Export:** "Export / print" downloads one self-contained HTML file or
+  prints it (the print dialog also saves it as PDF). Drafts are marked "Not
+  yet approved" on every page; sources become numbered references.
+- **Compare candidates:** up to three assessed candidates of the same job
+  side by side.
+
+| Page | Address |
+|---|---|
+| Interview analysis (Q&A analysis, transcript, session details) | `/interviews/<id>/analysis` |
+| Assessment report (report, compare candidates) | `/interviews/<id>/report` |
+| Reports of a job | `/reports` |
+
+API (interviewers only): `GET/POST /api/interviews/{id}/analysis`,
+`GET/POST /api/interviews/{id}/report`, `POST /api/interviews/{id}/report/review`,
+`GET /api/interviews/{id}/report/export`, `GET /api/jobs/{id}/reports`.
+`POST` starts a run, continues a failed one, or with `{"again": true}`
+replaces it (analysing again also replaces the report).
 
 ## Email (interview invitations)
 

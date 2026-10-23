@@ -5,6 +5,7 @@ import { createBrowserRouter, Navigate } from 'react-router';
 import RequireInterviewer from './auth/RequireInterviewer';
 import AppLayout from './layout/AppLayout';
 import { NAV_ITEMS } from './layout/navigation';
+import InterviewAnalysisPage from './pages/analysis/InterviewAnalysisPage';
 import HiringAssistantPage from './pages/assistant/HiringAssistantPage';
 import CandidateJoinPage from './pages/CandidateJoinPage';
 import ComingSoonPage from './pages/ComingSoonPage';
@@ -16,12 +17,15 @@ import JobsPage from './pages/JobsPage';
 import KnowledgeBasePage from './pages/knowledge/KnowledgeBasePage';
 import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
+import AssessmentReportPage from './pages/report/AssessmentReportPage';
+import ReportsPage from './pages/report/ReportsPage';
 
 // Screens that are built; other menu items still show "coming soon".
 const BUILT_PAGES = {
   '/jobs': <JobsPage />,
   '/interviews': <InterviewsPage />,
   '/knowledge-base': <KnowledgeBasePage />,
+  '/reports': <ReportsPage />,
 };
 
 // The Hiring Assistant and the interview room fill the whole area (no page
@@ -52,6 +56,8 @@ export const router = createBrowserRouter([
       { path: 'assistant/:jobId', element: <HiringAssistantPage />, handle: FULL_BLEED },
       { path: 'jobs/:jobId', element: <JobPage /> },
       { path: 'interviews/:interviewId/room', element: <InterviewRoomPage />, handle: LIVE_ROOM },
+      { path: 'interviews/:interviewId/analysis', element: <InterviewAnalysisPage /> },
+      { path: 'interviews/:interviewId/report', element: <AssessmentReportPage /> },
       // Each module replaces its "coming soon" page with the real screen.
       ...NAV_ITEMS.filter((item) => item.path !== '/assistant').map((item) => ({
         path: item.path,

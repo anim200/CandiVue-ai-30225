@@ -29,6 +29,7 @@ from app.core import clock
 from app.db.database import get_db
 from app.db.models import Candidate, InterviewSession, Job, TranscriptTurn, User
 from app.db.models.interview import InvitationStatus, SessionStatus, Speaker
+from app.graphs import qa_analysis
 from app.interviews import calendar_sync, chat, cv_view, emails, planning, room
 
 logger = logging.getLogger(__name__)
@@ -66,6 +67,8 @@ class InterviewOut(BaseModel):
     invitation_status: InvitationStatus
     invitation_error: str | None  # why the last email failed
     started_at: datetime | None  # when the call first opened (Live)
+    ended_at: datetime | None
+    interviewer_name: str | None  # who took part (or was planned)
     admitted: bool  # the candidate was let in from the waiting room
 
 
@@ -257,13 +260,15 @@ def end_interview(
     interview_id: int, db: Annotated[Session, Depends(get_db)]
 ) -> InterviewOut:
     """End the interview: it is saved as ended with its end time, the call
-    closes for everyone and the candidate's link stops working."""
+    closes for everyone and the candidate's link stops working. The Q&A
+    analysis (F5) starts, and after it the assessment report (F6)."""
     session = _active(db, interview_id)
     session.status = SessionStatus.ENDED
     session.ended_at = clock.now()
     db.commit()
     room.end_room(session.id)
     logger.info("Interview ended: session %d", interview_id)
+    qa_analysis.start_analysis(db, session.id)
     return _out(db, session)
 
 
@@ -321,6 +326,9 @@ def _transcript_status(
 def _out(db: Session, session: InterviewSession) -> InterviewOut:
     """An interview as the pages show it."""
     candidate = db.get(Candidate, session.candidate_id)
+    interviewer = (
+        db.get(User, session.interviewer_id) if session.interviewer_id else None
+    )
     return InterviewOut(
         id=session.id,
         candidate_id=candidate.id,
@@ -333,6 +341,8 @@ def _out(db: Session, session: InterviewSession) -> InterviewOut:
         invitation_status=session.invitation_status,
         invitation_error=session.invitation_error,
         started_at=session.started_at,
+        ended_at=session.ended_at,
+        interviewer_name=interviewer.full_name if interviewer else None,
         admitted=session.admitted_at is not None,
     )
 
