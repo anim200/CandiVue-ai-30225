@@ -6,9 +6,10 @@ import {
   IconBriefcase,
   IconFileText,
   IconLayoutDashboard,
-  IconSparkles,
   IconVideo,
 } from '@tabler/icons-react';
+
+import AssistantMark from '../components/AssistantMark';
 
 export const NAV_ITEMS = [
   {
@@ -42,7 +43,7 @@ export const NAV_ITEMS = [
   {
     path: '/assistant',
     label: 'Hiring Assistant',
-    icon: IconSparkles,
+    icon: AssistantMark,
     description: 'Chat with the Hiring Assistant to create jobs and schedule interviews.',
     group: 'AI tools',
   },

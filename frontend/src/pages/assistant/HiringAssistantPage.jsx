@@ -9,11 +9,13 @@
 
 import { Button } from '@mantine/core';
 import { useDocumentTitle } from '@mantine/hooks';
-import { IconPlus, IconSparkles } from '@tabler/icons-react';
+import { IconPlus } from '@tabler/icons-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 
 import { apiGet, apiPost, apiPostAi, apiPut } from '../../api/client';
+import AssistantMark from '../../components/AssistantMark';
+import { CHAT_STEPS } from '../../components/aiSignal';
 import { EmptyState, ErrorBanner } from '../../components/Feedback';
 import { notifyError } from '../../components/notify';
 import classes from './Assistant.module.css';
@@ -161,6 +163,7 @@ export default function HiringAssistantPage() {
   const [threadFailed, setThreadFailed] = useState(false);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [working, setWorking] = useState(null); // { steps, startedAt } while the AI works
   const [sentText, setSentText] = useState(null); // shown at once, before the answer
   const [turnFailed, setTurnFailed] = useState(null); // the error message, or null
   const [reviewBusy, setReviewBusy] = useState(false);
@@ -236,7 +239,7 @@ export default function HiringAssistantPage() {
   // Keep the newest message in view.
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [thread, sentText, sending, turnFailed]);
+  }, [thread, sentText, working, turnFailed]);
 
   // Start a new job and open its (empty) chat.
   async function newJob() {
@@ -258,6 +261,7 @@ export default function HiringAssistantPage() {
     setDraft('');
     setSentText(text);
     setSending(true);
+    setWorking({ steps: CHAT_STEPS.message, startedAt: Date.now() });
     setTurnFailed(null);
     try {
       setThread(await apiPostAi(`/assistant/jobs/${id}/messages`, { text }));
@@ -270,6 +274,7 @@ export default function HiringAssistantPage() {
       loadJobs();
     } finally {
       setSending(false);
+      setWorking(null);
       loadModels();
     }
   }
@@ -277,6 +282,7 @@ export default function HiringAssistantPage() {
   // Continue a turn that failed (the backend kept the message).
   async function retryTurn() {
     setSending(true);
+    setWorking({ steps: CHAT_STEPS.message, startedAt: Date.now() });
     setTurnFailed(null);
     try {
       setThread(await apiPostAi(`/assistant/jobs/${id}/retry`));
@@ -286,6 +292,7 @@ export default function HiringAssistantPage() {
       setTurnFailed(error.message);
     } finally {
       setSending(false);
+      setWorking(null);
       loadModels();
     }
   }
@@ -293,6 +300,7 @@ export default function HiringAssistantPage() {
   // Post the approved JD again (after a failure or once the form link is added).
   async function postAgain() {
     setSending(true);
+    setWorking({ steps: CHAT_STEPS.post, startedAt: Date.now() });
     setReviewError(null);
     try {
       setThread(await apiPostAi(`/assistant/jobs/${id}/post`));
@@ -301,6 +309,7 @@ export default function HiringAssistantPage() {
       setReviewError(error.message);
     } finally {
       setSending(false);
+      setWorking(null);
     }
   }
 
@@ -321,6 +330,14 @@ export default function HiringAssistantPage() {
   // (confirm, cancel).
   async function decide(path, decision) {
     setReviewBusy(true);
+    // Decisions that make the AI or a service work show the Signal status;
+    // quick ones (approve, edit, skip, cancel) only their busy button.
+    const slow = {
+      review: decision.action === 'reject' && CHAT_STEPS.reject,
+      'post-decision': decision.action === 'post' && CHAT_STEPS.post,
+      'invitation-decision': decision.action === 'confirm' && CHAT_STEPS.invite,
+    }[path];
+    if (slow) setWorking({ steps: slow, startedAt: Date.now() });
     setReviewError(null);
     try {
       setThread(await apiPostAi(`/assistant/jobs/${id}/${path}`, decision));
@@ -338,6 +355,7 @@ export default function HiringAssistantPage() {
       }
     } finally {
       setReviewBusy(false);
+      setWorking(null);
       loadModels();
     }
   }
@@ -374,7 +392,7 @@ export default function HiringAssistantPage() {
       <section className={`${classes.chat} ${id ? '' : classes.hideOnPhone}`}>
         {!id || (jobs && !job) ? (
           <EmptyState
-            icon={IconSparkles}
+            icon={AssistantMark}
             title={id ? 'This job no longer exists' : 'Choose a job or start a new one'}
             action={
               <Button leftSection={<IconPlus size={16} />} onClick={newJob} loading={creating}>
@@ -397,7 +415,7 @@ export default function HiringAssistantPage() {
               {!thread && !threadFailed && <ChatSkeleton />}
               {isEmpty && (
                 <EmptyState
-                  icon={IconSparkles}
+                  icon={AssistantMark}
                   title="Describe the role you’re hiring for"
                   action={
                     <div className={classes.chips}>
@@ -446,7 +464,9 @@ export default function HiringAssistantPage() {
                 </AssistantRow>
               )}
               {sentText && <UserBubble text={sentText} />}
-              {sending && <WorkingLine />}
+              {working && (
+                <WorkingLine key={working.startedAt} steps={working.steps} startedAt={working.startedAt} />
+              )}
               {turnFailed && (
                 <ErrorBanner title="I couldn’t answer just now." onRetry={retryTurn}>
                   {turnFailed} Your message is saved.

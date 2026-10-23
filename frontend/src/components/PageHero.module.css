@@ -1,0 +1,139 @@
+/* The band at the top of each interviewer page (PageHero.jsx). It spans
+   the whole content area: the negative margins undo the page padding of
+   AppLayout (16px on phones, 32px sides and 24px top from 768px). */
+
+.hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  container: hero / inline-size;
+  margin: -16px -16px 0;
+  padding: 20px 16px 22px;
+  background: var(--cv-art-wash-1);
+  border-bottom: 1px solid var(--cv-art-border);
+}
+
+/* From 768px the band is at least 148px high so the drawing shows whole;
+   a short header (title and one button) sits in its middle. */
+@media (min-width: 48em) {
+  .hero {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 148px;
+    margin: -24px -32px 0;
+    padding: 24px 32px 28px;
+  }
+}
+
+.art {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* The page's drawing, as high as the band, fading out at the bottom. */
+.motif {
+  position: absolute;
+  top: 0;
+  right: calc(8px + var(--hero-beside, 0px));
+  z-index: -1;
+  height: 100%;
+  aspect-ratio: 490 / 290;
+  pointer-events: none;
+  mask-image: linear-gradient(to bottom, #000 72%, transparent);
+}
+
+.content {
+  position: relative;
+}
+
+/* Left of the controls only while there is room for title, drawing and
+   controls side by side. */
+@container hero (max-width: 940px) {
+  .beside {
+    display: none;
+  }
+}
+
+/* Colours of the drawing (light and dark values in tokens.css). */
+.wash1 {
+  stop-color: var(--cv-art-wash-1);
+}
+
+.wash2 {
+  stop-color: var(--cv-art-wash-2);
+}
+
+.wash3 {
+  stop-color: var(--cv-art-wash-3);
+}
+
+.stopInk {
+  stop-color: var(--cv-art-ink);
+}
+
+.stopMint {
+  stop-color: var(--cv-art-mint);
+}
+
+.stopFade {
+  stop-color: var(--cv-art-wash-1);
+}
+
+.ink {
+  fill: var(--cv-art-ink);
+}
+
+.line {
+  stroke: var(--cv-art-ink);
+}
+
+.node {
+  fill: var(--cv-art-node);
+  stroke: var(--cv-art-ink);
+}
+
+/* The drawing's strong point breathes slowly (off with "reduce motion"). */
+.pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pulse 3.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(0.85);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+/* Phones: the buttons wrap under the title, so only the soft wash stays. */
+@media (max-width: 47.99em) {
+  .drawing,
+  .motif {
+    display: none;
+  }
+}
+
+@media print {
+  .hero {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  .art,
+  .motif {
+    display: none;
+  }
+}

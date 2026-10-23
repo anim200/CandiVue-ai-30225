@@ -14,6 +14,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 
 import { apiGet } from '../../api/client';
 import { EmptyState, ErrorBanner, Skeleton } from '../../components/Feedback';
+import PageHero from '../../components/PageHero';
 import StatusBadge from '../../components/StatusBadge';
 import { whenText } from '../../utils/dates';
 import { usePolling } from '../../utils/usePolling';
@@ -127,20 +128,22 @@ export default function ReportsPage() {
 
   return (
     <div className={classes.page}>
-      <div className={classes.listTop}>
-        <h1 className={classes.title}>Reports</h1>
-        {jobs?.length > 0 && (
-          <Select
-            className={classes.jobSelect}
-            aria-label="Job"
-            data={jobs.map((job) => ({ value: String(job.id), label: job.title }))}
-            value={jobId}
-            onChange={(value) => setSearch({ job: value })}
-            allowDeselect={false}
-            searchable
-          />
-        )}
-      </div>
+      <PageHero art="chart" beside={290}>
+        <div className={classes.listTop}>
+          <h1 className={classes.title}>Reports</h1>
+          {jobs?.length > 0 && (
+            <Select
+              className={classes.jobSelect}
+              aria-label="Job"
+              data={jobs.map((job) => ({ value: String(job.id), label: job.title }))}
+              value={jobId}
+              onChange={(value) => setSearch({ job: value })}
+              allowDeselect={false}
+              searchable
+            />
+          )}
+        </div>
+      </PageHero>
       {body}
     </div>
   );

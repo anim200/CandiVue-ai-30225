@@ -81,10 +81,6 @@
   gap: 12px;
 }
 
-.progressCount {
-  font: 500 15px var(--mantine-font-family-monospace);
-}
-
 .bar {
   height: 10px;
   background: var(--cv-line);

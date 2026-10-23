@@ -16,13 +16,13 @@ import {
   IconCopy,
   IconFileText,
   IconRefresh,
-  IconSparkles,
   IconTargetArrow,
   IconUsers,
 } from '@tabler/icons-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { apiGet, apiPostAi, apiPut } from '../../api/client';
+import AssistantMark from '../../components/AssistantMark';
 import { ErrorBanner } from '../../components/Feedback';
 import { notifyError } from '../../components/notify';
 import ChatComposer from '../assistant/ChatComposer';
@@ -208,7 +208,7 @@ export default function RoomAssistant({ interviewId }) {
         {thread && thread.items.length === 0 && !sending && (
           <div className={classes.empty}>
             <span className={classes.emptyIcon}>
-              <IconSparkles size={22} />
+              <AssistantMark size={24} />
             </span>
             <b>Need a question?</b>
             Pick one of the buttons below or ask in your own words, e.g. “two questions about Docker in production”.

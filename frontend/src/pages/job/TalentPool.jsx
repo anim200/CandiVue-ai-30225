@@ -5,11 +5,12 @@
 // applicant only when the interviewer clicks "Add to this job".
 // Interviewers only (route guard + backend).
 
-import { Button, Loader } from '@mantine/core';
+import { Button } from '@mantine/core';
 import { IconCircleCheck, IconRefresh, IconUserPlus, IconUsersGroup } from '@tabler/icons-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import { apiGet, apiPost } from '../../api/client';
+import AiSignalStatus from '../../components/AiSignalStatus';
 import { notifyDone } from '../../components/notify';
 import StatusBadge from '../../components/StatusBadge';
 import { usePolling } from '../../utils/usePolling';
@@ -143,10 +144,10 @@ export default function TalentPool({ job, onAdded, onViewCv, viewingId }) {
 
       {error && <div className={classes.error}>{error}</div>}
       {running && (
-        <div className={classes.status} role="status">
-          <Loader size={14} />
-          Checking the talent pool{run.total ? ` · ${run.processed} of ${run.total}` : '…'}
-        </div>
+        <AiSignalStatus
+          status={`Checking the talent pool${run.total ? ` · ${run.processed} of ${run.total}` : '…'}`}
+          startedAt={run.started_at}
+        />
       )}
       {run?.status === 'failed' && (
         <div className={classes.error}>The last check stopped: {run.error} Try “Check again”.</div>

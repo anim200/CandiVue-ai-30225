@@ -222,15 +222,13 @@
   animation: fadeUp 0.35s ease-out;
 }
 
+/* The assistant's mark beside its messages (signal colours). */
 .avatar {
+  --mark-icon: var(--cv-signal-icon);
+  --mark-accent: var(--cv-signal-accent);
   width: 28px;
   height: 28px;
-  border-radius: 50%;
-  background: #23717a;
-  color: #fff;
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
   flex: none;
 }
 
@@ -263,8 +261,15 @@
   color: var(--cv-success-text-strong);
 }
 
+/* The Signal status while the assistant works: its mark sits where the
+   avatar is, the step where the reply will be. */
 .working {
-  color: var(--cv-text-secondary);
+  width: 100%;
+  max-width: 460px;
+}
+
+.working > * {
+  flex: 1;
 }
 
 .spinner {

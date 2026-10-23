@@ -14,13 +14,14 @@
 
 import { Button, Drawer, Tooltip } from '@mantine/core';
 import { useDocumentTitle, useMediaQuery } from '@mantine/hooks';
-import { IconArrowLeft, IconFileText, IconMessageCircle, IconSparkles, IconTextCaption } from '@tabler/icons-react';
+import { IconArrowLeft, IconFileText, IconMessageCircle, IconTextCaption } from '@tabler/icons-react';
 import { LiveKitRoom } from '@livekit/components-react';
 import { DisconnectReason } from 'livekit-client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 
 import { apiGet, apiPost } from '../../api/client';
+import AssistantMark from '../../components/AssistantMark';
 import ConfirmModal from '../../components/ConfirmModal';
 import { ErrorBanner, Skeleton } from '../../components/Feedback';
 import { notifyDone, notifyError } from '../../components/notify';
@@ -245,7 +246,7 @@ function Room({ interview, interviewId, onInterview, onEnd, ending }) {
               onClick={() => setTab('assistant')}
               title="Only you see the assistant; the candidate never does"
             >
-              <IconSparkles size={16} /> Assistant
+              <AssistantMark size={17} /> Assistant
             </button>
             <button
               type="button"

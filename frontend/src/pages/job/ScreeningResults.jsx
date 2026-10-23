@@ -27,6 +27,8 @@ import {
 } from '@tabler/icons-react';
 import { useState } from 'react';
 
+import AiSignalStatus from '../../components/AiSignalStatus';
+import { screeningStatus } from '../../components/aiSignal';
 import StatusBadge from '../../components/StatusBadge';
 import PipelineBoard from './PipelineBoard';
 import { countTicks, scoreBands } from './pipelineFormat';
@@ -71,11 +73,11 @@ export function ScreeningProgress({ run }) {
   const total = run.total || 0;
   const share = total ? Math.round((100 * run.processed) / total) : 0;
   return (
-    <div className={classes.progressCard} role="status">
+    <div className={classes.progressCard}>
       <div className={classes.progressTop}>
         <div className={classes.cardTitle}>Screening CVs</div>
-        <div className={classes.progressCount}>{total ? `${run.processed} of ${total} CVs` : 'Starting…'}</div>
       </div>
+      <AiSignalStatus status={screeningStatus(run)} startedAt={run.started_at} />
       <div className={classes.bar}>
         <div className={classes.barFill} style={{ width: `${Math.max(share, 4)}%` }} />
       </div>

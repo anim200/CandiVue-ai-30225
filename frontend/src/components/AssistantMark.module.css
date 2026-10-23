@@ -1,0 +1,86 @@
+/* The AI's icon (AssistantMark.jsx). Colours: the text colour, or
+   --mark-icon / --mark-accent when a parent sets them. */
+
+.mark {
+  flex: none;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.ring {
+  fill: none;
+  stroke: var(--mark-icon, currentColor);
+  stroke-width: 2.6;
+}
+
+.lines {
+  stroke: var(--mark-icon, currentColor);
+  stroke-width: 1.6;
+  stroke-opacity: 0.6;
+  stroke-linecap: round;
+}
+
+.nodes {
+  fill: var(--mark-icon, currentColor);
+}
+
+.core {
+  fill: var(--mark-accent, currentColor);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* ---- While the AI works ---- */
+.sig {
+  fill: var(--mark-accent, currentColor);
+  opacity: 0;
+  animation: travel 1.5s ease-in infinite;
+}
+
+.sig2 {
+  animation-delay: 0.25s;
+}
+
+.sig3 {
+  animation-delay: 0.5s;
+}
+
+.active .core {
+  animation: core 1.5s ease-in-out infinite;
+}
+
+@keyframes travel {
+  15% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+    transform: translate(var(--dx), var(--dy));
+  }
+  80%,
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy));
+  }
+}
+
+@keyframes core {
+  0%,
+  60%,
+  100% {
+    transform: scale(1);
+  }
+  80% {
+    transform: scale(1.35);
+  }
+}
+
+/* Reduce motion: it keeps moving (it means "working") but slower. The
+   app-wide rule in global.css stops animations, so this restarts it. */
+@media (prefers-reduced-motion: reduce) {
+  .sig,
+  .active .core {
+    animation-duration: 3s !important;
+    animation-iteration-count: infinite !important;
+  }
+}

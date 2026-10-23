@@ -30,6 +30,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiDelete, apiGet, apiPost, apiPostAi, apiUpload } from '../../api/client';
 import ConfirmModal from '../../components/ConfirmModal';
 import { EmptyState, ErrorBanner } from '../../components/Feedback';
+import PageHero from '../../components/PageHero';
 import { notifyDone, notifyError } from '../../components/notify';
 import StatusBadge from '../../components/StatusBadge';
 import { shortDate } from '../JobsPage';
@@ -367,7 +368,9 @@ export default function KnowledgeBasePage() {
   if (failed && docs === null) {
     return (
       <div className={classes.page}>
-        <h1 className={classes.title}>Knowledge base</h1>
+        <PageHero art="documents">
+          <h1 className={classes.title}>Knowledge base</h1>
+        </PageHero>
         <ErrorBanner icon={IconDatabaseOff} title="The knowledge base can’t be reached right now." onRetry={load}>
           Uploads are paused; the assistant keeps working without references. Try again in a few
           minutes.
@@ -387,19 +390,21 @@ export default function KnowledgeBasePage() {
 
   return (
     <div className={classes.page}>
-      <div className={classes.top}>
-        <div>
-          <h1 className={classes.title}>Knowledge base</h1>
-          <div className={classes.intro}>
-            Reference documents the Hiring Assistant and the interview analysis look up when writing
-            job descriptions, suggesting questions, checking answers and drafting emails.
+      <PageHero art="documents">
+        <div className={classes.top}>
+          <div>
+            <h1 className={classes.title}>Knowledge base</h1>
+            <div className={classes.intro}>
+              Reference documents the Hiring Assistant and the interview analysis look up when writing
+              job descriptions, suggesting questions, checking answers and drafting emails.
+            </div>
+          </div>
+          <div className={classes.indexState}>
+            <span className={`${classes.dot} ${indexing ? classes.dotBusy : ''}`} />
+            {indexing ? `Indexing ${indexing} document${indexing > 1 ? 's' : ''}…` : `Search index up to date · ${passages} passages`}
           </div>
         </div>
-        <div className={classes.indexState}>
-          <span className={`${classes.dot} ${indexing ? classes.dotBusy : ''}`} />
-          {indexing ? `Indexing ${indexing} document${indexing > 1 ? 's' : ''}…` : `Search index up to date · ${passages} passages`}
-        </div>
-      </div>
+      </PageHero>
 
       <div className={classes.warning}>
         <IconShieldLock size={18} color="var(--cv-warning-text-mid)" style={{ flex: 'none', marginTop: 1 }} />
