@@ -139,7 +139,48 @@
   gap: 10px;
   font-size: 14px;
   color: #e6f3f4;
-  animation: float 7s ease-in-out infinite;
+  animation: float 9s ease-in-out infinite; /* each card starts at another point */
+}
+
+/* What changes when the next example candidate comes: it fades out with a
+   small slide down and comes back with a small slide up. */
+.cardContent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s ease;
+}
+
+.out .cardContent {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+.quoteCard {
+  padding-left: 8px;
+}
+
+/* A small drawn face (LoginCards.jsx), never a photo. */
+.face {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #2c4f55;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.25);
+}
+
+.face svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.quote {
+  white-space: nowrap;
 }
 
 .timestamp {
@@ -182,11 +223,16 @@
   background: rgba(255, 255, 255, 0.15);
 }
 
+/* Width set by LoginCards.jsx; it fills smoothly, and empties at once. */
 .scoreBar {
-  width: 82%;
   height: 4px;
   border-radius: 2px;
   background: #7fd0d8;
+  transition: width 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.barReset {
+  transition: none;
 }
 
 .demoNote {
@@ -385,7 +431,7 @@
     transform: translateY(0);
   }
   50% {
-    transform: translateY(-8px);
+    transform: translateY(-3px);
   }
 }
 

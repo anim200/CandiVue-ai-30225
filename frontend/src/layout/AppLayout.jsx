@@ -69,7 +69,7 @@ export default function AppLayout() {
               size="sm"
               aria-label={menuOpen ? 'Close menu' : 'Open menu'}
             />
-            <Logo />
+            <Logo animated />
           </Group>
           <Group gap="md" wrap="nowrap">
             <BackendStatus />
