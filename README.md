@@ -132,6 +132,11 @@ The interviewer and candidate screens are a single-page web app in
 
 How it runs:
 
+- **Light or dark:** *Appearance* in the user menu (and a sun/moon button
+  on the login and candidate pages). The choice is remembered in the browser
+  and all its tabs follow it; the default is light. All colours of our own
+  CSS are tokens in `frontend/src/styles/tokens.css` (a light and a dark
+  value each); emails and the printed report always stay light.
 - **Docker:** the `frontend` image builds the app with Node and serves the
   result with nginx. nginx forwards every `/api/...` request to the backend,
   so the browser uses one address for both and no CORS is needed.
