@@ -425,6 +425,7 @@ export default function KnowledgeBasePage() {
             maxSize={MAX_MB * 1024 * 1024}
             accept={ACCEPT}
             activateOnClick={false}
+            enablePointerEvents
             openRef={openRef}
           >
             <Dropzone.Accept>
