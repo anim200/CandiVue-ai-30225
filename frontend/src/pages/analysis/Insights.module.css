@@ -1,0 +1,324 @@
+/* CV claims check, interview score and interview quality tabs (F8-F10).
+   Builds on Analysis.module.css (cards, chips); tones from the design. */
+
+.label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--cv-text-dimmed);
+}
+
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ---- F8: claims ---- */
+
+.claims {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.claim {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--cv-border-light);
+  border-left: 4px solid var(--cv-border-strong);
+  border-radius: 8px;
+  animation: fadeUp 0.3s ease-out both;
+}
+
+.contradiction {
+  border-left-color: #b03a2e;
+}
+
+.unverified {
+  border-left-color: #c08a1e;
+}
+
+.supported {
+  border-left-color: #2d7a4e;
+}
+
+.claimGrid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.claimText {
+  margin: 2px 0 4px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.quote {
+  font-size: 13px;
+  color: var(--cv-text-dimmed);
+}
+
+.followUp {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text-strong);
+  font-size: 14px;
+}
+
+.followUp svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+/* ---- F9: interview score ---- */
+
+.scoreHead {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.bigScore {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.bigScore span {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--cv-text-dimmed);
+  margin-left: 2px;
+}
+
+.dimensions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 24px;
+}
+
+.dimension {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.dimTop {
+  display: flex;
+  justify-content: space-between;
+  font-size: 15px;
+}
+
+.dimScore {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.fill {
+  height: 4px;
+  border-radius: 2px;
+  animation: grow 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.reason {
+  font-size: 13.5px;
+  color: var(--cv-text-secondary);
+  line-height: 1.45;
+}
+
+/* Score and verdict tones: text colour on numbers, fill on bars. */
+.success {
+  color: var(--cv-success-text-strong);
+}
+
+.warning {
+  color: var(--cv-warning-text);
+}
+
+.danger {
+  color: var(--cv-danger-text-strong);
+}
+
+.neutral {
+  color: var(--cv-text-dimmed);
+}
+
+.fill.success {
+  background: #2d7a4e;
+}
+
+.fill.warning {
+  background: #c08a1e;
+}
+
+.fill.danger {
+  background: #b03a2e;
+}
+
+/* ---- F10: interview quality ---- */
+
+.verdict {
+  border-left-width: 4px;
+}
+
+.verdict.success {
+  border-left-color: #2d7a4e;
+}
+
+.verdict.warning {
+  border-left-color: #c08a1e;
+}
+
+.verdict.danger {
+  border-left-color: #b03a2e;
+}
+
+.verdict,
+.verdict p,
+.verdict li {
+  color: var(--cv-text);
+}
+
+.verdictHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reasons {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.reschedule {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--cv-danger-tint);
+  color: var(--cv-danger-text-deep-2);
+  font-size: 14px;
+}
+
+.qualityGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.talkBar {
+  display: flex;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.talkBar > div {
+  transition: width 0.5s ease;
+}
+
+.talkInterviewer {
+  background: #23717a;
+}
+
+.talkCandidate {
+  background: var(--cv-primary-tint-deep);
+}
+
+.talkLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 13.5px;
+  color: var(--cv-text-secondary);
+}
+
+.talkLegend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 4px;
+}
+
+.stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--cv-text-secondary);
+}
+
+.stats b {
+  color: var(--cv-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.lowSignal {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14.5px;
+}
+
+.lowSignal li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.qidButton {
+  border: 0;
+  cursor: pointer;
+  flex: none;
+}
+
+@container (max-width: 560px) {
+  .claimGrid,
+  .dimensions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 47.99em) {
+  .qualityGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes grow {
+  from {
+    width: 0;
+  }
+}

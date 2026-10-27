@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css"><style>body{margin:0;background:#ECEEEF;font-family:'Public Sans',system-ui,sans-serif;color:#1A2227;-webkit-font-smoothing:antialiased}a{color:#1C5D65}a:hover{color:#164A51}input{font-family:inherit}.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:600 10px 'IBM Plex Mono',monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:600 13px/1.2 'Public Sans',sans-serif;color:#1a1a1a}.dv-opts{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}.dv-oid{font:600 10.5px 'IBM Plex Mono',monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 'Public Sans',sans-serif;color:rgba(0,0,0,.6)}.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}.dv-opt:target .dv-oid{background:#23717A;color:#fff}.dv-next{margin:22px 0 0;font:12px/1.5 'Public Sans',sans-serif;color:rgba(0,0,0,.55)}@keyframes cvfadeup{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}@keyframes cvfade{from{opacity:0}to{opacity:1}}@keyframes cvpop{from{opacity:0;transform:scale(.97) translateY(8px)}to{opacity:1;transform:none}}@keyframes cvspin{to{transform:rotate(360deg)}}@keyframes cvpulse{50%{opacity:.45}}@keyframes cvstripes{to{background-position:28px 0}}@keyframes cvbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}</style><script src="theme.js"></script></helmet>
+
+<section class="dv-turn" id="t1" data-screen-label="Knowledge Base">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Knowledge base: documents used for retrieval (RAG) · <span style="font-family:'IBM Plex Mono';font-weight:500">KnowledgeBasePage → CollectionNav, UploadDropzone (@mantine/dropzone), DocumentsTable, RetrievalTestCard</span></span></div>
+<div class="dv-opts">
+<div class="dv-opt" id="1a"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Click a collection to filter. Click the drop zone to simulate an upload: files go through uploading → indexing → ready, with one failure and one personal-data warning. Try a search at the bottom.</div>
+<div class="dv-card" data-screen-label="1a Knowledge base" style="width:1280px;display:grid;grid-template-columns:240px 1fr;grid-template-rows:56px auto;background:#F5F7F8">
+<header style="grid-column:1/-1;height:56px;background:#fff;border-bottom:1px solid #DEE3E6;display:flex;align-items:center;justify-content:space-between;padding:0 20px"><div style="display:flex;align-items:center;gap:10px"><div data-component="LogoMark" style="width:30px;height:30px;border-radius:8px;background:linear-gradient(150deg,#2E8F9A 0%,#1B5E66 55%,#123F45 100%);position:relative;flex:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 1px 2px rgba(16,40,50,.25)"><span style="position:absolute;left:6.5px;top:6.5px;width:17px;height:17px;border-radius:50%;border:2.6px solid #fff;box-sizing:border-box"></span><span style="position:absolute;left:13.5px;top:10.5px;width:6px;height:6px;border-radius:50%;background:#BDEDF1"></span><span style="position:absolute;left:20.7px;top:3.9px;width:4px;height:4px;border-radius:50%;background:#F2C46D;box-shadow:0 0 0 1px #123F45"></span></div><div data-component="Wordmark" style="display:flex;align-items:center;gap:6px"><span style="font-size:17px;font-weight:700;letter-spacing:-.025em;color:#1A2227;line-height:1">Candi<span style="color:#23717A">Vue</span></span><span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#1C5D65;background:#EDF5F6;border:1px solid #CFE5E8;border-radius:4px;padding:3px 5px">AI</span></div></div><div data-component="UserMenu" style="display:flex;align-items:center;gap:10px;padding:4px 8px;border-radius:6px;cursor:pointer;position:relative" title="Account and appearance"><div style="width:30px;height:30px;border-radius:50%;background:#D5E9EB;color:#1C5D65;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center">IA</div><div style="display:flex;flex-direction:column;line-height:1.2"><span style="font-size:14px;font-weight:600">Interviewer A</span><span style="font-size:12px;color:#66717A">interviewer.a@example.com</span></div><i class="ti ti-chevron-down" style="font-size:16px;color:#66717A"></i></div></header>
+<nav style="background:#fff;border-right:1px solid #DEE3E6;padding:16px 12px;display:flex;flex-direction:column;gap:2px"><a href="Jobs.dc.html" style="height:40px;border-radius:6px;display:flex;align-items:center;gap:12px;padding:0 12px;font-size:14px;font-weight:500;color:#1A2227;text-decoration:none"><i class="ti ti-briefcase" style="font-size:19px;color:#48535B"></i>Jobs</a><a href="Interviews.dc.html" style="height:40px;border-radius:6px;display:flex;align-items:center;gap:12px;padding:0 12px;font-size:14px;font-weight:500;color:#1A2227;text-decoration:none"><i class="ti ti-video" style="font-size:19px;color:#48535B"></i>Interviews</a><a href="Reports.dc.html" style="height:40px;border-radius:6px;display:flex;align-items:center;gap:12px;padding:0 12px;font-size:14px;font-weight:500;color:#1A2227;text-decoration:none"><i class="ti ti-file-text" style="font-size:19px;color:#48535B"></i>Reports</a><div style="height:1px;background:#E9ECEE;margin:8px 4px"></div><a href="Hiring Assistant.dc.html" style="height:40px;border-radius:6px;display:flex;align-items:center;gap:12px;padding:0 12px;font-size:14px;font-weight:500;color:#1A2227;text-decoration:none"><i class="ti ti-sparkles" style="font-size:19px;color:#48535B"></i>Hiring Assistant</a><div style="height:40px;border-radius:6px;background:#EDF5F6;color:#1C5D65;display:flex;align-items:center;gap:12px;padding:0 12px;font-size:14px;font-weight:600"><i class="ti ti-books" style="font-size:19px"></i>Knowledge base</div></nav>
+
+<main style="padding:24px 32px 40px;display:flex;flex-direction:column;gap:18px;min-width:0">
+<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:24px">
+<div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:26px;font-weight:600;letter-spacing:-.01em">Knowledge base</h1><div style="font-size:14px;color:#48535B;max-width:640px;line-height:1.55">Reference documents the Hiring Assistant and the interview analysis look up when writing job descriptions, suggesting questions, checking answers and drafting emails.</div></div>
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#48535B;flex:none"><span style="width:8px;height:8px;border-radius:50%;background:#2D7A4E"></span>Search index up to date · {{ totalChunks }} passages</div></div>
+
+<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 14px;border-radius:8px;background:#FBF0D9;font-size:14px;line-height:1.5;color:#5A3D00"><i class="ti ti-shield-lock" style="font-size:18px;color:#C08A1E;margin-top:1px"></i><span><b style="font-weight:600">Don’t upload CVs, interview notes or any personal data here.</b> CVs arrive through each job’s application form. Files are checked for personal details before they are indexed.</span></div>
+
+<div style="display:grid;grid-template-columns:230px minmax(0,1fr);gap:16px;align-items:start">
+<div data-component="CollectionNav" style="background:#fff;border:1px solid #DEE3E6;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:2px">
+<div style="font-size:12px;font-weight:600;color:#66717A;padding:6px 8px">Collections</div>
+<sc-for list="{{ cols }}" as="c" hint-placeholder-count="6"><div onClick="{{ c.pick }}" style="padding:9px 10px;border-radius:6px;display:flex;gap:10px;align-items:flex-start;cursor:pointer;transition:background .15s;background:{{ c.bg }}" style-hover="background:#F1F4F5"><i class="{{ c.icon }}" style="font-size:18px;color:{{ c.ic }};margin-top:1px"></i><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><div style="display:flex;justify-content:space-between;gap:6px"><span style="font-size:14px;font-weight:{{ c.fw }};color:{{ c.fg }}">{{ c.name }}</span><span style="font-size:12px;color:#66717A;font-variant-numeric:tabular-nums">{{ c.count }}</span></div><span style="font-size:12px;color:#66717A;line-height:1.4">{{ c.use }}</span></div></div></sc-for>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+<div data-component="UploadDropzone" onClick="{{ simulate }}" style="border:2px dashed {{ dz.bd }};background:{{ dz.bg }};border-radius:10px;padding:26px 20px;display:flex;align-items:center;gap:18px;cursor:pointer;transition:background .2s,border-color .2s" style-hover="background:#EDF5F6;border-color:#4FA2AB">
+<span style="width:52px;height:52px;border-radius:12px;background:#fff;border:1px solid #D5E9EB;color:#23717A;display:inline-flex;align-items:center;justify-content:center;flex:none;animation:cvbob 3s ease-in-out infinite"><i class="ti ti-cloud-upload" style="font-size:26px"></i></span>
+<div style="flex:1;display:flex;flex-direction:column;gap:4px"><div style="font-size:16px;font-weight:600">Drop files here or <span style="color:#1C5D65;text-decoration:underline">choose files</span></div><div style="font-size:13px;color:#48535B">PDF, DOCX, TXT or Markdown · up to 20 MB each · added to <b style="font-weight:600;color:#1A2227">{{ target }}</b></div></div>
+<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex:none"><span style="font-size:12px;color:#66717A">Add to</span><span style="height:32px;padding:0 10px;border:1px solid #C9D0D4;border-radius:4px;background:#fff;font-size:13px;display:inline-flex;align-items:center;gap:8px">{{ target }}<i class="ti ti-chevron-down" style="font-size:14px;color:#66717A"></i></span></div>
+</div>
+
+<div data-component="DocumentsTable" style="background:#fff;border:1px solid #DEE3E6;border-radius:8px;overflow:hidden">
+<div style="padding:12px 18px;border-bottom:1px solid #DEE3E6;display:flex;justify-content:space-between;align-items:center"><div style="font-size:16px;font-weight:600">{{ tableTitle }}</div><div style="font-size:13px;color:#66717A">{{ shownCount }}</div></div>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 124px 144px 64px 60px;gap:0 10px;padding:9px 18px;border-bottom:1px solid #DEE3E6;font-size:12px;font-weight:600;color:#66717A"><div>Document</div><div>Collection</div><div>Status</div><div>Passages</div><div></div></div>
+<sc-for list="{{ docs }}" as="d" hint-placeholder-count="6">
+<div style="border-bottom:1px solid #E9ECEE;animation:cvfadeup .3s ease-out">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 124px 144px 64px 60px;gap:0 10px;padding:0 18px;min-height:52px;align-items:center;font-size:14px">
+<div style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:30px;height:30px;border-radius:6px;background:{{ d.tbg }};color:{{ d.tfg }};display:inline-flex;align-items:center;justify-content:center;flex:none;font:700 9px 'IBM Plex Mono'">{{ d.ext }}</span><div style="display:flex;flex-direction:column;min-width:0"><span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ d.name }}</span><span style="font-size:12px;color:#66717A">{{ d.size }} · added {{ d.date }}</span></div></div>
+<div style="color:#48535B;font-size:13px">{{ d.col }}</div>
+<div style="display:flex;flex-direction:column;gap:5px"><span style="align-self:flex-start;height:22px;padding:0 9px;border-radius:999px;background:{{ d.sbg }};color:{{ d.sfg }};font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:5px;white-space:nowrap"><sc-if value="{{ d.spin }}"><span style="width:9px;height:9px;border:1.5px solid {{ d.spinbg }};border-top-color:{{ d.sfg }};border-radius:50%;display:inline-block;animation:cvspin .9s linear infinite"></span></sc-if><sc-if value="{{ d.noSpin }}"><i class="{{ d.sicon }}" style="font-size:13px"></i></sc-if>{{ d.status }}</span><sc-if value="{{ d.showBar }}"><div style="height:4px;width:120px;background:#E9ECEE;border-radius:2px;overflow:hidden"><div style="width:{{ d.pct }};height:4px;border-radius:2px;background:repeating-linear-gradient(45deg,rgba(255,255,255,.3) 0 5px,transparent 5px 10px),#23717A;background-size:28px 100%,auto;animation:cvstripes 1s linear infinite;transition:width .4s"></div></div></sc-if></div>
+<div style="font-variant-numeric:tabular-nums;color:#1A2227">{{ d.chunks }}</div>
+<div style="display:flex;gap:2px;justify-content:flex-end"><span title="Preview" style="width:28px;height:28px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;color:#48535B;cursor:pointer" style-hover="background:#F1F4F5"><i class="ti ti-eye" style="font-size:16px"></i></span><span onClick="{{ d.remove }}" title="Remove" style="width:28px;height:28px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;color:#48535B;cursor:pointer" style-hover="background:#FBE9E7;color:#932E24"><i class="ti ti-trash" style="font-size:16px"></i></span></div>
+</div>
+<sc-if value="{{ d.msg }}"><div style="margin:0 18px 12px 58px;padding:9px 12px;border-radius:6px;background:{{ d.mbg }};font-size:13px;line-height:1.5;color:{{ d.mfg }};display:flex;gap:10px;align-items:center;animation:cvfade .25s"><span style="flex:1">{{ d.msg }}</span><span onClick="{{ d.remove }}" style="font-weight:600;text-decoration:underline;cursor:pointer;white-space:nowrap">Remove file</span></div></sc-if>
+</div>
+</sc-for>
+<sc-if value="{{ noDocs }}"><div style="padding:40px 20px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center"><span style="width:44px;height:44px;border-radius:50%;background:#EDF5F6;color:#23717A;display:inline-flex;align-items:center;justify-content:center"><i class="ti ti-file-plus" style="font-size:22px"></i></span><div style="font-size:16px;font-weight:600">No documents in this collection yet</div><div style="font-size:14px;color:#48535B;max-width:380px;line-height:1.5">Upload files above. Until then, the assistant works without this kind of reference.</div></div></sc-if>
+</div>
+
+<div data-component="RetrievalTestCard" style="background:#fff;border:1px solid #DEE3E6;border-radius:8px;padding:16px 18px;display:flex;flex-direction:column;gap:12px">
+<div><div style="font-size:16px;font-weight:600">Try a search</div><div style="font-size:13px;color:#66717A;margin-top:2px">See which passages the assistant would find for a question.</div></div>
+<div style="display:flex;gap:8px"><div style="position:relative;flex:1"><i class="ti ti-search" style="position:absolute;left:10px;top:10px;font-size:16px;color:#8A949A"></i><input value="{{ q }}" onChange="{{ onQ }}" onKeyDown="{{ onKey }}" placeholder="e.g. interview questions about database migrations" style="width:100%;box-sizing:border-box;height:36px;border:1px solid #C9D0D4;border-radius:4px;padding:0 10px 0 32px;font-size:14px;outline-color:#4FA2AB"></div><span onClick="{{ runSearch }}" style="height:36px;padding:0 16px;border-radius:4px;background:#EDF5F6;color:#1C5D65;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:6px;cursor:pointer">Search</span></div>
+<sc-if value="{{ searching }}"><div style="font-size:13px;color:#66717A;display:flex;align-items:center;gap:8px"><span style="width:12px;height:12px;border:2px solid #D5E9EB;border-top-color:#23717A;border-radius:50%;display:inline-block;animation:cvspin .8s linear infinite"></span>Searching…</div></sc-if>
+<sc-for list="{{ hits }}" as="h"><div style="border:1px solid #E9ECEE;border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;animation:cvfadeup .3s ease-out"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><span style="font:500 12px 'IBM Plex Mono';color:#1C5D65">{{ h.src }}</span><span style="font-size:12px;color:#66717A;display:flex;align-items:center;gap:6px">match<div style="width:60px;height:4px;background:#E9ECEE;border-radius:2px"><div style="width:{{ h.pct }};height:4px;background:#23717A;border-radius:2px"></div></div></span></div><div style="font-size:14px;line-height:1.5">{{ h.text }}</div></div></sc-for>
+</div>
+</div></div>
+</main></div></div>
+</div>
+<p class="dv-next">Try next: “add a document preview drawer with its passages” · “let the interviewer set which collections each feature may use”</p>
+</section>
+
+<section class="dv-turn" id="t2" data-screen-label="Knowledge base states">
+<div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">Upload, indexing and error states</span></div>
+<div class="dv-opts">
+<div class="dv-opt" id="2a"><div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>Dragging files over</div><div class="dv-card" style="width:620px;padding:16px"><div style="border:2px dashed #23717A;background:#EDF5F6;border-radius:10px;padding:30px 20px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center"><i class="ti ti-file-download" style="font-size:30px;color:#23717A;animation:cvbob 1.2s ease-in-out infinite"></i><div style="font-size:16px;font-weight:600;color:#103A40">Drop 3 files to add them to Reference library</div></div></div></div>
+<div class="dv-opt" id="2b"><div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a>File rejected before upload</div><div class="dv-card" style="width:620px;padding:16px"><div style="display:flex;gap:12px;padding:12px 16px;border-radius:8px;background:#FBE9E7;align-items:flex-start"><i class="ti ti-file-x" style="font-size:20px;color:#B03A2E"></i><div style="font-size:14px;line-height:1.5;color:#5A2620"><b style="font-weight:600;color:#932E24">2 files weren’t added.</b><br>“Team photo.png” is an image; upload PDF, DOCX, TXT or Markdown.<br>“Full handbook.pdf” is 48 MB; the limit is 20 MB. Split it into smaller files.</div></div></div></div>
+<div class="dv-opt" id="2c"><div class="dv-olabel"><a class="dv-oid" href="#2c">2c</a>Personal data found (blocked from indexing)</div><div class="dv-card" style="width:620px;padding:16px"><div style="display:flex;gap:12px;padding:12px 16px;border-radius:8px;background:#FBF0D9;align-items:flex-start"><i class="ti ti-user-exclamation" style="font-size:20px;color:#C08A1E"></i><div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:14px;line-height:1.5;color:#5A3D00"><b style="font-weight:600">“Interview notes March.docx” looks like it contains personal data</b> (names, email addresses and phone numbers). It hasn’t been indexed.</div><div style="display:flex;gap:12px;font-size:13px;font-weight:600"><span style="color:#932E24;text-decoration:underline">Remove file</span><span style="color:#1C5D65;text-decoration:underline">Upload a cleaned copy</span></div></div></div></div></div>
+<div class="dv-opt" id="2d"><div class="dv-olabel"><a class="dv-oid" href="#2d">2d</a>Remove document <span style="font-family:'IBM Plex Mono'">Modal</span></div><div class="dv-card" style="width:440px;padding:20px;display:flex;flex-direction:column;gap:12px;animation:cvpop .25s ease-out"><div style="font-size:17px;font-weight:600">Remove “Backend question bank 2025.pdf”?</div><div style="font-size:14px;line-height:1.55;color:#48535B">Its 214 passages are deleted from the search index. Past reports and job descriptions keep the text they already quoted.</div><div style="display:flex;justify-content:flex-end;gap:8px"><span style="height:36px;padding:0 14px;border-radius:4px;font-size:14px;font-weight:600;color:#1C5D65;display:inline-flex;align-items:center">Cancel</span><span style="height:36px;padding:0 16px;border-radius:4px;background:#B03A2E;color:#fff;font-size:14px;font-weight:600;display:inline-flex;align-items:center">Remove</span></div></div></div>
+<div class="dv-opt" id="2e"><div class="dv-olabel"><a class="dv-oid" href="#2e">2e</a>Search index unavailable</div><div class="dv-card" style="width:620px;padding:16px"><div style="display:flex;gap:12px;padding:12px 16px;border-radius:8px;background:#FBE9E7;align-items:center"><i class="ti ti-database-off" style="font-size:20px;color:#B03A2E"></i><div style="flex:1;font-size:14px;line-height:1.5;color:#5A2620"><b style="font-weight:600;color:#932E24">The knowledge base can’t be reached right now.</b> Uploads are paused; the assistant keeps working without references. Try again in a few minutes.</div><span style="height:32px;padding:0 14px;border-radius:4px;background:#fff;border:1px solid #E3B7B1;color:#932E24;font-size:13px;font-weight:600;display:inline-flex;align-items:center">Try again</span></div></div></div>
+<div class="dv-opt" id="2f"><div class="dv-olabel"><a class="dv-oid" href="#2f">2f</a>Loading</div><div class="dv-card" style="width:620px;padding:18px;display:flex;flex-direction:column;gap:14px;animation:cvpulse 1.6s infinite"><div style="height:80px;border-radius:10px;background:#EDF0F2"></div><div style="height:14px;width:70%;background:#EDF0F2;border-radius:4px"></div><div style="height:14px;width:85%;background:#EDF0F2;border-radius:4px"></div><div style="height:14px;width:60%;background:#EDF0F2;border-radius:4px"></div></div></div>
+<div class="dv-opt" id="2g"><div class="dv-olabel"><a class="dv-oid" href="#2g">2g</a>Search found nothing</div><div class="dv-card" style="width:620px;padding:18px;font-size:14px;color:#48535B;line-height:1.5;display:flex;gap:10px;align-items:flex-start"><i class="ti ti-search-off" style="font-size:18px;color:#66717A"></i>No passages matched closely enough. The assistant would answer without a reference for this question. Try different words, or upload a document that covers it.</div></div>
+</div>
+<p class="dv-next">Try next: “show document version replacement” · “usage log: which passages were used in which job description”</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { col: 'all', q: '', hits: [], searching: false, uploaded: false, docs: [
+    { id: 1, name: 'Python web frameworks: official guides (sample).pdf', size: '3.2 MB', col: 'ref', st: 'ready', chunks: 412, date: '28 Sep' },
+    { id: 2, name: 'PostgreSQL reference excerpt (sample).pdf', size: '2.1 MB', col: 'ref', st: 'ready', chunks: 288, date: '28 Sep' },
+    { id: 3, name: 'Hybrid work policy 2026.docx', size: '84 KB', col: 'policy', st: 'ready', chunks: 18, date: '29 Sep' },
+    { id: 4, name: 'Backend Developer profile 2025.md', size: '12 KB', col: 'jobs', st: 'ready', chunks: 9, date: '29 Sep' },
+    { id: 5, name: 'Interview invitation (standard).txt', size: '3 KB', col: 'email', st: 'ready', chunks: 2, date: '30 Sep' },
+    { id: 6, name: 'Backend question bank 2025.pdf', size: '640 KB', col: 'qbank', st: 'ready', chunks: 214, date: '2 Oct' }
+  ] };
+  C = [
+    ['all', 'All documents', 'ti ti-books', 'Everything in the index'],
+    ['ref', 'Reference library', 'ti ti-book-2', 'Technical docs for writing JDs and checking answers'],
+    ['policy', 'Company policies', 'ti ti-building', 'Used when writing job descriptions'],
+    ['jobs', 'Previous job profiles', 'ti ti-briefcase', 'Starting points for new jobs'],
+    ['email', 'Email templates', 'ti ti-mail', 'Invitation and reminder wording'],
+    ['qbank', 'Interview question bank', 'ti ti-message-question', 'Questions suggested during interviews']
+  ];
+  componentWillUnmount() { (this.tm || []).forEach(clearTimeout); }
+  at(ms, fn) { (this.tm = this.tm || []).push(setTimeout(fn, ms)); }
+  patch(id, p) { this.setState(s => ({ docs: s.docs.map(d => d.id === id ? { ...d, ...p } : d) })); }
+  simulate() {
+    if (this.state.uploaded) return;
+    const col = this.state.col === 'all' ? 'ref' : this.state.col;
+    const nd = [
+      { id: 101, name: 'Docker best practices (sample).pdf', size: '1.4 MB', col, st: 'uploading', pct: 10, chunks: '—', date: 'Just now' },
+      { id: 102, name: 'Scanned brochure.pdf', size: '5.8 MB', col, st: 'uploading', pct: 5, chunks: '—', date: 'Just now' },
+      { id: 103, name: 'Interview notes March.docx', size: '210 KB', col, st: 'uploading', pct: 20, chunks: '—', date: 'Just now' }
+    ];
+    this.setState(s => ({ uploaded: true, docs: [...nd, ...s.docs] }));
+    this.at(500, () => { this.patch(101, { pct: 60 }); this.patch(102, { pct: 45 }); this.patch(103, { pct: 80 }); });
+    this.at(1100, () => { this.patch(101, { st: 'indexing', pct: 30 }); this.patch(102, { st: 'indexing', pct: 20 }); this.patch(103, { st: 'indexing', pct: 50 }); });
+    this.at(1900, () => { this.patch(101, { pct: 75 }); this.patch(103, { st: 'pii' }); });
+    this.at(2500, () => { this.patch(102, { st: 'failed' }); });
+    this.at(2900, () => { this.patch(101, { st: 'ready', chunks: 96 }); });
+  }
+  search() {
+    if (!this.state.q.trim()) return;
+    this.setState({ searching: true, hits: [] });
+    this.at(700, () => this.setState({ searching: false, hits: [
+      { src: 'Backend question bank 2025.pdf · p. 4', pct: '91%', text: 'How do you keep database migrations safe when several developers change models at the same time?' },
+      { src: 'PostgreSQL reference excerpt (sample).pdf · p. 12', pct: '78%', text: 'Run schema changes inside a transaction where possible, so a failed migration leaves the database unchanged.' },
+      { src: 'Backend Developer profile 2025.md', pct: '64%', text: 'Experience with schema migrations and code review for database changes.' }
+    ] }));
+  }
+  renderVals() {
+    const s = this.state, colName = id => (this.C.find(c => c[0] === id) || [])[1];
+    const ST = {
+      uploading: ['Uploading', '#E7EEF9', '#234E8B', '', true, '#A9C0E4'],
+      indexing: ['Indexing', '#E7EEF9', '#234E8B', '', true, '#A9C0E4'],
+      ready: ['Ready', '#E7F3EC', '#245F3E', 'ti ti-check'],
+      failed: ['Failed', '#FBE9E7', '#932E24', 'ti ti-alert-triangle'],
+      pii: ['Personal data', '#FBF0D9', '#7A5000', 'ti ti-user-exclamation']
+    };
+    const EXT = { pdf: ['#FBE9E7', '#932E24'], docx: ['#E7EEF9', '#234E8B'], md: ['#EEF1F3', '#3E484F'], txt: ['#EEF1F3', '#3E484F'] };
+    const list = s.docs.filter(d => s.col === 'all' || d.col === s.col);
+    const docs = list.map(d => { const st = ST[d.st], ext = d.name.split('.').pop().toLowerCase(), e = EXT[ext] || EXT.txt;
+      return { name: d.name, size: d.size, col: colName(d.col), chunks: d.chunks, date: d.date, ext: ext.toUpperCase(), tbg: e[0], tfg: e[1],
+        status: st[0], sbg: st[1], sfg: st[2], sicon: st[3], spin: !!st[4], noSpin: !st[4], spinbg: st[5] || '', showBar: !!st[4], pct: (d.pct || 0) + '%',
+        msg: d.st === 'failed' ? 'We couldn’t read any text in this file. It may be a scanned image. Upload a text-based PDF or DOCX instead.' : d.st === 'pii' ? 'This file seems to contain names, email addresses or phone numbers, so it was not indexed. Remove personal data and upload a cleaned copy.' : '',
+        mbg: d.st === 'failed' ? '#FBE9E7' : '#FBF0D9', mfg: d.st === 'failed' ? '#5A2620' : '#5A3D00',
+        remove: () => this.setState(x => ({ docs: x.docs.filter(y => y.id !== d.id) })) }; });
+    const cols = this.C.map(c => { const on = s.col === c[0]; return { name: c[1], icon: c[2], use: c[3], count: c[0] === 'all' ? s.docs.length : s.docs.filter(d => d.col === c[0]).length,
+      bg: on ? '#EDF5F6' : 'transparent', fg: on ? '#103A40' : '#1A2227', fw: on ? 600 : 500, ic: on ? '#23717A' : '#66717A', pick: () => this.setState({ col: c[0] }) }; });
+    const total = s.docs.filter(d => d.st === 'ready').reduce((a, d) => a + (+d.chunks || 0), 0);
+    return {
+      cols, docs, noDocs: !docs.length,
+      tableTitle: s.col === 'all' ? 'All documents' : colName(s.col), shownCount: docs.length + (docs.length === 1 ? ' document' : ' documents'),
+      target: s.col === 'all' ? 'Reference library' : colName(s.col),
+      dz: { bd: s.uploaded ? '#A9D2D6' : '#C9D0D4', bg: s.uploaded ? '#F7FBFB' : '#FAFBFB' },
+      simulate: () => this.simulate(), totalChunks: total.toLocaleString('en-GB'),
+      q: s.q, onQ: e => this.setState({ q: e.target.value }), onKey: e => { if (e.key === 'Enter') this.search(); }, runSearch: () => this.search(),
+      searching: s.searching, hits: s.hits
+    };
+  }
+}
+</script>
+</body>
+</html>

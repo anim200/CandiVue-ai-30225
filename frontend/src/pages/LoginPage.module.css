@@ -1,0 +1,484 @@
+/* Login screen, from docs/design_handoff_candivue_ui/Login.dc.html (frame 1a).
+   Phones and tablets (below 62em / 992px) show only the form. */
+
+.page {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: 100vh;
+}
+
+/* The brand panel only appears on wide screens. */
+.brand {
+  display: none;
+}
+
+@media (min-width: 62em) {
+  .page {
+    grid-template-columns: 1.15fr 1fr;
+  }
+
+  .brand {
+    display: flex;
+  }
+}
+
+/* ---- Brand panel (left) ---- */
+
+.brand {
+  position: relative;
+  overflow: hidden;
+  flex-direction: column;
+  padding: 48px 56px;
+  color: #fff;
+  background: radial-gradient(110% 80% at 15% 0%, #1e6670 0%, #123f45 50%, #0b2a2f 100%);
+}
+
+/* Three thin rings that slowly "breathe", plus a soft glow. */
+.ring,
+.glow {
+  position: absolute;
+  left: 78%;
+  top: 72%;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.ring {
+  animation: breathe 9s ease-in-out infinite;
+}
+
+.glow {
+  width: 240px;
+  height: 240px;
+  background: radial-gradient(circle, rgba(127, 208, 216, 0.22), rgba(127, 208, 216, 0) 70%);
+}
+
+.logoRow {
+  position: relative;
+  animation: fade 0.6s ease-out;
+}
+
+.story {
+  position: relative;
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  max-width: 470px;
+}
+
+.headline {
+  margin: 0;
+  font-size: 41px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  animation: fadeUp 0.7s ease-out both 0.1s;
+}
+
+.intro {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.6;
+  color: #c8e4e7;
+  text-wrap: pretty;
+  animation: fadeUp 0.7s ease-out both 0.2s;
+}
+
+.principles {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.principle {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 16px;
+  animation: fadeUp 0.6s ease-out both;
+}
+
+.principleIcon {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #7fd0d8;
+}
+
+/* Floating "evidence" chips (synthetic examples). Placed in the panel's
+   flow (not on top of it): 28px under the logo = 120px from the top and
+   56px from the right, as in the design, and never over the headline. */
+.chips {
+  position: relative;
+  align-self: flex-end;
+  margin-top: 28px;
+  margin-bottom: 32px; /* keeps a gap above the headline on short screens */
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: flex-end;
+}
+
+.chip {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: #e6f3f4;
+  animation: float 9s ease-in-out infinite; /* each card starts at another point */
+}
+
+/* What changes when the next example candidate comes: it fades out with a
+   small slide down and comes back with a small slide up. */
+.cardContent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s ease;
+}
+
+.out .cardContent {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+.quoteCard {
+  padding-left: 8px;
+}
+
+/* A small drawn face (LoginCards.jsx), never a photo. */
+.face {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #2c4f55;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.25);
+}
+
+.face svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.quote {
+  white-space: nowrap;
+}
+
+.timestamp {
+  font: 500 13px var(--mantine-font-family-monospace);
+  color: #bdedf1;
+  background: rgba(127, 208, 216, 0.15);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.met {
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(143, 211, 169, 0.18);
+  color: #a8e2be;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.score {
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+}
+
+.scoreLabel {
+  font-size: 12px;
+  color: #a9c9cc;
+}
+
+.scoreTrack {
+  width: 110px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Width set by LoginCards.jsx; it fills smoothly, and empties at once. */
+.scoreBar {
+  height: 4px;
+  border-radius: 2px;
+  background: #7fd0d8;
+  transition: width 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.barReset {
+  transition: none;
+}
+
+.demoNote {
+  position: relative;
+  margin-top: 40px;
+  font-size: 13px;
+  color: #8fb3b7;
+}
+
+/* ---- Form side (right) ---- */
+
+.formSide {
+  position: relative; /* for the appearance button in the corner */
+  background: var(--cv-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+}
+
+@media (min-width: 36em) {
+  .formSide {
+    padding: 40px;
+  }
+}
+
+.form {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: fadeUp 0.6s ease-out both 0.15s;
+}
+
+.title {
+  margin: 0;
+  font-size: 29px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--cv-text-secondary);
+}
+
+/* Message box: tint + icon + text. Errors shake once. */
+.message {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.error {
+  background: var(--cv-danger-tint);
+  color: var(--cv-danger-text-deep);
+  animation: shake 0.4s ease-in-out;
+}
+
+.error svg {
+  color: var(--cv-danger-text);
+  flex: none;
+}
+
+.info {
+  background: var(--cv-info-tint);
+  color: var(--cv-info-text-deep);
+}
+
+.info svg {
+  color: var(--cv-info-text);
+  flex: none;
+}
+
+.input {
+  height: 42px;
+  border-radius: 6px;
+  border-color: var(--cv-border-strong);
+  font-size: 16px;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.input:focus,
+.input:focus-within {
+  border-color: #23717a;
+  box-shadow: 0 0 0 3px rgba(35, 113, 122, 0.15);
+}
+
+/* Invalid email: red border and a small red hint (design colours). */
+.input[data-error] {
+  border-color: #b03a2e;
+  color: var(--cv-text);
+}
+
+.fieldError {
+  font-size: 13px;
+  color: var(--cv-danger-text-strong);
+  margin-top: 6px;
+  animation: fade 0.2s;
+}
+
+.label {
+  font-size: 15px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.submit {
+  height: 44px;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(16, 58, 64, 0.2);
+  transition:
+    background 0.15s,
+    transform 0.1s;
+}
+
+.submit:active {
+  transform: scale(0.99);
+}
+
+/* Button spinner (design: 15px ring, 0.8s) and the check that fades in. */
+.buttonSpinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: var(--cv-border-surface);
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 0.8s linear infinite;
+}
+
+.fadeIn {
+  animation: fade 0.2s;
+}
+
+.signedIn {
+  font-size: 15px;
+  color: var(--cv-success-text-strong);
+  text-align: center;
+  animation: fadeUp 0.3s ease-out;
+}
+
+.candidateNote {
+  border-top: 1px solid var(--cv-border-light);
+  padding-top: 18px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--cv-text-secondary);
+}
+
+.candidateIcon {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 8px;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.candidateNote b {
+  font-weight: 600;
+  color: var(--cv-text);
+}
+
+/* ---- Animations (values from the design) ---- */
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.04);
+    opacity: 0.6;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: none;
+  }
+  20%,
+  60% {
+    transform: translateX(-5px);
+  }
+  40%,
+  80% {
+    transform: translateX(5px);
+  }
+}
+
+/* Light/dark button in the top-right corner of the form side. */
+.themeToggle {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}

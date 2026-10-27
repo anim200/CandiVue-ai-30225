@@ -1,0 +1,684 @@
+/* Panels beside the call: chat with the other person, the Hiring Assistant
+   (interviewer only) and the candidate's CV (interviewer only). Each panel
+   fills its column and scrolls inside. */
+
+.muted {
+  color: var(--cv-text-dimmed);
+  font-size: 13px;
+}
+
+.iconButton {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--cv-text-dimmed);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.iconButton:hover {
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text);
+}
+
+.empty {
+  margin: auto;
+  max-width: 270px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--cv-text-dimmed);
+  animation: fadeUp 0.35s ease-out;
+}
+
+.empty b {
+  color: var(--cv-text);
+  font-size: 15px;
+}
+
+.emptyIcon {
+  width: 46px;
+  height: 46px;
+  margin-bottom: 4px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text);
+}
+
+/* ---------- chat between interviewer and candidate ---------- */
+
+.chat {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.chatList {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.msgRow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  animation: fadeUp 0.3s ease-out;
+}
+
+.msgRow + .msgRow {
+  margin-top: 2px;
+}
+
+.msgMeta {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--cv-text-dimmed);
+}
+
+.bubble {
+  max-width: 88%;
+  padding: 8px 12px;
+  border-radius: 4px 12px 12px 12px;
+  background: var(--cv-hover);
+  color: var(--cv-text);
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.mine {
+  align-items: flex-end;
+}
+
+.mine .bubble {
+  border-radius: 12px 4px 12px 12px;
+  background: #23717a;
+  color: #fff;
+}
+
+.link {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.chatComposer {
+  flex: none;
+  margin: 0 12px 12px;
+  padding: 6px 6px 6px 12px;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  border: 1px solid var(--cv-border);
+  border-radius: 14px;
+  background: var(--cv-surface);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.chatComposer:focus-within {
+  border-color: #23717a;
+  box-shadow: 0 0 0 3px rgba(35, 113, 122, 0.12);
+}
+
+.chatInput {
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 6px 0;
+}
+
+.sendButton {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cv-line);
+  color: var(--cv-text-faint);
+  cursor: default;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.sendReady {
+  background: #23717a;
+  color: #fff;
+  cursor: pointer;
+}
+
+.sendReady:hover {
+  transform: scale(1.06);
+}
+
+/* ---------- Hiring Assistant in the room ---------- */
+
+.assistant {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.assistantList {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* The chat bubbles from the Hiring Assistant page, a bit wider here. */
+.assistantList > div {
+  max-width: 100%;
+}
+
+.answer {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.answer > div:first-child {
+  flex: 1;
+  font-size: 14px;
+}
+
+.questions {
+  border: 1px solid var(--cv-primary-border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--cv-subtle-7), var(--cv-surface) 60%);
+  padding: 12px 12px 10px;
+  animation: fadeUp 0.35s ease-out;
+}
+
+.questionsHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cv-primary-text-deep);
+}
+
+.questionsHead > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.savedTag {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cv-success-text-strong);
+  background: var(--cv-success-tint);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.questionList {
+  margin: 10px 0 4px;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.questionList li::marker {
+  color: var(--cv-primary-text);
+  font-weight: 700;
+}
+
+.questionText {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  justify-content: space-between;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--cv-text);
+}
+
+.questionWhy {
+  margin-top: 2px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--cv-text-dimmed);
+}
+
+.topic {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text);
+  font-weight: 600;
+}
+
+.linkButton {
+  border: 0;
+  background: none;
+  padding: 4px 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--cv-primary-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.linkButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.quick {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px 2px;
+}
+
+.chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border: 1px solid var(--cv-primary-border);
+  border-radius: 999px;
+  background: var(--cv-surface);
+  color: var(--cv-primary-text-deep);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.chip:hover:not(:disabled) {
+  background: var(--cv-primary-tint);
+  border-color: #23717a;
+  transform: translateY(-1px);
+}
+
+.chip:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.hint {
+  flex: none;
+  margin: 6px 12px 0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: var(--cv-warning-tint-2);
+  color: var(--cv-warning-text-deep-3);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.hint a {
+  color: var(--cv-warning-text);
+  font-weight: 600;
+}
+
+/* The shared composer, slightly tighter inside the panel. */
+.assistantComposer {
+  flex: none;
+  padding: 4px 4px 0;
+}
+
+/* ---------- the candidate's CV ---------- */
+
+.cvPanel {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--cv-surface);
+}
+
+.cvHead {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 12px 12px 16px;
+  border-bottom: 1px solid var(--cv-border-light);
+}
+
+.avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #23717a, #2f8f88);
+  color: #fff;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.cvName {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.35;
+}
+
+.cvName b {
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.cvName span {
+  font-size: 12.5px;
+  color: var(--cv-text-dimmed);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cvScroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cv-text-dimmed);
+}
+
+.note {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--cv-page);
+  color: var(--cv-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.noteWarn {
+  background: var(--cv-warning-tint);
+  color: var(--cv-warning-text-deep-2);
+}
+
+.scoreRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Overall score as a ring (conic gradient, filled to the score). */
+.ring {
+  --value: 0;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: conic-gradient(#23717a calc(var(--value) * 1%), var(--cv-line) 0);
+}
+
+.ring span {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cv-surface);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--cv-primary-text-deep);
+  font-family: var(--mantine-font-family-monospace);
+}
+
+.scoreTitle {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.dim {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 8px;
+  font-size: 13px;
+  color: var(--cv-text-secondary);
+  cursor: default;
+}
+
+.dim b {
+  font-family: var(--mantine-font-family-monospace);
+  color: var(--cv-text);
+}
+
+.dimBar {
+  grid-column: 1 / -1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--cv-line);
+  overflow: hidden;
+}
+
+.dimBar div {
+  height: 100%;
+  border-radius: 3px;
+  background: #23717a;
+  animation: grow 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: left;
+}
+
+.reqs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.reqs li {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.reqIcon {
+  flex: none;
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.met {
+  background: var(--cv-success-tint);
+  color: var(--cv-success-text);
+}
+
+.partly {
+  background: var(--cv-warning-tint);
+  color: var(--cv-warning-text);
+}
+
+.unmet {
+  background: var(--cv-danger-tint);
+  color: var(--cv-danger-text);
+}
+
+.reqName {
+  font-weight: 600;
+  color: var(--cv-text);
+}
+
+.level {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--cv-text-dimmed);
+  text-transform: capitalize;
+}
+
+.evidence {
+  color: var(--cv-text-dimmed);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  font-size: 13px;
+}
+
+.facts span {
+  color: var(--cv-text-dimmed);
+}
+
+.facts b {
+  font-weight: 600;
+}
+
+.capital {
+  text-transform: capitalize;
+}
+
+.roles {
+  margin: 4px 0 0;
+  padding: 0 0 0 12px;
+  list-style: none;
+  border-left: 2px solid var(--cv-primary-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.roles li {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.roles span {
+  color: var(--cv-text-dimmed);
+  font-size: 12px;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text-deep);
+  font-size: 12px;
+}
+
+.skills {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--cv-text-secondary);
+  white-space: pre-wrap;
+}
+
+.cvFoot {
+  flex: none;
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--cv-border-light);
+}
+
+.previewBody {
+  padding: 0 16px 16px;
+}
+
+.previewFrame {
+  width: 100%;
+  height: min(78vh, 900px);
+  border: 1px solid var(--cv-border);
+  border-radius: 8px;
+  background: var(--cv-page);
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .msgRow,
+  .questions,
+  .empty,
+  .dimBar div {
+    animation: none;
+  }
+}

@@ -1,0 +1,125 @@
+# Testing one job from start to finish
+
+Everything here is **synthetic** (made-up people, the fictional company
+"Example Freight Ltd.", example.com addresses). It is for development and
+testing only; the final demo uses the trainer's sample CVs (requirement.md
+N13, CN5).
+
+| Folder | What | Where it goes |
+|---|---|---|
+| `knowledge-base/` | 6 reference documents, one folder per collection | Knowledge base page |
+| `synthetic-cvs/` | 28 CVs (PDF, Word, a scanned PDF, two-column layouts) and `EXPECTED.md`, the answer key | Job page, **Add CV** |
+| `edge-cases/` | `not-really-a-pdf.pdf`: text with a .pdf name | Job page, **Add CV** (must be refused) |
+
+The test job is **PHP Laravel Developer**, the job `EXPECTED.md` was written for.
+
+## 1. Knowledge base
+
+1. Open **Knowledge base**. For each folder in `knowledge-base/`, pick the
+   collection with the same name under **Add to**, then drop its file(s):
+   - `company-policies/` → Company policies (2 files)
+   - `previous-job-profiles/` → Previous job profiles
+   - `reference-library/` → Reference library
+   - `email-templates/` → Email templates
+   - `question-bank/` → Interview question bank
+2. Each document shows **Indexing**, then **Ready** with its passage count
+   (needs the local Ollama models).
+3. **Try a search**: "How many days do engineers work in the office?" should
+   find the hybrid work policy first.
+
+## 2. Create the job in the Hiring Assistant
+
+1. **Jobs → Create job with Hiring Assistant**.
+2. Send this message:
+
+   > We need a PHP Laravel Developer with at least 5 years of experience.
+   > PHP, Laravel and Docker are must-haves. An AWS certification is nice to
+   > have. Use our company policies and the previous senior PHP developer
+   > profile when you write the job description.
+
+3. Expect: a profile card (mandatory PHP, Laravel, Docker; preferred AWS
+   certification; 5+ years; suggested weights), a step line "Looked at …
+   passages in the knowledge base", and job description version 1 **waiting
+   for your approval**, with "Based on" chips.
+4. Try **Reject with feedback** ("Shorter, and mention hybrid work"), then
+   **Edit**, then **Approve**.
+5. "Post this job to the job board?" → **Don't post** is fine for this test.
+   (Posting needs a valid Blogger refresh token and the Google Form link.)
+
+## 3. Applicants
+
+1. Open the job from **Jobs**. If the profile is not saved yet, the page says
+   why **Screen CVs** is disabled.
+2. **Add CV** → select all 28 files in `synthetic-cvs/` (PDF and DOCX).
+   The result box shows how many were added.
+3. **Add CV** → `edge-cases/not-really-a-pdf.pdf` → it is refused and the
+   applicant row says **File refused**.
+4. Remove one applicant with the bin icon: a confirm dialog, then a
+   "Removed …" message top right.
+
+## 4. Screening
+
+1. **Screen CVs**: a striped progress bar counts "n of 28 CVs". The first run
+   takes a few minutes on a laptop CPU; later runs reuse the parsed CVs.
+2. When it ends: a **Screening finished** message, the ranking, the
+   **Excluded** list and the applicants list folded below.
+3. Compare with `synthetic-cvs/EXPECTED.md`: groups (top / middle / excluded)
+   should match; order inside a group may differ.
+4. Click a candidate: the side panel shows the score breakdown and each
+   requirement with its evidence line from the CV.
+5. Change a weight and **Save weights**: a "Weights saved" message, then the
+   yellow note "The weights changed since the last screening" with
+   **Screen again**.
+6. **Jobs** list: the job shows "n ranked". In the Hiring Assistant, the
+   progress bar ticks **CVs screened**.
+
+## 5. Shortlist and invitations (in the Hiring Assistant chat)
+
+1. Open the job's chat and send: `Shortlist the top 5.`
+   A **Shortlist** card shows 5 candidates with rank and scores, plus notes
+   (e.g. a tie at the cut). The ranking on the job page now says
+   **Shortlisted** for them.
+2. Try changing it: `Add everyone with skills at least 90.`,
+   `Remove rank 3.`, `Shortlist everyone who meets Docker with an overall
+   score above 70.`, or an excluded name (it is refused with the reason).
+3. Send: `Invite the shortlist next week, mornings.` It is **refused**:
+   applications are still open (or no closing date is set).
+4. Send: `Close applications now.` Then click **Screen CVs** again on the
+   job page (the ranking must include every applicant).
+5. Ask again: `Invite the shortlist next week, mornings.`
+   The assistant finds free times (skipping busy events in your Google
+   Calendar) and shows **Interview invitations**, waiting for your
+   confirmation, with "Free in your calendar". The chat box is locked until
+   you answer. Without the calendar set up you see a warning instead.
+6. Click **Change**: untick one person and edit one time, then **Confirm**.
+   A result card shows what was scheduled (or skipped, with the reason),
+   "Email sent" and "Added to your calendar". The event is now in your
+   Google Calendar, and the email in your test inbox has an invite.ics
+   (Gmail shows it as an event).
+7. Open **Interviews**: each interview shows **Invited** or **Invitation
+   failed** with the reason; use the send icon to send it again. **Cancel**
+   an interview: its link stops working, a "Interview cancelled" email
+   arrives and the event disappears from your calendar.
+8. More to try in the chat: `Move <name>'s interview to Thursday at 14:00.`,
+   `Cancel the interview with <name>.`, `Invite <name> at 07:00` (a
+   warning: outside working hours), two people at the same time (refused:
+   overlap), or a time when your calendar has an event (refused: busy).
+
+## 6. The video interview (two tabs on one laptop)
+
+1. **Interviews → Join now** on an upcoming interview whose invitation was
+   emailed (**Invited**; before that, Join now is off). Allow the camera and
+   microphone. The page shows LIVE, your video small in the corner and
+   "<candidate> hasn't joined yet".
+2. Open the candidate's link from the invitation email in a **private
+   window of the same browser**. Welcome → **Check camera and mic** →
+   **Join interview**.
+3. Both windows now show each other. Try **Mute** and **Camera off** on one
+   side: the other side sees the microphone icon and "camera off".
+4. Reload the candidate's window: it goes straight back into the call.
+5. **End session** (interviewer) → confirm. The interviewer is back on the
+   Interviews list (the interview is under **Past**, Ended); the candidate
+   sees "The interview has ended" and the link no longer works.
+
+Use a headset, or mute the side that is not speaking, to avoid echo.
+

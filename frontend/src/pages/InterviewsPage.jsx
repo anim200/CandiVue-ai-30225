@@ -1,0 +1,294 @@
+// Interviews (design: Interviews.dc.html): upcoming and past interviews.
+// Interviews are planned in the Hiring Assistant and appear here once the
+// interviewer confirms them (the invitation email is sent then). The email
+// is the only way the candidate gets their link, and "Join now" (the video
+// call) only opens once it was sent. "Send invitation" emails it (again,
+// with a new link); "Cancel" stops the interview and its link. An ended
+// interview opens its Q&A analysis and its assessment report.
+// Interviewers only.
+
+import { ActionIcon, Button, Group, SegmentedControl, Tooltip } from '@mantine/core';
+import { useDocumentTitle } from '@mantine/hooks';
+import {
+  IconBan,
+  IconCalendarEvent,
+  IconCheck,
+  IconClock,
+  IconFileText,
+  IconMailCheck,
+  IconMailX,
+  IconMessage2Search,
+  IconPlayerPlay,
+  IconPlayerRecord,
+  IconSend,
+  IconVideo,
+  IconX,
+} from '@tabler/icons-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router';
+
+import { apiGet, apiPost } from '../api/client';
+import ConfirmModal from '../components/ConfirmModal';
+import { EmptyState, ErrorBanner, Skeleton } from '../components/Feedback';
+import PageHero from '../components/PageHero';
+import { notifyDone, notifyError } from '../components/notify';
+import StatusBadge from '../components/StatusBadge';
+import { whenText } from '../utils/dates';
+import { calendarProblem } from './assistant/labels';
+import classes from './InterviewsPage.module.css';
+
+const SESSION = {
+  scheduled: { tone: 'neutral', icon: IconCalendarEvent, text: 'Scheduled' },
+  live: { tone: 'info', icon: IconPlayerRecord, text: 'Live' },
+  ended: { tone: 'success', icon: IconCheck, text: 'Ended' },
+  cancelled: { tone: 'neutral', icon: IconBan, text: 'Cancelled' },
+};
+const INVITATION = {
+  pending: { tone: 'warning', icon: IconClock, text: 'Invitation pending' },
+  sent: { tone: 'success', icon: IconMailCheck, text: 'Invited' },
+  failed: { tone: 'danger', icon: IconMailX, text: 'Invitation failed' },
+};
+
+// The application photo for the identity check (F7, §4B-15), shown under
+// upcoming interviews so a missing or unusable photo is known in advance.
+const PHOTO = {
+  ready: ['ok', 'Application photo ready'],
+  pending: ['plain', 'Application photo not processed yet'],
+  missing: ['plain', 'No application photo'],
+  no_consent: ['plain', 'No consent to use the photo'],
+  no_face: ['warn', 'Application photo: no face found'],
+  several_faces: ['warn', 'Application photo: more than one person'],
+  too_small: ['warn', 'Application photo: face too small'],
+  unreadable: ['warn', 'Application photo: file unreadable'],
+  too_large: ['warn', 'Application photo: file too large'],
+  download_failed: ['warn', 'Application photo: download failed'],
+};
+
+// A status badge from one of the tables above.
+function Badge({ of, value }) {
+  const { tone, icon: Icon, text } = of[value];
+  return (
+    <StatusBadge tone={tone} icon={<Icon size={13} />}>
+      {text}
+    </StatusBadge>
+  );
+}
+
+export default function InterviewsPage() {
+  const [when, setWhen] = useState('upcoming');
+  const [interviews, setInterviews] = useState(null); // null = loading
+  const [failed, setFailed] = useState(false);
+  const [busy, setBusy] = useState(null); // interview id being emailed
+  const [cancelling, setCancelling] = useState(null); // interview to confirm
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const navigate = useNavigate();
+  useDocumentTitle('Interviews · CandiVue AI');
+
+  // Load the chosen list.
+  const load = useCallback(async () => {
+    setFailed(false);
+    try {
+      setInterviews(await apiGet(`/interviews?when=${when}`));
+    } catch {
+      setFailed(true);
+    }
+  }, [when]);
+
+  useEffect(() => {
+    setInterviews(null);
+    load();
+  }, [load]);
+
+  // Email the invitation (again) with a new private link.
+  async function send(interview) {
+    setBusy(interview.id);
+    try {
+      const result = await apiPost(`/interviews/${interview.id}/send`);
+      if (result.sent) notifyDone(`Invitation sent to ${interview.candidate_name}`);
+      else notifyError('The invitation wasn’t sent.', result);
+      if (calendarProblem(result.calendar)) notifyError('Your calendar wasn’t updated.', { message: result.calendar });
+      await load();
+    } catch (error) {
+      notifyError('The invitation wasn’t sent.', error);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // Cancel the confirmed interview.
+  async function cancel() {
+    setCancelBusy(true);
+    try {
+      const result = await apiPost(`/interviews/${cancelling.id}/cancel`);
+      notifyDone(`Interview with ${cancelling.candidate_name} cancelled`);
+      if (result.email && result.email !== 'sent') {
+        notifyError('The candidate wasn’t emailed about it.', { message: result.email });
+      }
+      if (calendarProblem(result.calendar)) {
+        notifyError('Your calendar wasn’t updated.', { message: result.calendar });
+      }
+      await load();
+    } catch (error) {
+      notifyError('The interview wasn’t cancelled.', error);
+    } finally {
+      setCancelling(null);
+      setCancelBusy(false);
+    }
+  }
+
+  let body;
+  if (failed) {
+    body = (
+      <ErrorBanner title="We couldn’t load interviews." onRetry={load}>
+        Check your connection and try again.
+      </ErrorBanner>
+    );
+  } else if (interviews === null) {
+    body = (
+      <div className={classes.card}>
+        <Skeleton />
+      </div>
+    );
+  } else if (interviews.length === 0) {
+    body = (
+      <div className={classes.card}>
+        <EmptyState icon={IconVideo} title={when === 'upcoming' ? 'No upcoming interviews' : 'No past interviews'}>
+          Ask the Hiring Assistant to invite candidates from a job’s shortlist. Interviews appear here once you
+          confirm them.
+        </EmptyState>
+      </div>
+    );
+  } else {
+    body = (
+      <div className={classes.card}>
+        <div className={classes.head}>
+          <div>Candidate</div>
+          <div className={classes.medium}>Job</div>
+          <div>Date and time</div>
+          <div className={classes.medium}>Session</div>
+          <div>Invitation</div>
+          <div />
+        </div>
+        {interviews.map((interview) => (
+          <div key={interview.id} className={classes.row}>
+            <div className={classes.name}>
+              {interview.candidate_name}
+              {when === 'upcoming' && PHOTO[interview.photo] && (
+                <div className={`${classes.photo} ${classes[`photo_${PHOTO[interview.photo][0]}`]}`}>
+                  {PHOTO[interview.photo][1]}
+                </div>
+              )}
+            </div>
+            <Link to={`/jobs/${interview.job_id}`} className={`${classes.job} ${classes.medium}`}>
+              {interview.job_title}
+            </Link>
+            <div className={classes.when}>
+              {whenText(interview.scheduled_at)} · {interview.duration_minutes} min
+            </div>
+            <div className={classes.medium}>
+              <Badge of={SESSION} value={interview.status} />
+            </div>
+            <div className={classes.invitation}>
+              <Badge of={INVITATION} value={interview.invitation_status} />
+              {interview.invitation_status === 'failed' && interview.invitation_error && (
+                <div className={classes.reason}>{interview.invitation_error}</div>
+              )}
+            </div>
+            <Group gap={6} wrap="nowrap" className={classes.actions}>
+              {when === 'upcoming' && (
+                <>
+                  <Tooltip label="Send the invitation email first" disabled={interview.invitation_status === 'sent'}>
+                    {/* a wrapper, because a disabled button shows no tooltip */}
+                    <span>
+                      <Button
+                        size="xs"
+                        leftSection={<IconPlayerPlay size={14} />}
+                        disabled={interview.invitation_status !== 'sent'}
+                        onClick={() => navigate(`/interviews/${interview.id}/room`)}
+                      >
+                        {interview.status === 'live' ? 'Rejoin' : 'Join now'}
+                      </Button>
+                    </span>
+                  </Tooltip>
+                  <Tooltip label={interview.invitation_status === 'pending' ? 'Send the invitation' : 'Send the invitation again'}>
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      loading={busy === interview.id}
+                      onClick={() => send(interview)}
+                      aria-label={`Send the invitation to ${interview.candidate_name}`}
+                    >
+                      <IconSend size={17} />
+                    </ActionIcon>
+                  </Tooltip>
+                  <Tooltip label="Cancel the interview">
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      onClick={() => setCancelling(interview)}
+                      aria-label={`Cancel the interview with ${interview.candidate_name}`}
+                    >
+                      <IconX size={17} />
+                    </ActionIcon>
+                  </Tooltip>
+                </>
+              )}
+              {interview.status === 'ended' && (
+                <>
+                  <Button
+                    size="xs"
+                    variant="light"
+                    component={Link}
+                    to={`/interviews/${interview.id}/analysis`}
+                    leftSection={<IconMessage2Search size={14} />}
+                  >
+                    Analysis
+                  </Button>
+                  <Button
+                    size="xs"
+                    component={Link}
+                    to={`/interviews/${interview.id}/report`}
+                    leftSection={<IconFileText size={14} />}
+                  >
+                    Report
+                  </Button>
+                </>
+              )}
+            </Group>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className={classes.page}>
+      <PageHero art="interview" beside={170}>
+        <div className={classes.top}>
+          <h1 className={classes.title}>Interviews</h1>
+          <SegmentedControl
+            value={when}
+            onChange={setWhen}
+            data={[
+              { value: 'upcoming', label: 'Upcoming' },
+              { value: 'past', label: 'Past' },
+            ]}
+          />
+        </div>
+      </PageHero>
+      {body}
+      <ConfirmModal
+        opened={Boolean(cancelling)}
+        onClose={() => setCancelling(null)}
+        title="Cancel this interview?"
+        confirmLabel="Cancel interview"
+        onConfirm={cancel}
+        busy={cancelBusy}
+      >
+        The interview with {cancelling?.candidate_name} on {cancelling && whenText(cancelling.scheduled_at)} is
+        cancelled and their link stops working. If they were sent the invitation, they are emailed that it is
+        cancelled. It is also removed from your calendar.
+      </ConfirmModal>
+    </div>
+  );
+}

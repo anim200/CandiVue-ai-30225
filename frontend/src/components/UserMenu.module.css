@@ -1,0 +1,64 @@
+/* User menu, from the design (Jobs.dc.html: UserMenu, frame 2d). */
+
+.target {
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background-color 0.15s;
+}
+
+.target:hover {
+  background-color: var(--cv-hover);
+}
+
+/* Very small phones (up to 360px): no room for the chevron. */
+@media (max-width: 22.5em) {
+  .target {
+    padding: 4px;
+  }
+
+  .chevron {
+    display: none;
+  }
+}
+
+.avatar {
+  background: var(--cv-primary-tint-strong);
+  color: var(--cv-primary-text-strong);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dropdown {
+  border: 1px solid var(--cv-border);
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 10px 30px rgba(26, 34, 39, 0.12);
+}
+
+/* Name and email at the top, separated by a thin line. */
+.who {
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--cv-border-light);
+  margin-bottom: 4px;
+}
+
+.item {
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 4px;
+  font-size: 15px;
+}
+
+.signOut {
+  color: var(--cv-danger-text-strong);
+}
+
+.signOut:hover,
+.signOut[data-hovered] {
+  background-color: var(--cv-danger-tint);
+}
+
+/* Appearance (light or dark) under the name. */
+.appearance {
+  padding: 6px 10px 10px;
+}

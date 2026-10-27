@@ -1,0 +1,13 @@
+# Keep the image small and free of secrets.
+# (tests/ and dev requirements are needed by the "test" image; the runtime
+# image does not copy them.)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.env
+.env.*
+Dockerfile
+.dockerignore

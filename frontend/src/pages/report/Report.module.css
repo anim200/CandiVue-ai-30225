@@ -1,0 +1,776 @@
+/* Assessment report and Reports list (design: Assessment Report.dc.html
+   1a-2h, Reports.dc.html). Font sizes are the design's + 1px (user,
+   07-10-2026). Below 1100px the source panel moves under the report. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: fadeUp 0.3s ease-out;
+}
+
+/* ---- Header ---- */
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--cv-text-dimmed);
+  min-width: 0;
+}
+
+.breadcrumb a {
+  color: var(--cv-text-secondary);
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  color: var(--cv-primary-text-strong);
+  text-decoration: underline;
+}
+
+.breadcrumb span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titleRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px 20px;
+  flex-wrap: wrap;
+}
+
+.titleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 6px 12px;
+  flex-wrap: wrap;
+  font-size: 15px;
+  color: var(--cv-text-secondary);
+}
+
+.sep {
+  color: var(--cv-text-ghost);
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tabPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 16px;
+}
+
+/* ---- Banners ---- */
+
+.banner {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 15px;
+  line-height: 1.5;
+  animation: fadeUp 0.3s ease-out;
+}
+
+.bannerChanges {
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text-deep);
+}
+
+.bannerApproved {
+  background: var(--cv-success-tint);
+  color: var(--cv-success-text-deep);
+}
+
+/* "Send selection email" under the Approved banner (§4B-14). */
+.selectionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border: 1px solid var(--cv-border-2);
+  border-radius: 8px;
+  background: var(--cv-surface);
+  font-size: 15px;
+  color: var(--cv-text-secondary);
+}
+
+.versionNote {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--cv-warning-tint);
+  color: var(--cv-warning-text-deep);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* ---- Layout ---- */
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px;
+  align-items: start;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.topCards {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 1100px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .topCards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---- Cards ---- */
+
+.card {
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
+  border-radius: 8px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cv-text-dimmed);
+}
+
+.headline {
+  font-size: 23px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.steps,
+.stepLabels {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.step {
+  height: 8px;
+  border-radius: 2px;
+  background: var(--cv-line-3);
+}
+
+.stepOn {
+  background: #23717a;
+}
+
+.stepLabels {
+  font-size: 12px;
+  color: var(--cv-text-dimmed);
+}
+
+.stepLabelOn {
+  color: var(--cv-primary-text-strong);
+  font-weight: 700;
+}
+
+/* "Identity: confirmed by face recognition ..." under the position (F7). */
+.identityLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--cv-border-light);
+  font-size: 13.5px;
+  color: var(--cv-text-secondary);
+}
+
+.identityConfirmed {
+  color: var(--cv-success-text-strong);
+}
+
+.note {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--cv-text-secondary);
+}
+
+.scoreRow {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr) 30px;
+  gap: 10px;
+  align-items: center;
+  font-size: 14px;
+}
+
+.scoreRow b {
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.cvLabel {
+  font-weight: 600;
+}
+
+.scoreTrack {
+  height: 8px;
+  background: var(--cv-muted);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.scoreFill {
+  height: 8px;
+  background: #23717a;
+  border-radius: 2px;
+  animation: grow 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.cvFill {
+  background: #4fa2ab;
+}
+
+.coverage {
+  font-size: 13px;
+  color: var(--cv-text-secondary);
+  border-top: 1px solid var(--cv-border-light);
+  padding-top: 8px;
+  line-height: 1.5;
+}
+
+.coverage a {
+  font-weight: 600;
+  color: var(--cv-primary-text-strong);
+}
+
+/* ---- Findings ---- */
+
+.findings {
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.section {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--cv-border-light);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.section:last-child {
+  border-bottom: 0;
+}
+
+.sectionTitle {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.none {
+  padding-left: 26px;
+  font-size: 14px;
+  color: var(--cv-text-dimmed);
+}
+
+.finding {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 26px;
+}
+
+.findingText {
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.chip {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 4px;
+  font: 500 12px var(--mantine-font-family-monospace);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text-strong);
+  border: 1px solid var(--cv-primary-border);
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.chip:hover,
+.chipOn {
+  background: #23717a;
+  color: #fff;
+  border-color: #23717a;
+}
+
+.unsupported {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--cv-danger-text-strong);
+}
+
+/* ---- Source panel ---- */
+
+.panel {
+  position: sticky;
+  top: 16px;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.panelHead {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--cv-border);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.panelBody {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.panelEmpty {
+  padding: 14px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--cv-text-dimmed);
+}
+
+.panelLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 500 13px var(--mantine-font-family-monospace);
+  color: var(--cv-primary-text-strong);
+}
+
+.line {
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 14px;
+  line-height: 1.5;
+  border: 1px solid var(--cv-border-light);
+  animation: fadeUp 0.3s ease-out;
+}
+
+.lineCited {
+  background: var(--cv-warning-tint-4);
+  border-color: var(--cv-warning-border);
+}
+
+.lineWho {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cv-text-dimmed);
+  margin-bottom: 2px;
+}
+
+.lineWho span {
+  font-family: var(--mantine-font-family-monospace);
+  font-weight: 500;
+}
+
+.panelNote {
+  font-size: 13px;
+  color: var(--cv-text-dimmed);
+  line-height: 1.5;
+}
+
+.link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--cv-primary-text-strong);
+  cursor: pointer;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+/* ---- Review bar ---- */
+
+.reviewBar {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin: 0 -32px;
+  padding: 14px 32px;
+  background: var(--cv-surface);
+  border-top: 1px solid var(--cv-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px 16px;
+  flex-wrap: wrap;
+}
+
+/* The page has 16px side padding below Mantine's "sm" breakpoint. */
+@media (max-width: 48em) {
+  .reviewBar {
+    margin: 0 -16px;
+    padding: 12px 16px;
+  }
+}
+
+.reviewStatus {
+  display: flex;
+  align-items: center;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+  font-size: 15px;
+  color: var(--cv-text-secondary);
+}
+
+.modalText {
+  font-size: 15px;
+  color: var(--cv-text-secondary);
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+/* ---- Compare candidates ---- */
+
+.compare {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.compareBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.compareLabel {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.person {
+  height: 30px;
+  padding: 0 6px 0 10px;
+  border-radius: 999px;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text-strong);
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.compareScroll {
+  overflow-x: auto;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
+  border-radius: 8px;
+}
+
+/* Columns share the width and text wraps; on a narrow screen the table
+   keeps a readable minimum width and scrolls sideways. */
+.compareTable {
+  min-width: 640px;
+}
+
+.compareRow {
+  display: grid;
+  border-bottom: 1px solid var(--cv-border-light);
+}
+
+.compareRow:last-child {
+  border-bottom: 0;
+}
+
+.compareRow > div {
+  padding: 10px 16px;
+  font-size: 15px;
+  line-height: 1.45;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.compareRow > div + div {
+  border-left: 1px solid var(--cv-border-light);
+}
+
+.compareHead {
+  background: var(--cv-subtle-2);
+  font-weight: 600;
+}
+
+.compareHead > div:first-child {
+  font-size: 13px;
+  color: var(--cv-text-dimmed);
+}
+
+.compareHead a {
+  color: var(--cv-text);
+}
+
+.compareFirst {
+  background: var(--cv-subtle);
+  font-weight: 600;
+}
+
+.rowLabel {
+  font-weight: 600;
+}
+
+.subLabel {
+  color: var(--cv-text-dimmed);
+  padding-left: 28px !important;
+}
+
+.cellBar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  gap: 8px;
+  align-items: center;
+}
+
+.cellBar b {
+  text-align: right;
+  font-weight: 600;
+}
+
+/* ---- Reports list ---- */
+
+.listTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.jobSelect {
+  min-width: 280px;
+}
+
+.listCard {
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
+  border-radius: 8px;
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+.listHead,
+.listRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px minmax(0, 1fr) 190px;
+  gap: 0 12px;
+  align-items: center;
+  padding: 0 20px;
+}
+
+.listHead {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--cv-border);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cv-text-dimmed);
+}
+
+.listRow {
+  width: 100%;
+  min-height: 52px;
+  border: 0;
+  border-bottom: 1px solid var(--cv-border-light);
+  background: none;
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.listRow:last-child {
+  border-bottom: 0;
+}
+
+.listRow:hover {
+  background: var(--cv-hover);
+}
+
+.listName {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+@container (max-width: 640px) {
+  .listHead {
+    display: none;
+  }
+
+  .listRow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+    padding: 12px 16px;
+  }
+}
+
+/* ---- Animations ---- */
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes grow {
+  from {
+    width: 0;
+  }
+}
+
+/* The selection email preview and the confirmation (§4B-15). */
+.previewBox {
+  border: 1px solid var(--cv-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--cv-subtle-5);
+}
+
+.previewHead {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--cv-border);
+  background: var(--cv-surface);
+  font-size: 14px;
+}
+
+.previewHead span {
+  color: var(--cv-text-dimmed);
+  font-size: 12.5px;
+}
+
+.previewFrame {
+  display: block;
+  width: 100%;
+  height: 420px;
+  border: 0;
+  background: var(--cv-subtle-5);
+}
+
+.confirmRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--cv-warning-tint);
+  color: var(--cv-warning-text-deep);
+  font-size: 14px;
+}
+
+.listSection {
+  margin: 8px 0 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--cv-text-secondary);
+}

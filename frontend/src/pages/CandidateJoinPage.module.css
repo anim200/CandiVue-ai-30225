@@ -1,0 +1,64 @@
+/* Candidate link page (design: Candidate Join.dc.html). */
+
+.header {
+  height: 56px;
+  background: var(--cv-surface);
+  border-bottom: 1px solid var(--cv-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px;
+}
+
+@media (min-width: 48em) {
+  .header {
+    padding: 0 24px;
+  }
+}
+
+.help {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--cv-text-secondary);
+}
+
+/* Phones: a short "Help" link; tablets and up: the full sentence. */
+.helpShort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.helpFull {
+  display: none;
+}
+
+@media (min-width: 48em) {
+  .helpShort {
+    display: none;
+  }
+
+  .helpFull {
+    display: inline;
+  }
+}
+
+/* "Opening your interview…" spinner (design frame 3a: 28px ring, 1s). */
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--cv-primary-border);
+  border-top-color: #23717a;
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

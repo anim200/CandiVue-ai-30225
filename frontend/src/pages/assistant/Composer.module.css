@@ -1,0 +1,352 @@
+/* Message box and AI model picker at the bottom of the chat.
+   Deliberate change from the design (user, 07-10-2026): rounded card with
+   a focus glow, round send button that pops in, usage meter for the model.
+   All motion stops with prefers-reduced-motion (styles/global.css). */
+
+.composer {
+  padding: 12px 24px 14px;
+  border-top: 1px solid var(--cv-border-light);
+  background: linear-gradient(180deg, var(--cv-surface) 0%, var(--cv-subtle-4) 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ---- Locked hint ---- */
+
+.hint {
+  font-size: 13px;
+  color: var(--cv-warning-text);
+  background: var(--cv-warning-tint-3);
+  border: 1px solid var(--cv-warning-border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  animation: slideDown 0.25s ease-out;
+}
+
+/* ---- The input card ---- */
+
+.card {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 6px 6px 6px 16px;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border-strong);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(26, 34, 39, 0.04);
+  transition:
+    border-color 0.2s,
+    box-shadow 0.25s;
+}
+
+.card:hover {
+  border-color: var(--cv-border-stronger);
+}
+
+.card:focus-within {
+  border-color: #4fa2ab;
+  box-shadow:
+    0 0 0 4px rgba(35, 113, 122, 0.12),
+    0 8px 24px rgba(26, 34, 39, 0.07);
+}
+
+.locked {
+  background: var(--cv-page);
+  border-style: dashed;
+}
+
+.textarea {
+  font-size: 15px;
+  line-height: 1.5;
+  padding: 7px 0 !important;
+  color: var(--cv-text);
+}
+
+.textarea::placeholder {
+  color: var(--cv-text-faint);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.charCount {
+  font: 500 12px var(--mantine-font-family-monospace);
+  color: var(--cv-text-faint);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.charCountHigh {
+  color: var(--cv-danger-text);
+}
+
+/* ---- Send button ---- */
+
+.send {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cv-hover-5);
+  color: var(--cv-text-faint-4);
+  cursor: not-allowed;
+  transition:
+    transform 0.15s,
+    box-shadow 0.2s,
+    background 0.2s;
+}
+
+.ready {
+  background: linear-gradient(135deg, #2f8a94 0%, #1c5d65 100%);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(35, 113, 122, 0.3);
+  animation: pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.ready:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(35, 113, 122, 0.35);
+}
+
+.ready:active {
+  transform: scale(0.92);
+}
+
+.ready:focus-visible {
+  outline: 2px solid #4fa2ab;
+  outline-offset: 2px;
+}
+
+.sendIcon {
+  transition: transform 0.2s;
+}
+
+.ready:hover .sendIcon {
+  transform: translateY(-2px);
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: var(--cv-border-surface);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ---- Keyboard hint (inside the card) and footer ---- */
+
+.keyHint {
+  font-size: 12px;
+  color: var(--cv-text-faint);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  animation: fadeIn 0.25s ease-out;
+}
+
+.footer {
+  min-height: 30px;
+}
+
+.kbd {
+  font: 600 11px var(--mantine-font-family-monospace);
+  padding: 1px 5px;
+  border: 1px solid var(--cv-border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--cv-surface);
+  color: var(--cv-text-secondary);
+}
+
+/* ---- Model picker ---- */
+
+.modelBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--cv-text-dimmed);
+}
+
+.modelInput {
+  height: 30px;
+  min-height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--cv-primary-border);
+  background: var(--cv-subtle-8);
+  color: var(--cv-primary-text-strong);
+  font-size: 13px;
+  font-weight: 600;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    box-shadow 0.2s;
+}
+
+.modelInput:hover {
+  background: var(--cv-primary-tint);
+  border-color: var(--cv-primary-border-strong);
+}
+
+.modelInput:focus {
+  border-color: #4fa2ab;
+  box-shadow: 0 0 0 3px rgba(35, 113, 122, 0.12);
+}
+
+.modelIcon {
+  color: var(--cv-primary-text);
+}
+
+/* Usage: replays a short highlight when the model changes (new key). */
+.usage {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  animation: flash 0.9s ease-out;
+}
+
+.meter {
+  width: 72px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--cv-hover-5);
+  overflow: hidden;
+}
+
+.meterFill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #4fa2ab, #23717a);
+  animation: grow 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: width 0.6s ease;
+}
+
+.levelHigh {
+  background: linear-gradient(90deg, #e2b04f, #c08a1e);
+}
+
+.levelFull {
+  background: linear-gradient(90deg, #d0675c, #b03a2e);
+}
+
+.blocked {
+  color: var(--cv-warning-text);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pulseDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #c08a1e;
+  animation: pulse 1.6s ease-out infinite;
+}
+
+.googleLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--cv-text-dimmed);
+  transition: color 0.15s;
+}
+
+.googleLink:hover {
+  color: var(--cv-primary-text-strong);
+}
+
+/* ---- Narrow chat and phones ---- */
+
+@container (max-width: 640px) {
+  .composer {
+    padding: 10px 16px 12px;
+  }
+
+  .keyHint {
+    display: none; /* not enough room */
+  }
+}
+
+@media (hover: none) {
+  .keyHint {
+    display: none; /* touch keyboards have no Shift+Enter habit */
+  }
+}
+
+/* ---- Animations ---- */
+
+@keyframes pop {
+  from {
+    transform: scale(0.6);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes grow {
+  from {
+    width: 0;
+  }
+}
+
+@keyframes flash {
+  from {
+    background: var(--cv-primary-tint-strong);
+  }
+  to {
+    background: transparent;
+  }
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(192, 138, 30, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 8px rgba(192, 138, 30, 0);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,0 +1,79 @@
+/* The CandiVue AI logo (Logo.jsx). Colours are tokens: the light values
+   are the brand colours, the dark ones keep the logo readable on the dark
+   top bar. */
+
+.logo {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+}
+
+.mark {
+  display: block;
+  flex: none;
+  filter: drop-shadow(0 2px 4px rgba(29, 92, 90, 0.25));
+}
+
+.word {
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--cv-brand-word);
+  white-space: nowrap;
+}
+
+.vue {
+  color: var(--cv-brand-vue);
+}
+
+.ai {
+  padding: 2px 8px 2px 7px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--cv-brand-ai-from), var(--cv-brand-ai-to));
+  color: var(--cv-brand-ai-text);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+/* Login brand panel: bigger. */
+.lg {
+  gap: 12px;
+}
+
+.lg .word {
+  font-size: 25px;
+}
+
+.lg .ai {
+  padding: 3px 10px 3px 9px;
+  font-size: 12.5px;
+}
+
+/* On the dark login brand panel (the same in light and dark mode). */
+.onDark .word {
+  color: #ffffff;
+}
+
+.onDark .vue {
+  color: #7fd0d8;
+}
+
+.onDark .ai {
+  background: rgba(255, 255, 255, 0.12);
+  color: #bff3ea;
+}
+
+.onDark .mark {
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.25));
+}
+
+/* Very narrow phones: the pill would push the account menu off screen. */
+@media (max-width: 360px) {
+  .md .ai {
+    display: none;
+  }
+}

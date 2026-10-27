@@ -1,0 +1,355 @@
+"""Hiring Assistant API: read a job's chat, send a message, review the JD,
+confirm posting it, confirm interview invitations; and the assistant in the
+interview room (its own thread per interview, §4B-10).
+
+Interviewers only (N9); the candidate never sees the assistant (§4B-10).
+Every request runs the graph until it answers or pauses for review; the
+thread is saved by the checkpointer, so nothing is lost on a restart (N26).
+"""
+
+import logging
+from typing import Annotated, Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from langchain_core.messages import HumanMessage
+from langgraph.errors import GraphRecursionError
+from langgraph.types import Command
+from pydantic import BaseModel, Field, model_validator
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.assistant import posting
+from app.assistant.room_tools import question_bank_size
+from app.assistant.schemas import JobDescriptionContent
+from app.assistant.thread_view import thread_items
+from app.auth.dependencies import CurrentUser, require_interviewer
+from app.db.database import get_db
+from app.db.models import InterviewSession, Job, JobDescription
+from app.db.models.job import JobDescriptionStatus
+from app.graphs.hiring_assistant import (
+    build_hiring_assistant,
+    posting_message,
+    room_thread_config,
+    thread_config,
+)
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(
+    prefix="/api/assistant",
+    tags=["hiring assistant"],
+    dependencies=[Depends(require_interviewer)],
+)
+
+NOT_FOUND = "This job no longer exists."
+REVIEW_FIRST = "Please approve, edit or reject the job description first."
+NOTHING_TO_REVIEW = "There is no job description waiting for review."
+NOTHING_TO_CONFIRM = "There is no post waiting for your confirmation."
+CONFIRM_FIRST = "Please choose Post or Don't post first."
+INVITATIONS_FIRST = "Please confirm, change or cancel the interviews first."
+NOTHING_TO_SCHEDULE = "There are no interviews waiting for your confirmation."
+# What to finish first, by what the paused graph waits for (JD review otherwise).
+FIRST = {
+    "post_confirmation": CONFIRM_FIRST,
+    "invitation_confirmation": INVITATIONS_FIRST,
+}
+APPROVE_FIRST = "Approve a job description before posting it."
+STUCK = "The assistant couldn't finish this request. Please rephrase it or try again."
+
+
+class MessageRequest(BaseModel):
+    """A chat message from the interviewer."""
+
+    text: str = Field(min_length=1, max_length=2000)
+
+
+class ReviewRequest(BaseModel):
+    """The interviewer's decision on the JD waiting for review (§4B-7)."""
+
+    action: Literal["approve", "edit", "reject"]
+    feedback: str | None = Field(default=None, max_length=1000)
+    content: JobDescriptionContent | None = None  # the edited JD (for "edit")
+
+    @model_validator(mode="after")
+    def needs_details(self):
+        """A rejection needs feedback; an edit needs the edited text."""
+        if self.action == "reject" and not (self.feedback or "").strip():
+            raise ValueError("Tell the assistant what to change.")
+        if self.action == "edit" and self.content is None:
+            raise ValueError("The edited job description is missing.")
+        return self
+
+
+class PostDecisionRequest(BaseModel):
+    """The interviewer's answer to "Post this job to the job board?"."""
+
+    action: Literal["post", "skip"]
+
+
+class InvitationItem(BaseModel):
+    """One candidate on the confirmed card, with the (possibly changed) time."""
+
+    candidate_id: int
+    starts_at: str | None = Field(default=None, max_length=40)
+
+
+class InvitationDecisionRequest(BaseModel):
+    """The interviewer's answer on the interview card: confirm the items left
+    on it (with their times), or cancel everything."""
+
+    action: Literal["confirm", "cancel"]
+    items: list[InvitationItem] = Field(default=[], max_length=20)
+
+
+class RoomThreadOut(BaseModel):
+    """The interview room's assistant chat."""
+
+    session_id: int
+    items: list[dict]
+    question_bank_documents: int  # 0: the assistant suggests its own questions
+    cv_questions_saved: bool
+
+
+class ThreadOut(BaseModel):
+    """The chat as the screen shows it, plus the review waiting (if any)."""
+
+    job_id: int
+    items: list[dict]
+    pending_review: dict | None
+
+
+def _graph(request: Request):
+    """The Hiring Assistant graph, using the app's database checkpointer."""
+    return build_hiring_assistant(request.app.state.checkpointer)
+
+
+def _require_job(db: Session, job_id: int) -> None:
+    """Stop with 404 if the job does not exist."""
+    if db.get(Job, job_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, NOT_FOUND)
+
+
+def _thread(graph, db: Session, job_id: int) -> ThreadOut:
+    """Read the saved thread and any review the graph is waiting for."""
+    snapshot = graph.get_state(thread_config(job_id))
+    messages = snapshot.values.get("messages", []) if snapshot.values else []
+    pending = next((i.value for task in snapshot.tasks for i in task.interrupts), None)
+    return ThreadOut(
+        job_id=job_id, items=thread_items(db, messages), pending_review=pending
+    )
+
+
+def _pending_kind(graph, db: Session, job_id: int) -> str | None:
+    """What the paused graph is waiting for: "jd_approval",
+    "post_confirmation", "invitation_confirmation" or None."""
+    pending = _thread(graph, db, job_id).pending_review
+    return pending["kind"] if pending else None
+
+
+def _run(graph, graph_input, job_id: int) -> None:
+    """Run one turn of a job's chat (see _run_config)."""
+    _run_config(graph, graph_input, thread_config(job_id))
+
+
+def _run_config(graph, graph_input, config: dict) -> None:
+    """Run one turn of the graph; a turn that never ends (the LLM keeps
+    calling tools) is stopped by the step limit and gets a clear message."""
+    try:
+        graph.invoke(graph_input, config)
+    except GraphRecursionError:
+        logger.warning(
+            "Assistant turn hit the step limit: %s", config["configurable"]["thread_id"]
+        )
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, STUCK) from None
+
+
+@router.get("/jobs/{job_id}/thread", response_model=ThreadOut)
+def get_thread(
+    job_id: int, request: Request, db: Annotated[Session, Depends(get_db)]
+) -> ThreadOut:
+    """Return a job's chat thread."""
+    _require_job(db, job_id)
+    return _thread(_graph(request), db, job_id)
+
+
+@router.post("/jobs/{job_id}/messages", response_model=ThreadOut)
+def send_message(
+    job_id: int,
+    body: MessageRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_interviewer)],
+) -> ThreadOut:
+    """Send a chat message; the assistant answers (calling tools if needed)."""
+    _require_job(db, job_id)
+    graph = _graph(request)
+    waiting = _pending_kind(graph, db, job_id)
+    if waiting:
+        raise HTTPException(status.HTTP_409_CONFLICT, FIRST.get(waiting, REVIEW_FIRST))
+    # interviewer_id: whose calendar the interview tools check and book.
+    graph_input = {
+        "messages": [HumanMessage(body.text)],
+        "job_id": job_id,
+        "interviewer_id": user.id,
+    }
+    _run(graph, graph_input, job_id)
+    return _thread(graph, db, job_id)
+
+
+@router.post("/jobs/{job_id}/review", response_model=ThreadOut)
+def review_job_description(
+    job_id: int,
+    body: ReviewRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+) -> ThreadOut:
+    """Approve, edit or reject the JD; the paused graph continues from there."""
+    _require_job(db, job_id)
+    graph = _graph(request)
+    if _pending_kind(graph, db, job_id) != "jd_approval":
+        raise HTTPException(status.HTTP_409_CONFLICT, NOTHING_TO_REVIEW)
+    decision = body.model_dump(mode="json", exclude_none=True)
+    _run(graph, Command(resume=decision), job_id)
+    return _thread(graph, db, job_id)
+
+
+@router.post("/jobs/{job_id}/post-decision", response_model=ThreadOut)
+def decide_posting(
+    job_id: int,
+    body: PostDecisionRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+) -> ThreadOut:
+    """Answer "Post this job to the job board?": post it now, or not."""
+    _require_job(db, job_id)
+    graph = _graph(request)
+    if _pending_kind(graph, db, job_id) != "post_confirmation":
+        raise HTTPException(status.HTTP_409_CONFLICT, NOTHING_TO_CONFIRM)
+    _run(graph, Command(resume={"action": body.action}), job_id)
+    return _thread(graph, db, job_id)
+
+
+@router.post("/jobs/{job_id}/invitation-decision", response_model=ThreadOut)
+def decide_invitations(
+    job_id: int,
+    body: InvitationDecisionRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+) -> ThreadOut:
+    """Confirm (as shown, or after changes) or cancel the planned interviews."""
+    _require_job(db, job_id)
+    graph = _graph(request)
+    if _pending_kind(graph, db, job_id) != "invitation_confirmation":
+        raise HTTPException(status.HTTP_409_CONFLICT, NOTHING_TO_SCHEDULE)
+    _run(graph, Command(resume=body.model_dump()), job_id)
+    return _thread(graph, db, job_id)
+
+
+@router.post("/jobs/{job_id}/retry", response_model=ThreadOut)
+def retry_turn(
+    job_id: int, request: Request, db: Annotated[Session, Depends(get_db)]
+) -> ThreadOut:
+    """Continue a chat turn that stopped because the AI failed. The message
+    was already saved, so it is not sent again; the graph resumes from the
+    step that failed."""
+    _require_job(db, job_id)
+    graph = _graph(request)
+    snapshot = graph.get_state(thread_config(job_id))
+    unfinished = bool(snapshot.next)
+    if unfinished and not _thread(graph, db, job_id).pending_review:
+        _run(graph, None, job_id)
+    return _thread(graph, db, job_id)
+
+
+@router.post("/jobs/{job_id}/post", response_model=ThreadOut)
+def post_again(
+    job_id: int, request: Request, db: Annotated[Session, Depends(get_db)]
+) -> ThreadOut:
+    """Post the approved JD to the job board again: after a failure, or once
+    the application form link has been added. The result joins the chat."""
+    _require_job(db, job_id)
+    graph = _graph(request)
+    if waiting := _pending_kind(graph, db, job_id):
+        raise HTTPException(status.HTTP_409_CONFLICT, FIRST.get(waiting, REVIEW_FIRST))
+    approved = db.scalar(
+        select(JobDescription.id).where(
+            JobDescription.job_id == job_id,
+            JobDescription.status == JobDescriptionStatus.APPROVED,
+        )
+    )
+    if approved is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, APPROVE_FIRST)
+    result = posting.post_job(job_id)
+    graph.update_state(thread_config(job_id), {"messages": [posting_message(result)]})
+    return _thread(graph, db, job_id)
+
+
+# ---------- the assistant in the interview room ----------
+
+
+def _session(db: Session, session_id: int) -> InterviewSession:
+    """The interview, or 404."""
+    session = db.get(InterviewSession, session_id)
+    if session is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, "This interview no longer exists."
+        )
+    return session
+
+
+def _room_thread(graph, db: Session, session: InterviewSession) -> RoomThreadOut:
+    """Read the interview's assistant thread."""
+    snapshot = graph.get_state(room_thread_config(session.id))
+    messages = snapshot.values.get("messages", []) if snapshot.values else []
+    return RoomThreadOut(
+        session_id=session.id,
+        items=thread_items(db, messages),
+        question_bank_documents=question_bank_size(db),
+        cv_questions_saved=session.cv_questions is not None,
+    )
+
+
+@router.get("/interviews/{session_id}/thread", response_model=RoomThreadOut)
+def get_room_thread(
+    session_id: int, request: Request, db: Annotated[Session, Depends(get_db)]
+) -> RoomThreadOut:
+    """The assistant chat of one interview (prepared before or used during
+    the call)."""
+    return _room_thread(_graph(request), db, _session(db, session_id))
+
+
+@router.post("/interviews/{session_id}/messages", response_model=RoomThreadOut)
+def send_room_message(
+    session_id: int,
+    body: MessageRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_interviewer)],
+) -> RoomThreadOut:
+    """Ask the assistant during the interview, e.g. for questions."""
+    session = _session(db, session_id)
+    graph = _graph(request)
+    graph_input = {
+        "messages": [HumanMessage(body.text)],
+        "job_id": session.job_id,
+        "interviewer_id": user.id,
+        "session_id": session.id,
+    }
+    _run_config(graph, graph_input, room_thread_config(session.id))
+    db.refresh(session)  # CV questions may have been saved meanwhile
+    return _room_thread(graph, db, session)
+
+
+@router.post("/interviews/{session_id}/retry", response_model=RoomThreadOut)
+def retry_room_turn(
+    session_id: int, request: Request, db: Annotated[Session, Depends(get_db)]
+) -> RoomThreadOut:
+    """Continue a room turn that stopped because the AI failed (the message
+    was saved; it is not sent again)."""
+    session = _session(db, session_id)
+    graph = _graph(request)
+    config = room_thread_config(session.id)
+    if graph.get_state(config).next:
+        _run_config(graph, None, config)
+    db.refresh(session)
+    return _room_thread(graph, db, session)

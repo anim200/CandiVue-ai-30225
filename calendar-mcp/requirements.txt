@@ -1,0 +1,4 @@
+mcp==2.3.0
+google-auth==2.60.0
+requests==2.34.2
+uvicorn==0.54.0

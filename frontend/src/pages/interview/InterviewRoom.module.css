@@ -1,0 +1,426 @@
+/* The interviewer's live interview: a top bar, then three columns (CV, the
+   call with the transcript, assistant/chat tabs) that fill the screen under
+   the app header; each column scrolls inside. Narrower screens: the CV
+   opens as a drawer; phones and tablets stack the call and the tabs. */
+
+.roomWrap {
+  height: calc(100dvh - 56px); /* under the app header */
+}
+
+.room {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--cv-page);
+}
+
+.topbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px 14px;
+  flex-wrap: wrap;
+  padding: 10px 20px;
+  background: var(--cv-surface);
+  border-bottom: 1px solid var(--cv-border-3);
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: none;
+  padding: 4px 8px 4px 2px;
+  border-radius: 6px;
+  color: var(--cv-text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.back:hover {
+  color: var(--cv-primary-text);
+  background: var(--cv-primary-tint);
+}
+
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--cv-danger-tint);
+  color: var(--cv-danger-text-strong);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.live::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #b03a2e;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  font-size: 15px;
+}
+
+.title b {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.job {
+  color: var(--cv-text-dimmed);
+  font-size: 14px;
+}
+
+.timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 14px;
+  color: var(--cv-text-secondary);
+}
+
+.over {
+  font-family: var(--mantine-font-family);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cv-warning-text);
+  background: var(--cv-warning-tint);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.overLong {
+  color: var(--cv-danger-text-strong);
+  background: var(--cv-danger-tint);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 390px;
+}
+
+.withCv {
+  grid-template-columns: 300px minmax(0, 1fr) 390px;
+}
+
+.cvColumn {
+  min-height: 0;
+  border-right: 1px solid var(--cv-border-3);
+  animation: slideIn 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* The call uses the full column width: 16:9 when there is room, wider on
+   short screens (it shrinks before the transcript card does). */
+.center {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* The live transcript card under the call (TranscriptPanel); it takes any
+   height left over and scrolls inside. */
+.transcript {
+  flex: 1 0 130px;
+  width: 100%;
+}
+
+/* Assistant and chat tabs. */
+.side {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--cv-surface);
+  border-left: 1px solid var(--cv-border-3);
+}
+
+.tabs {
+  flex: none;
+  display: flex;
+  gap: 4px;
+  padding: 8px 10px 0;
+  border-bottom: 1px solid var(--cv-border-light);
+}
+
+.tab {
+  position: relative;
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 10px 11px;
+  border: 0;
+  background: none;
+  color: var(--cv-text-dimmed);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.tab::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: #23717a;
+  transform: scaleX(0);
+  transition: transform 0.2s ease;
+}
+
+.tab:hover {
+  color: var(--cv-text);
+}
+
+.tabActive {
+  color: var(--cv-primary-text-deep);
+}
+
+.tabActive::after {
+  transform: scaleX(1);
+}
+
+/* Green dot on the Transcript tab while speech-to-text listens. */
+.liveDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2d7a4e;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.unread {
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #e0a526;
+  color: var(--cv-text);
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  animation: popIn 0.25s ease-out;
+}
+
+.tabPanel {
+  flex: 1;
+  min-height: 0;
+}
+
+.tabPanel[hidden] {
+  display: none;
+}
+
+/* "… is waiting to join · Let in" over the stage. */
+.lobbyBanner {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--cv-surface) 96%, transparent);
+  box-shadow: 0 8px 24px rgba(16, 22, 25, 0.28);
+  color: var(--cv-text);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.lobbyBanner > span:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pulse {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #e0a526;
+  box-shadow: 0 0 0 0 rgba(224, 165, 38, 0.6);
+  animation: ring 1.6s ease-out infinite;
+}
+
+.drawerCv {
+  height: 100dvh;
+}
+
+/* Loading, errors, "open in another tab". */
+.message {
+  max-width: 560px;
+  margin: 40px auto;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.messageCard {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 24px;
+  border: 1px solid var(--cv-border);
+  border-radius: 12px;
+  background: var(--cv-surface);
+  color: var(--cv-text-secondary);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.messageCard b {
+  color: var(--cv-text);
+  font-size: 17px;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes ring {
+  70% {
+    box-shadow: 0 0 0 9px rgba(224, 165, 38, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(224, 165, 38, 0);
+  }
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+}
+
+/* Laptops: a narrower right column. */
+@media (max-width: 87.5em) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) 350px;
+  }
+
+  .withCv {
+    grid-template-columns: 280px minmax(0, 1fr) 350px;
+  }
+}
+
+/* Tablets and phones: the page scrolls; the call first, then the tabs. */
+@media (max-width: 61.99em) {
+  .roomWrap {
+    height: auto;
+  }
+
+  .room {
+    height: auto;
+    min-height: calc(100dvh - 56px);
+  }
+
+  .layout,
+  .withCv {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .center {
+    overflow: visible;
+    padding: 16px;
+  }
+
+  .transcript {
+    flex: none;
+    height: 280px; /* the page scrolls on phones and tablets */
+  }
+
+  .side {
+    height: 620px;
+    border-left: 0;
+    border-top: 1px solid var(--cv-border-3);
+  }
+
+  .topbar {
+    padding: 8px 12px;
+  }
+
+  .job {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live::before,
+  .liveDot,
+  .pulse,
+  .unread,
+  .cvColumn {
+    animation: none;
+  }
+}
+
+/* The check-in result in the "Let in" banner (F7). */
+.checkIn {
+  flex: none;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.checkIn_ok {
+  background: var(--cv-success-tint-2);
+  color: var(--cv-success-text-strong-2);
+}
+
+.checkIn_warn {
+  background: var(--cv-warning-tint);
+  color: var(--cv-warning-text-2);
+}
+
+.checkIn_bad {
+  background: var(--cv-danger-tint-2);
+  color: var(--cv-danger-text-strong-2);
+}
+
+.checkIn_plain {
+  background: var(--cv-hover-3);
+  color: var(--cv-text-secondary);
+}

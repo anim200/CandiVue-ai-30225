@@ -1,0 +1,151 @@
+/* Jobs list (design: Jobs.dc.html, frame 1a and states 2a-2c). */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.card {
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
+  border-radius: 8px;
+  overflow: hidden;
+  container-type: inline-size; /* the layout below follows the card's width */
+}
+
+/* Wide card: a 6-column table. Medium: Interviews and Updated hidden.
+   Narrow (phones): title on its own line, status and CVs underneath. */
+.row,
+.head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px 190px 130px 120px 24px;
+  gap: 0 12px;
+  align-items: center;
+  padding: 0 20px;
+}
+
+.head {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--cv-border);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cv-text-dimmed);
+}
+
+.row {
+  height: 52px;
+  border-bottom: 1px solid var(--cv-border-light);
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.15s;
+  width: 100%;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  background: none;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.row:hover,
+.row:focus-visible {
+  background: var(--cv-hover);
+  outline: none;
+}
+
+.jobTitle {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.number {
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  color: var(--cv-text-secondary);
+}
+
+.chevron {
+  color: var(--cv-text-faint-2);
+}
+
+.cvLabel {
+  display: none;
+}
+
+@container (max-width: 760px) {
+  .row,
+  .head {
+    grid-template-columns: minmax(0, 1fr) 110px 170px 24px;
+  }
+
+  .medium {
+    display: none;
+  }
+}
+
+@container (max-width: 520px) {
+  .head {
+    display: none;
+  }
+
+  .row {
+    grid-template-columns: auto minmax(0, 1fr) 16px;
+    grid-template-areas:
+      'title title chevron'
+      'status cvs chevron';
+    gap: 6px 10px;
+    height: auto;
+    min-height: 64px;
+    padding: 12px 16px;
+  }
+
+  .jobTitle {
+    grid-area: title;
+    white-space: normal; /* the whole title, on two lines if needed */
+  }
+
+  .status {
+    grid-area: status;
+  }
+
+  .cvs {
+    grid-area: cvs;
+    white-space: nowrap;
+    font-size: 14px;
+    color: var(--cv-text-secondary);
+  }
+
+  .cvLabel {
+    display: inline;
+  }
+
+  .chevron {
+    grid-area: chevron;
+  }
+}

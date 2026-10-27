@@ -1,0 +1,731 @@
+/* Hiring Assistant (design: Hiring Assistant.dc.html, frames 1a, 2a-2h, 3a-3b).
+   Layout: thread list (260px) + chat. Phones: one at a time. */
+
+.layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  height: calc(100dvh - 56px);
+}
+
+/* ---- Thread list ---- */
+
+.threads {
+  background: var(--cv-subtle);
+  border-right: 1px solid var(--cv-border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+}
+
+.threadsHead {
+  padding: 16px 14px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.threadsTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cv-text-dimmed);
+}
+
+.newThread {
+  width: 30px;
+  height: 30px;
+  border-radius: 4px;
+  border: 1px solid var(--cv-border-strong);
+  background: var(--cv-surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--cv-text);
+}
+
+.newThread:hover {
+  background: var(--cv-hover);
+}
+
+.threadItems {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 8px 12px;
+}
+
+.thread {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s;
+}
+
+.thread:hover {
+  background: var(--cv-hover);
+}
+
+.threadActive,
+.threadActive:hover {
+  background: var(--cv-surface);
+  border-color: var(--cv-primary-border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.threadName {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.threadActive .threadName {
+  font-weight: 600;
+}
+
+.threadStage {
+  font-size: 13px;
+  color: var(--cv-text-dimmed);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.attention {
+  color: var(--cv-warning-text);
+}
+
+/* ---- Chat column ---- */
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--cv-surface);
+  container-type: inline-size; /* chat parts below follow the chat's width */
+}
+
+.progress {
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--cv-border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.progressTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.jobName {
+  font-size: 18px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.safeNote {
+  font-size: 13px;
+  color: var(--cv-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cv-text-dimmed);
+  /* Never push the page sideways: scroll inside when the chat is narrow. */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.steps::-webkit-scrollbar {
+  display: none;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.stepDone {
+  color: var(--cv-success-text-strong);
+}
+
+.stepNow {
+  color: var(--cv-warning-text);
+}
+
+.stepLine {
+  flex: 1;
+  height: 2px;
+  background: var(--cv-line-3);
+  min-width: 12px;
+}
+
+.stepLineDone {
+  background: #2d7a4e;
+}
+
+.backLink {
+  display: none;
+  color: var(--cv-text-secondary);
+}
+
+/* ---- Messages ---- */
+
+.messages {
+  flex: 1;
+  overflow: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.userBubble {
+  align-self: flex-end;
+  max-width: 70%;
+  background: var(--cv-primary-tint);
+  color: var(--cv-primary-text-deep);
+  border-radius: 10px 10px 2px 10px;
+  padding: 10px 14px;
+  font-size: 15px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere; /* long links wrap instead of running off the screen */
+  animation: fadeUp 0.3s ease-out;
+}
+
+.assistantRow {
+  display: flex;
+  gap: 10px;
+  max-width: 82%;
+  animation: fadeUp 0.35s ease-out;
+}
+
+/* The assistant's mark beside its messages (signal colours). */
+.avatar {
+  --mark-icon: var(--cv-signal-icon);
+  --mark-accent: var(--cv-signal-accent);
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  flex: none;
+}
+
+.assistantBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.assistantText {
+  font-size: 15px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.stepLines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.stepLineItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--cv-success-text-strong);
+}
+
+/* The Signal status while the assistant works: its mark sits where the
+   avatar is, the step where the reply will be. */
+.working {
+  width: 100%;
+  max-width: 460px;
+}
+
+.working > * {
+  flex: 1;
+}
+
+.spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--cv-primary-border);
+  border-top-color: #23717a;
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 0.8s linear infinite;
+}
+
+.reviewNote {
+  align-self: center;
+  font-size: 13px;
+  color: var(--cv-text-dimmed);
+  background: var(--cv-page);
+  border-radius: 999px;
+  padding: 4px 12px;
+  animation: fade 0.2s ease-out;
+}
+
+/* Screening finished on the job page (design: ScreeningNotice). */
+.screeningNotice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--cv-page);
+  font-size: 13px;
+  color: var(--cv-text-secondary);
+}
+
+.screeningText {
+  flex: 1;
+  min-width: 200px;
+}
+
+.screeningText b {
+  font-weight: 600;
+  color: var(--cv-text);
+}
+
+/* ---- Cards ---- */
+
+.profileCard {
+  border: 1px solid var(--cv-border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 8px 14px;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.weightsNote {
+  color: var(--cv-text-dimmed);
+  font-size: 14px;
+}
+
+.profileLabel {
+  color: var(--cv-text-dimmed);
+  font-size: 14px;
+}
+
+.jdCard {
+  border: 1px solid var(--cv-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.jdPending {
+  border-color: var(--cv-warning-border);
+}
+
+.jdHead {
+  padding: 10px 16px;
+  background: var(--cv-subtle);
+  border-bottom: 1px solid var(--cv-border-light);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.jdPending .jdHead {
+  background: var(--cv-warning-tint-light);
+}
+
+.jdHeadTitle {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.jdBody {
+  padding: 12px 16px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--cv-text);
+}
+
+.jdAbout {
+  margin: 0;
+}
+
+.jdClamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.jdSection {
+  margin: 12px 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cv-text-secondary);
+}
+
+.jdList {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.toggle {
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--cv-primary-text-strong);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.sources {
+  padding: 8px 16px 12px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.sourcesLabel,
+.rejectedNote {
+  font-size: 13px;
+  color: var(--cv-text-dimmed);
+}
+
+.rejectedNote {
+  margin-left: 6px;
+}
+
+.sourceChip {
+  font: 500 12px var(--mantine-font-family-monospace);
+  color: var(--cv-primary-text-strong);
+  background: var(--cv-primary-tint);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.jdActions {
+  padding: 10px 16px;
+  border-top: 1px solid var(--cv-border-light);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---- Job board result (PostingResultCard, frame 2e) ---- */
+
+.postingCard {
+  flex: 1;
+  border: 1px solid var(--cv-border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.postingBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Waiting for the interviewer: amber like a JD to approve. */
+.postConfirm {
+  border-color: var(--cv-warning-border);
+  background: var(--cv-warning-tint-light);
+}
+
+/* ---- Shortlist and interview cards ---- */
+
+.people {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.person {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 10px;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--cv-border-faint);
+  font-size: 15px;
+}
+
+.person:last-child {
+  border-bottom: 0;
+}
+
+.skipped {
+  opacity: 0.5;
+}
+
+.personRank {
+  color: var(--cv-text-dimmed);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.personName {
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.personScore,
+.personTime {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.personScore {
+  font-weight: 600;
+}
+
+.personMeta {
+  grid-column: 2 / -1;
+  font-size: 13px;
+  color: var(--cv-text-dimmed);
+}
+
+.timeInput {
+  width: 200px;
+}
+
+.cardNotes {
+  padding: 10px 16px;
+  border-top: 1px solid var(--cv-border-light);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--cv-text-secondary);
+}
+
+.noteLine {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.noteLine svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.warningText {
+  color: var(--cv-warning-text);
+}
+
+.problemText {
+  color: var(--cv-danger-text-strong);
+}
+
+.previewToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--cv-primary-text-strong);
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+/* The email exactly as sent: plain text, line breaks kept. */
+.preview {
+  white-space: pre-wrap;
+  background: var(--cv-page);
+  border: 1px solid var(--cv-border-light);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--cv-text);
+  animation: fade 0.2s ease-out;
+}
+
+/* "Nothing is booked until you confirm" sits left of the buttons and wraps
+   before the buttons do. */
+.actionsHint {
+  flex: 1 1 120px;
+  align-self: center;
+}
+
+/* ---- Example openers (empty chat) ---- */
+
+.chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.chip {
+  font-size: 14px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--cv-border-strong);
+  background: var(--cv-surface);
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: inherit;
+  color: inherit;
+}
+
+.chip:hover {
+  background: var(--cv-hover);
+}
+
+/* ---- Loading skeleton (frame 2h) ---- */
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 24px;
+  animation: pulse 1.6s infinite;
+}
+
+.skeleton div {
+  background: var(--cv-muted);
+}
+
+/* ---- Edit dialog: locked requirements ---- */
+
+.lockedChips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.lockedChip {
+  font-size: 14px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--cv-hover);
+}
+
+.hint {
+  font-size: 13px;
+  color: var(--cv-text-dimmed);
+}
+
+/* ---- Phones and small tablets: list OR chat ---- */
+
+@media (max-width: 47.99em) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .hideOnPhone {
+    display: none;
+  }
+
+  .backLink {
+    display: inline-flex;
+  }
+}
+
+/* A narrow chat (phones, or tablets with the thread list open). */
+@container (max-width: 640px) {
+  .progress,
+  .messages {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .assistantRow,
+  .userBubble {
+    max-width: 100%;
+  }
+
+  .profileCard {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .profileLabel {
+    margin-top: 6px;
+  }
+
+  .jdActions {
+    justify-content: stretch;
+  }
+
+  .jdActions > * {
+    flex: 1 1 auto;
+  }
+}
+
+/* ---- Animations (values from the design) ---- */
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.45;
+  }
+}

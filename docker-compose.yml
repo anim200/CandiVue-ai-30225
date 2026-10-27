@@ -1,0 +1,337 @@
+name: candivue
+
+services:
+  db:
+    image: pgvector/pgvector:0.8.7-pg17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    # No "ports": the database is reachable only from other containers.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      target: runtime
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Dhaka}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      LLM_PROVIDER: ${LLM_PROVIDER:-google_genai}
+      LLM_MODEL: ${LLM_MODEL:-gemini-3.5-flash-lite}
+      LLM_MODELS: ${LLM_MODELS:-gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-60}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-2}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-ollama}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-qwen3-embedding:0.6b}
+      # Empty SCREENING_AI_MODEL (set, but blank) = local model only.
+      SCREENING_AI_MODEL: ${SCREENING_AI_MODEL-gemini-3.5-flash-lite}
+      SCREENING_MODEL: ${SCREENING_MODEL:-qwen3:4b-instruct}
+      OLLAMA_BASE_URL: http://ollama:11434
+      JOBBOARD_MCP_URL: http://jobboard-mcp:8001/mcp
+      EMAIL_MCP_URL: http://email-mcp:8002/mcp
+      CALENDAR_MCP_URL: http://calendar-mcp:8003/mcp
+      # Video calls: the LiveKit server below; the secret signs room tickets.
+      LIVEKIT_URL: http://livekit:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-candivue}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET in .env}
+      # The address candidates open their interview link at.
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:5173}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-20}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-480}
+      DEMO_INTERVIEWER_EMAIL: ${DEMO_INTERVIEWER_EMAIL:-}
+      DEMO_INTERVIEWER_NAME: ${DEMO_INTERVIEWER_NAME:-Interviewer A}
+      DEMO_INTERVIEWER_PASSWORD: ${DEMO_INTERVIEWER_PASSWORD:-}
+      GOOGLE_FORM_POSITION_FIELD: ${GOOGLE_FORM_POSITION_FIELD:-}
+      MAX_CV_MB: ${MAX_CV_MB:-10}
+      REDISCOVERY_MAX_AGE_DAYS: ${REDISCOVERY_MAX_AGE_DAYS:-365}
+      FACE_REFERENCE_KEY: ${FACE_REFERENCE_KEY:-}
+      FACE_RETENTION_DAYS: ${FACE_RETENTION_DAYS:-30}
+      FACE_MATCH_FROM: ${FACE_MATCH_FROM:-0.363}
+      FACE_UNSURE_FROM: ${FACE_UNSURE_FROM:-0.28}
+    volumes:
+      - cv_intake:/data/cv_intake  # CVs for screening (later steps)
+    ports:
+      # Bound to localhost only (documented local-development exception, N10).
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully  # local models are ready
+      jobboard-mcp:
+        condition: service_healthy
+      email-mcp:
+        condition: service_healthy
+      calendar-mcp:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Local models: embeddings for the knowledge base (RAG) and CV screening,
+  # and the screening model (local_model.py). Text never leaves this
+  # machine. No "ports": only the backend can reach it.
+  ollama:
+    image: ollama/ollama:0.35.1
+    restart: unless-stopped
+    volumes:
+      - ollama_models:/root/.ollama  # downloaded models survive restarts
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Downloads the local models once: the embedding model (about 640 MB) and
+  # the screening model (about 2.5 GB). Afterwards they are already in the
+  # volume and this finishes at once. If Ollama's online registry cannot be
+  # reached (offline, or an outage on their side) a model that is already
+  # downloaded is used as it is ("ollama show" finds it), so the app still
+  # starts; it only fails when a model is really missing.
+  ollama-pull:
+    image: ollama/ollama:0.35.1
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        for model in "${EMBEDDING_MODEL:-qwen3-embedding:0.6b}" "${SCREENING_MODEL:-qwen3:4b-instruct}";
+        do ollama pull "$$model" || ollama show "$$model" > /dev/null || exit 1; done
+    restart: "no"
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  # Job board MCP server: posts approved job descriptions to Blogger (§4B-2,
+  # §4B-6). Only this container gets the Blogger credentials. No "ports":
+  # only the backend can reach it.
+  jobboard-mcp:
+    build:
+      context: ./jobboard-mcp
+      target: runtime
+    restart: unless-stopped
+    environment:
+      BLOGGER_CLIENT_ID: ${BLOGGER_CLIENT_ID:-}
+      BLOGGER_CLIENT_SECRET: ${BLOGGER_CLIENT_SECRET:-}
+      BLOGGER_REFRESH_TOKEN: ${BLOGGER_REFRESH_TOKEN:-}
+      BLOGGER_BLOG_ID: ${BLOGGER_BLOG_ID:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8001), 2)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Email MCP server: sends interview invitations (§4B-4, §4B-6). Only this
+  # container gets the email login. No "ports": only the backend can reach
+  # it. EMAIL_TEST_RECIPIENT sends every email to one test address (N13).
+  email-mcp:
+    build:
+      context: ./email-mcp
+      target: runtime
+    restart: unless-stopped
+    environment:
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-CandiVue Hiring}
+      EMAIL_TEST_RECIPIENT: ${EMAIL_TEST_RECIPIENT:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8002), 2)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Calendar MCP server: the interviewer's Google Calendar (§4B-8): busy
+  # times for scheduling, and the interview events. Only this container gets
+  # the Google sign-in. No "ports": only the backend can reach it.
+  calendar-mcp:
+    build:
+      context: ./calendar-mcp
+      target: runtime
+    restart: unless-stopped
+    environment:
+      CALENDAR_CLIENT_ID: ${CALENDAR_CLIENT_ID:-}
+      CALENDAR_CLIENT_SECRET: ${CALENDAR_CLIENT_SECRET:-}
+      CALENDAR_REFRESH_TOKEN: ${CALENDAR_REFRESH_TOKEN:-}
+      CALENDAR_ID: ${CALENDAR_ID:-primary}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8003), 2)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Video server for the interviews (F3): LiveKit, open source, runs here.
+  # Browsers reach its signalling through nginx (/rtc); the video and audio
+  # use the ports below, bound to this computer only (N10). Nothing is
+  # recorded. It tells the backend who joined (signed webhooks).
+  livekit:
+    image: livekit/livekit-server:v1.13.9
+    restart: unless-stopped
+    environment:
+      LIVEKIT_CONFIG: |
+        port: 7880
+        rtc:
+          tcp_port: 7881
+          udp_port: 7882
+          use_external_ip: false
+          node_ip: ${LIVEKIT_NODE_IP:-127.0.0.1}
+        keys:
+          ${LIVEKIT_API_KEY:-candivue}: ${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET in .env}
+        webhook:
+          api_key: ${LIVEKIT_API_KEY:-candivue}
+          urls:
+            - http://backend:8000/api/livekit/webhook
+        logging:
+          level: info
+    ports:
+      - "${LIVEKIT_BIND_ADDRESS:-127.0.0.1}:7881:7881"
+      - "${LIVEKIT_BIND_ADDRESS:-127.0.0.1}:7882:7882/udp"
+
+  # CV Collector (step 7): every few minutes it copies new CVs from the
+  # Google Form (Drive + response Sheet) into the cv_intake volume and
+  # records the candidates. Same image as the backend, other command. Only
+  # this container gets the Google key (read-only service account).
+  cv-collector:
+    build:
+      context: ./backend
+      target: runtime
+    restart: unless-stopped
+    command: ["python", "-m", "app.collector"]
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Dhaka}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # Required by the shared settings, but the collector never signs login
+      # tokens, so it does not get the real secret.
+      JWT_SECRET: not-used-by-the-cv-collector-000000
+      GOOGLE_SERVICE_ACCOUNT_KEY: ${GOOGLE_SERVICE_ACCOUNT_KEY:-}
+      CV_RESPONSES_SHEET_ID: ${CV_RESPONSES_SHEET_ID:-}
+      CV_COLLECT_INTERVAL_SECONDS: ${CV_COLLECT_INTERVAL_SECONDS:-300}
+      MAX_CV_MB: ${MAX_CV_MB:-10}
+      # Encrypts the invited applicants' face photos (F7, §4B-15).
+      FACE_REFERENCE_KEY: ${FACE_REFERENCE_KEY:-}
+    volumes:
+      - cv_intake:/data/cv_intake
+    depends_on:
+      backend:
+        condition: service_healthy  # the backend has applied the migrations
+
+  # Live transcript (F4): joins every live interview as a hidden,
+  # listen-only participant, streams each speaker's audio to Deepgram and
+  # saves the transcript turns. Same image as the backend. Only this
+  # container gets DEEPGRAM_API_KEY. It shares LiveKit's network: LiveKit
+  # tells every participant to send media to 127.0.0.1 (right for the
+  # browsers on this computer), and here 127.0.0.1 is LiveKit itself. The
+  # database is still reached by its name (db) on Docker's network.
+  transcriber:
+    build:
+      context: ./backend
+      target: runtime
+    restart: unless-stopped
+    command: ["python", "-m", "app.transcriber"]
+    # On stop/restart it first sends the audio still waiting and saves the
+    # last words (up to ~12 s on a slow network); Docker's default is 10 s.
+    stop_grace_period: 15s
+    network_mode: "service:livekit"
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Dhaka}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # Required by the shared settings; the transcriber never signs logins.
+      JWT_SECRET: not-used-by-the-transcriber-00000000
+      LIVEKIT_URL: http://127.0.0.1:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-candivue}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET in .env}
+      DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
+      DEEPGRAM_MODEL: ${DEEPGRAM_MODEL:-nova-3}
+      DEEPGRAM_LANGUAGE: ${DEEPGRAM_LANGUAGE:-en}
+    depends_on:
+      backend:
+        condition: service_healthy  # the backend has applied the migrations
+      livekit:
+        condition: service_started
+
+  # Tests for the job board MCP server (no real Blogger calls).
+  # Run: docker compose run --rm --build jobboard-tests
+  jobboard-tests:
+    build:
+      context: ./jobboard-mcp
+      target: test
+    profiles: ["test"]
+
+  # Tests for the email MCP server (no real email is sent).
+  # Run: docker compose run --rm --build email-tests
+  email-tests:
+    build:
+      context: ./email-mcp
+      target: test
+    profiles: ["test"]
+
+  # Tests for the calendar MCP server (no real calendar is changed).
+  # Run: docker compose run --rm --build calendar-tests
+  calendar-tests:
+    build:
+      context: ./calendar-mcp
+      target: test
+    profiles: ["test"]
+
+  # Runs the test suite against the real database. Not started by "up";
+  # run it with: docker compose run --rm tests
+  tests:
+    build:
+      context: ./backend
+      target: test
+    profiles: ["test"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+    depends_on:
+      backend:
+        condition: service_healthy  # backend has applied the migrations
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      # HTTP: always localhost only (documented local-development exception,
+      # N10). 5173 is the address the backend allows in CORS_ORIGINS.
+      - "127.0.0.1:${FRONTEND_PORT:-5173}:80"
+      # HTTPS: only active when certs/ holds a certificate. Localhost by
+      # default; set HTTPS_BIND_ADDRESS=0.0.0.0 to reach it from a phone.
+      - "${HTTPS_BIND_ADDRESS:-127.0.0.1}:${HTTPS_PORT:-5443}:443"
+    volumes:
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      backend:
+        condition: service_healthy  # nginx forwards /api to the backend
+      livekit:
+        condition: service_started  # nginx forwards /rtc (video signalling)
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  ollama_models:
+  cv_intake:  # collected CV files (personal data: never in git, N14)

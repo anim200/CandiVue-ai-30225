@@ -1,0 +1,209 @@
+/* "Past applicants who may fit" (F11). Same card look as the applicants
+   list; the rows follow the card's own width (container query). */
+
+.card {
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
+  border-radius: 8px;
+  overflow: hidden;
+  container-type: inline-size;
+  animation: fadeUp 0.3s ease-out;
+}
+
+.top {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--cv-border);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.icon {
+  color: var(--cv-primary-text);
+  flex: none;
+  margin-top: 2px;
+}
+
+.titleBlock {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.hint {
+  font-size: 14px;
+  color: var(--cv-text-dimmed);
+  margin-top: 2px;
+  line-height: 1.45;
+}
+
+.noShrink {
+  flex: none;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px;
+  font-size: 15px;
+  color: var(--cv-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.error {
+  margin: 12px 20px 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--cv-danger-tint);
+  color: var(--cv-danger-text-strong);
+  font-size: 14px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px 190px 150px;
+  gap: 0 14px;
+  align-items: center;
+  min-height: 64px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--cv-border-light);
+  font-size: 15px;
+  animation: fadeUp 0.3s ease-out both;
+}
+
+.row:hover {
+  background: var(--cv-subtle);
+}
+
+/* Name and where they applied: opens the evidence drawer. */
+.who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 10px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.who:hover .name {
+  color: var(--cv-primary-text-strong);
+  text-decoration: underline;
+}
+
+.name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.applied {
+  font-size: 14px;
+  color: var(--cv-text-dimmed);
+  overflow-wrap: anywhere;
+}
+
+.score {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar {
+  flex: 1;
+  max-width: 70px;
+  height: 4px;
+  background: var(--cv-line);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.fill {
+  height: 4px;
+  background: #23717a;
+  border-radius: 2px;
+}
+
+.met {
+  font-size: 14px;
+  color: var(--cv-text-secondary);
+}
+
+.action {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.note {
+  padding: 12px 20px;
+  font-size: 14px;
+  color: var(--cv-text-dimmed);
+  line-height: 1.45;
+}
+
+/* Medium: no requirements column (it is in the drawer). */
+@container (max-width: 640px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr) 100px 140px;
+  }
+
+  .met {
+    display: none;
+  }
+}
+
+/* Narrow (phones): who, then the score and the button. */
+@container (max-width: 440px) {
+  .top,
+  .status,
+  .note {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .top {
+    flex-wrap: wrap;
+  }
+
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'who who'
+      'score action';
+    gap: 4px 10px;
+    padding: 6px 16px 12px;
+  }
+
+  .who {
+    grid-area: who;
+  }
+
+  .score {
+    grid-area: score;
+  }
+
+  .action {
+    grid-area: action;
+  }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

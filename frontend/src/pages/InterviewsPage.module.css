@@ -1,0 +1,159 @@
+/* Interviews list (design: Interviews.dc.html, frame 1a and states 2a-2c).
+   Same look as the Jobs list. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.card {
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
+  border-radius: 8px;
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+/* Wide: 6 columns. Medium: Job and Session hidden. Narrow: stacked. */
+.row,
+.head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 210px 120px 170px 215px;
+  gap: 0 12px;
+  align-items: center;
+  padding: 0 20px;
+}
+
+.head {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--cv-border);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cv-text-dimmed);
+}
+
+.row {
+  min-height: 52px;
+  border-bottom: 1px solid var(--cv-border-light);
+  font-size: 15px;
+  transition: background 0.15s;
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.row:hover {
+  background: var(--cv-hover);
+}
+
+.name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.job {
+  color: var(--cv-primary-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Why the invitation email failed, under its badge. */
+.reason {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--cv-danger-text-strong);
+}
+
+.when {
+  font-variant-numeric: tabular-nums;
+  color: var(--cv-text-secondary);
+  white-space: nowrap;
+}
+
+.actions {
+  justify-content: flex-end;
+}
+
+@container (max-width: 900px) {
+  .row,
+  .head {
+    grid-template-columns: minmax(0, 1fr) 210px 170px 215px;
+  }
+
+  .medium {
+    display: none;
+  }
+}
+
+@container (max-width: 600px) {
+  .head {
+    display: none;
+  }
+
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'name invitation'
+      'when when'
+      'actions actions';
+    gap: 6px 10px;
+    padding: 12px 16px;
+  }
+
+  .name {
+    grid-area: name;
+  }
+
+  .invitation {
+    grid-area: invitation;
+  }
+
+  .when {
+    grid-area: when;
+    font-size: 14px;
+  }
+
+  .actions {
+    grid-area: actions;
+    justify-content: flex-start;
+  }
+}
+
+/* The application photo under the candidate's name (F7). */
+.photo {
+  margin-top: 2px;
+  font-size: 12.5px;
+  font-weight: 400;
+}
+
+.photo_ok {
+  color: var(--cv-success-text);
+}
+
+.photo_warn {
+  color: var(--cv-warning-text-3);
+}
+
+.photo_plain {
+  color: var(--cv-text-dimmed);
+}

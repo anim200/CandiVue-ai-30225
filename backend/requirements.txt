@@ -1,0 +1,37 @@
+fastapi==0.142.2
+uvicorn[standard]==0.54.0
+pydantic-settings==2.15.0
+sqlalchemy==2.1.2
+psycopg[binary]==3.3.6
+pgvector==0.5.0
+alembic==1.20.0
+langgraph==1.2.12
+langgraph-checkpoint-postgres==3.1.2
+psycopg-pool==3.3.3
+langchain==1.4.3
+langchain-google-genai==4.4.0
+pwdlib[argon2]==0.3.1
+PyJWT==2.15.1
+pypdf==6.19.0
+python-docx==1.2.0
+python-multipart==0.0.32
+langchain-ollama==1.1.0
+mcp==2.3.0
+# CV Collector: Google service account + Drive/Sheets REST calls
+google-auth==2.60.0
+requests==2.34.2
+# CV screening: PDF pages to images and OCR for scanned CVs (local Tesseract)
+pypdfium2==5.14.0
+pytesseract==0.3.13
+pillow==12.3.0
+# Video calls (F3): LiveKit room tickets, webhooks and closing a room
+livekit-api==1.2.1
+# Live transcript (F4): the transcriber joins the call as a hidden listener
+# (LiveKit real-time SDK) and streams each speaker's audio to Deepgram
+livekit==1.1.20
+websockets==16.1.1
+# Identity check (F7): local face detection/recognition (OpenCV YuNet + SFace),
+# encryption of the stored face data, and iPhone (HEIC) application photos
+opencv-python-headless==4.14.0.94
+cryptography==50.0.2
+pillow-heif==1.8.0
